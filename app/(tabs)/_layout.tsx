@@ -4,6 +4,7 @@ import React from "react";
 
 import Colors from "@/constants/Colors";
 import { useTheme } from "@/context/ThemeContext";
+import { Image } from "react-native";
 
 function TabBarIcon(props: {
   name: React.ComponentProps<typeof FontAwesome>["name"];
@@ -30,15 +31,35 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: "Tab One",
-          tabBarIcon: ({ color }) => <TabBarIcon name="code" color={color} />,
+          title: "Agent",
+          tabBarIcon: ({ focused }) => (
+            <Image
+              source={require("../../assets/icons/ai-assistant.png")}
+              style={{
+                height: 30,
+                width: 30,
+                tintColor: focused ? Colors[theme].primary : "#797979",
+              }}
+              resizeMode="contain"
+            />
+          ),
         }}
       />
       <Tabs.Screen
         name="two"
         options={{
-          title: "Tab Two",
-          tabBarIcon: ({ color }) => <TabBarIcon name="code" color={color} />,
+          title: "Watchlist",
+          tabBarIcon: ({ focused }) => (
+            <Image
+              source={require("../../assets/icons/eyes.png")}
+              style={{
+                height: 25,
+                width: 25,
+                tintColor: focused ? Colors[theme].primary : "#797979",
+              }}
+              resizeMode="contain"
+            />
+          ),
         }}
       />
     </Tabs>

@@ -95,7 +95,7 @@ const WithinContext = ({ loaded }: { loaded: boolean }) => {
 
   return (
     <>
-      <StatusBar style={theme === "dark" ? "light" : "dark"} />
+      <StatusBar style={"light"} />
       <Stack
         screenOptions={{
           headerShown: false,

@@ -8,8 +8,24 @@ export default function TabOneScreen() {
     <View
       style={[styles.container, { backgroundColor: Colors[theme].background }]}
     >
-      <Text style={[styles.title, { color: Colors[theme].text }]}>Tab One</Text>
-      <View style={styles.separator} />
+      <Text
+        style={[
+          styles.title,
+          { color: Colors[theme].text, fontFamily: "NunitoBold" },
+        ]}
+      >
+        Tab One
+      </Text>
+      <View
+        style={{
+          height: 100,
+          width: 300,
+          backgroundColor: Colors[theme].surface + "cc",
+          borderWidth: 1,
+          borderRadius: 7,
+          borderColor: Colors[theme].border,
+        }}
+      />
     </View>
   );
 }

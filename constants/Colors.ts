@@ -32,13 +32,13 @@ export default {
   },
 
   dark: {
-    surface: "#0A0A0A",
     background: "#141414",
     primary: "#EBEBDF",
     primary_variant: "#D1D1CB",
+    surface: "#242424",
     text: "#EBEBDF",
     text_secondary: "#A3A398",
-    border: "#2A2A2A",
+    border: "#38372e",
     card: "#1C1C1C",
     success: "#4BB543",
     warning: "#F4D03F",
