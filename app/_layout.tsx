@@ -80,7 +80,7 @@ const WithinContext = ({ loaded }: { loaded: boolean }) => {
       const timer = setTimeout(() => {
         SplashScreen.hideAsync();
         setShowSplash(false);
-      }, 10_000);
+      }, 2_000);
       return () => clearTimeout(timer);
     }
   }, [loaded]);
