@@ -52,13 +52,13 @@ export const PushNotificationProvider: React.FC<
     registerForPushNotificationsAsync()
       .then((token) => {
         setExpoPushToken(token ?? null);
-        if (token) {
-          console.log("Token received:", token);
-        }
+        // if (token) {
+        //   console.log("Token received:", token);
+        // }
       })
       .catch((err) => {
         setError(err);
-        console.error("Failed to get push token", err);
+        // console.error("Failed to get push token", err);
       });
 
     // 2. Listener: Handle notifications received while app is open

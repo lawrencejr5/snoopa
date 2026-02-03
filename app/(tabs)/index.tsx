@@ -40,7 +40,7 @@ export default function TabOneScreen() {
         <Text
           style={{
             color: Colors[theme].text,
-            fontFamily: "NunitoBold",
+            fontFamily: "FontBold",
             fontSize: 18,
           }}
         >
@@ -69,7 +69,7 @@ export default function TabOneScreen() {
               <Text
                 style={{
                   color: Colors[theme].text,
-                  fontFamily: "NunitoExtraBold",
+                  fontFamily: "FontBold",
                   fontSize: 22,
                   textAlign: "center",
                   marginTop: 20,
@@ -94,7 +94,7 @@ export default function TabOneScreen() {
                     <Text
                       style={{
                         color: Colors[theme].text,
-                        fontFamily: "NunitoMedium",
+                        fontFamily: "FontMedium",
                         fontSize: 15,
                         lineHeight: 22,
                       }}
@@ -113,6 +113,7 @@ export default function TabOneScreen() {
                       style={[
                         styles.status_card,
                         {
+                          marginTop: 10,
                           backgroundColor: Colors[theme].card,
                           borderColor: Colors[theme].border,
                         },
@@ -138,18 +139,18 @@ export default function TabOneScreen() {
                           style={{
                             color: Colors[theme].text_secondary,
                             fontSize: 11,
-                            fontFamily: "NunitoBold",
+                            fontFamily: "FontBold",
                             textTransform: "uppercase",
                             letterSpacing: 0.5,
                           }}
                         >
-                          STATUS UPDATE
+                          SCENT CAUGHT
                         </Text>
                       </View>
                       <Text
                         style={{
                           color: Colors[theme].text,
-                          fontFamily: "NunitoMedium",
+                          fontFamily: "FontMedium",
                           fontSize: 14,
                           lineHeight: 20,
                         }}
@@ -168,7 +169,7 @@ export default function TabOneScreen() {
                         <Text
                           style={{
                             color: Colors[theme].background,
-                            fontFamily: "NunitoBold",
+                            fontFamily: "FontBold",
                             fontSize: 13,
                           }}
                         >
@@ -186,7 +187,7 @@ export default function TabOneScreen() {
                       <Text
                         style={{
                           color: Colors[theme].text,
-                          fontFamily: "NunitoMedium",
+                          fontFamily: "FontMedium",
                           lineHeight: 24,
                           fontSize: 15,
                         }}
@@ -222,7 +223,8 @@ export default function TabOneScreen() {
               width: "100%",
               maxHeight: 80,
               color: Colors[theme].text,
-              fontFamily: "NunitoMedium",
+              fontFamily: "FontMedium",
+              fontSize: 15,
               marginBottom: 10,
             }}
           />
@@ -285,5 +287,4 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginTop: 2,
   },
-  // removed legacy styles: model_chat, snooped_chat
 });

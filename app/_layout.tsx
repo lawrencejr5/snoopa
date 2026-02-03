@@ -29,13 +29,17 @@ SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const [loaded, error] = useFonts({
-    SpaceMono: require("../assets/fonts/SpaceMono-Regular.ttf"),
-    NunitoBold: require("../assets/fonts/Nunito/Nunito-Bold.ttf"),
-    NunitoLight: require("../assets/fonts/Nunito/Nunito-Light.ttf"),
-    NunitoMedium: require("../assets/fonts/Nunito/Nunito-Medium.ttf"),
-    NunitoRegular: require("../assets/fonts/Nunito/Nunito-Regular.ttf"),
-    NunitoSemiBold: require("../assets/fonts/Nunito/Nunito-SemiBold.ttf"),
-    NunitoExtraBold: require("../assets/fonts/Nunito/Nunito-ExtraBold.ttf"),
+    FontBold: require("../assets/fonts/SpaceGrotesk/SpaceGrotesk-Bold.ttf"),
+    FontLight: require("../assets/fonts/SpaceGrotesk/SpaceGrotesk-Light.ttf"),
+    FontMedium: require("../assets/fonts/SpaceGrotesk/SpaceGrotesk-Medium.ttf"),
+    FontRegular: require("../assets/fonts/SpaceGrotesk/SpaceGrotesk-Regular.ttf"),
+    FontSemiBold: require("../assets/fonts/SpaceGrotesk/SpaceGrotesk-SemiBold.ttf"),
+    GeistBold: require("../assets/fonts/Geist/Geist-Bold.ttf"),
+    GeistLight: require("../assets/fonts/Geist/Geist-Light.ttf"),
+    GeistMedium: require("../assets/fonts/Geist/Geist-Medium.ttf"),
+    GeistRegular: require("../assets/fonts/Geist/Geist-Regular.ttf"),
+    GeistSemiBold: require("../assets/fonts/Geist/Geist-SemiBold.ttf"),
+    GeistExtraBold: require("../assets/fonts/Geist/Geist-ExtraBold.ttf"),
   });
 
   // Expo Router uses Error Boundaries to catch errors in the navigation tree.

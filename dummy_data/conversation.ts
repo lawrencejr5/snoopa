@@ -28,7 +28,7 @@ export const conversation = [
     role: "snoopa",
     type: "status",
     content:
-      "Scent caught. I'm locked on Bellingham's recovery. I'll stay on the sprint until he hits the grass again.",
+      "I'm locked on Bellingham's recovery. I'll let you know when he hits the grass again.",
     timestamp: "9:05 AM",
   },
 ];
