@@ -16,8 +16,8 @@ export default {
   // },
 
   light: {
-    background: "#0A0A0A",
-    surface: "#141414",
+    surface: "#0A0A0A",
+    background: "#141414",
     primary: "#EBEBDF",
     primary_variant: "#D1D1CB",
     text: "#EBEBDF",
@@ -32,8 +32,8 @@ export default {
   },
 
   dark: {
-    background: "#0A0A0A",
-    surface: "#141414",
+    surface: "#0A0A0A",
+    background: "#141414",
     primary: "#EBEBDF",
     primary_variant: "#D1D1CB",
     text: "#EBEBDF",
