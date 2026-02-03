@@ -41,5 +41,4 @@ yarn-error.*
 /android
 
 #firebase
-google-services.json
 firebase-private-key.json
