@@ -8,13 +8,13 @@ const SplashScreen = () => {
 
   return (
     <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-      <StatusBar style={theme === "dark" ? "light" : "dark"} />
+      <StatusBar style={"light"} />
 
       <Image
         source={
           theme === "dark"
             ? require("../assets/images/splash-screen-black.png")
-            : require("../assets/images/splash-screen-light.png")
+            : require("../assets/images/splash-screen-black.png")
         }
         style={{ width: "100%", height: "100%" }}
       />

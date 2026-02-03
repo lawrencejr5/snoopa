@@ -1,8 +1,9 @@
 import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import "react-native-reanimated";
+import CustomSplash from "./splashscreen";
 
 import { ConvexAuthProvider } from "@convex-dev/auth/react";
 import { ConvexReactClient } from "convex/react";
@@ -42,25 +43,6 @@ export default function RootLayout() {
     if (error) throw error;
   }, [error]);
 
-  useEffect(() => {
-    if (loaded) {
-      SplashScreen.hideAsync();
-    }
-  }, [loaded]);
-
-  if (!loaded) {
-    return null;
-  }
-
-  return <RootLayoutNav />;
-}
-
-const convex = new ConvexReactClient(process.env.EXPO_PUBLIC_CONVEX_URL!, {
-  unsavedChangesWarning: false,
-});
-
-function RootLayoutNav() {
-  const { theme } = useTheme();
   return (
     <ConvexAuthProvider client={convex} storage={AsyncStorage}>
       <KeyboardProvider>
@@ -71,14 +53,7 @@ function RootLayoutNav() {
                 <GestureHandlerRootView style={{ flex: 1 }}>
                   <PushNotificationProvider>
                     <BottomSheetModalProvider>
-                      <StatusBar style={theme === "dark" ? "light" : "dark"} />
-                      <Stack
-                        screenOptions={{
-                          headerShown: false,
-                          presentation: "card",
-                          animation: "ios_from_right",
-                        }}
-                      />
+                      <WithinContext loaded={loaded} />
                     </BottomSheetModalProvider>
                   </PushNotificationProvider>
                 </GestureHandlerRootView>
@@ -90,3 +65,44 @@ function RootLayoutNav() {
     </ConvexAuthProvider>
   );
 }
+
+const convex = new ConvexReactClient(process.env.EXPO_PUBLIC_CONVEX_URL!, {
+  unsavedChangesWarning: false,
+});
+
+const WithinContext = ({ loaded }: { loaded: boolean }) => {
+  const { theme } = useTheme();
+
+  const [showSplash, setShowSplash] = useState<boolean>(true);
+
+  useEffect(() => {
+    if (loaded) {
+      const timer = setTimeout(() => {
+        SplashScreen.hideAsync();
+        setShowSplash(false);
+      }, 10_000);
+      return () => clearTimeout(timer);
+    }
+  }, [loaded]);
+
+  if (!loaded) {
+    return null;
+  }
+
+  if (!loaded || showSplash) {
+    return <CustomSplash />;
+  }
+
+  return (
+    <>
+      <StatusBar style={theme === "dark" ? "light" : "dark"} />
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          presentation: "card",
+          animation: "ios_from_right",
+        }}
+      />
+    </>
+  );
+};
