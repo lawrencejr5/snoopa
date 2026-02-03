@@ -36,9 +36,11 @@ export default function TabLayout() {
             <Image
               source={require("../../assets/icons/ai-assistant.png")}
               style={{
-                height: 30,
-                width: 30,
-                tintColor: focused ? Colors[theme].primary : "#797979",
+                height: 27,
+                width: 27,
+                tintColor: focused
+                  ? Colors[theme].primary
+                  : Colors[theme].text_secondary,
               }}
               resizeMode="contain"
             />
@@ -53,9 +55,11 @@ export default function TabLayout() {
             <Image
               source={require("../../assets/icons/eyes.png")}
               style={{
-                height: 25,
-                width: 25,
-                tintColor: focused ? Colors[theme].primary : "#797979",
+                height: 24,
+                width: 24,
+                tintColor: focused
+                  ? Colors[theme].primary
+                  : Colors[theme].text_secondary,
               }}
               resizeMode="contain"
             />
