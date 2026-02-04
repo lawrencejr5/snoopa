@@ -209,8 +209,8 @@ export default function TabOneScreen() {
           style={{
             width: "100%",
             backgroundColor: Colors[theme].card,
-            borderRadius: 15,
-            padding: 10,
+            borderRadius: 20,
+            padding: 15,
           }}
         >
           <TextInput
@@ -224,7 +224,7 @@ export default function TabOneScreen() {
               maxHeight: 80,
               color: Colors[theme].text,
               fontFamily: "FontMedium",
-              fontSize: 15,
+              fontSize: 16,
               marginBottom: 10,
             }}
           />
@@ -238,7 +238,7 @@ export default function TabOneScreen() {
             <Pressable style={{ padding: 5 }}>
               <Image
                 source={require("@/assets/icons/sliders.png")}
-                style={{ width: 15, height: 15, tintColor: Colors[theme].text }}
+                style={{ width: 20, height: 20, tintColor: Colors[theme].text }}
               />
             </Pressable>
             <Pressable style={{ padding: 5 }}>
