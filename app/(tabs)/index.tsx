@@ -3,11 +3,10 @@ import { SideMenu } from "@/components/SideMenu";
 import Colors from "@/constants/Colors";
 import { useTheme } from "@/context/ThemeContext";
 import { createDrawerNavigator } from "@react-navigation/drawer";
-import { StyleSheet } from "react-native";
 
 const Drawer = createDrawerNavigator();
 
-export default function TabOneScreen() {
+const IndexPage = () => {
   const { theme } = useTheme();
   return (
     <Drawer.Navigator
@@ -26,6 +25,6 @@ export default function TabOneScreen() {
       <Drawer.Screen name="Chat" component={ChatScreen} />
     </Drawer.Navigator>
   );
-}
+};
 
-const styles = StyleSheet.create({});
+export default IndexPage;

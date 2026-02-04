@@ -1,0 +1,191 @@
+import Container from "@/components/Container";
+import Colors from "@/constants/Colors";
+import { useTheme } from "@/context/ThemeContext";
+import { notificationsData } from "@/dummy_data/notifications";
+import { Stack, useRouter } from "expo-router";
+import {
+  Image,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+
+export default function NotificationsScreen() {
+  const { theme } = useTheme();
+  const router = useRouter();
+
+  return (
+    <Container>
+      <Stack.Screen options={{ headerShown: false }} />
+
+      {/* Header */}
+      <View style={styles.header}>
+        <Pressable onPress={() => router.back()} style={[styles.backButton]}>
+          <Image
+            source={require("@/assets/icons/arrow-up.png")}
+            style={{
+              width: 30,
+              height: 30,
+              tintColor: Colors[theme].text,
+              transform: [{ rotate: "-90deg" }],
+            }}
+          />
+        </Pressable>
+        <Text style={[styles.headerTitle, { color: Colors[theme].text }]}>
+          Notifications
+        </Text>
+      </View>
+
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {notificationsData.map((item) => (
+          <View
+            key={item.id}
+            style={[
+              styles.notificationItem,
+              {
+                backgroundColor: item.read
+                  ? "transparent"
+                  : Colors[theme].surface,
+                borderColor: Colors[theme].border,
+              },
+            ]}
+          >
+            <View style={styles.notificationHeader}>
+              <View
+                style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
+              >
+                <View
+                  style={[
+                    styles.typeIndicator,
+                    {
+                      backgroundColor:
+                        item.type === "alert"
+                          ? Colors[theme].success
+                          : item.type === "system"
+                            ? Colors[theme].warning
+                            : Colors[theme].text_secondary,
+                    },
+                  ]}
+                />
+                <Text
+                  style={[
+                    styles.typeText,
+                    { color: Colors[theme].text_secondary },
+                  ]}
+                >
+                  {item.type.toUpperCase()}
+                </Text>
+              </View>
+              <Text
+                style={[
+                  styles.timestamp,
+                  { color: Colors[theme].text_secondary },
+                ]}
+              >
+                {item.timestamp}
+              </Text>
+            </View>
+
+            <Text style={[styles.title, { color: Colors[theme].text }]}>
+              {item.title}
+            </Text>
+            <Text style={[styles.message, { color: Colors[theme].text }]}>
+              {item.message}
+            </Text>
+          </View>
+        ))}
+
+        {notificationsData.length === 0 && (
+          <View style={{ marginTop: 100, alignItems: "center", opacity: 0.5 }}>
+            <Image
+              source={require("@/assets/icons/bells.png")}
+              style={{
+                width: 40,
+                height: 40,
+                tintColor: Colors[theme].text,
+                marginBottom: 15,
+              }}
+            />
+            <Text
+              style={{
+                fontFamily: "FontMedium",
+                color: Colors[theme].text,
+                fontSize: 16,
+              }}
+            >
+              All caught up
+            </Text>
+          </View>
+        )}
+      </ScrollView>
+    </Container>
+  );
+}
+
+const styles = StyleSheet.create({
+  header: {
+    paddingVertical: 20,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 20,
+    marginBottom: 10,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontFamily: "FontBold",
+    letterSpacing: -0.5,
+  },
+  scrollContent: {
+    paddingBottom: 40,
+  },
+  notificationItem: {
+    padding: 15,
+    borderRadius: 12,
+    marginBottom: 20,
+    borderWidth: 1,
+  },
+  notificationHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  typeIndicator: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  typeText: {
+    fontSize: 11,
+    fontFamily: "FontBold",
+    letterSpacing: 1,
+  },
+  timestamp: {
+    fontSize: 12,
+    fontFamily: "FontRegular",
+  },
+  title: {
+    fontSize: 16,
+    fontFamily: "FontBold",
+    marginBottom: 6,
+    letterSpacing: -0.3,
+  },
+  message: {
+    fontSize: 14,
+    fontFamily: "FontRegular",
+    lineHeight: 22,
+    opacity: 0.8,
+  },
+});

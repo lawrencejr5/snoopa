@@ -151,15 +151,6 @@ export default function WatchlistScreen() {
               <Text style={[styles.statNumber, { color: Colors[theme].text }]}>
                 {watchlistData.length}
               </Text>
-              <Image
-                source={require("@/assets/icons/tracked.png")}
-                style={{
-                  width: 20,
-                  height: 20,
-                  tintColor: Colors[theme].text,
-                  opacity: 0.8,
-                }}
-              />
             </View>
             <Text
               style={[

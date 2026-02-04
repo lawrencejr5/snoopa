@@ -47,7 +47,7 @@ export default function ChatScreen() {
         >
           Snoopa
         </Text>
-        <Pressable>
+        <Pressable onPress={() => navigation.push("notifications/index")}>
           <Image
             source={require("@/assets/icons/bells.png")}
             style={{ width: 25, height: 25, tintColor: Colors[theme].text }}

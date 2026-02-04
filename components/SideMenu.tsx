@@ -171,7 +171,7 @@ export const SideMenu = (props: DrawerContentComponentProps) => {
           style={{ flexDirection: "row", alignItems: "center", gap: 10 }}
         >
           <Image
-            source={require("@/assets/icons/user.png")}
+            source={require("@/assets/images/avatar.png")}
             style={{
               width: 32,
               height: 32,
@@ -196,7 +196,7 @@ export const SideMenu = (props: DrawerContentComponentProps) => {
                 color: Colors[theme].text_secondary,
               }}
             >
-              Pro Plan
+              Free Plan
             </Text>
           </View>
         </Pressable>
@@ -210,7 +210,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingTop: 50,
     paddingHorizontal: 20,
-    paddingBottom: 30,
+    paddingBottom: 10,
   },
   menuHeader: {
     fontSize: 12,
