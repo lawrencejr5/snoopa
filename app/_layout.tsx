@@ -49,23 +49,23 @@ export default function RootLayout() {
 
   return (
     <ConvexAuthProvider client={convex} storage={AsyncStorage}>
-      <KeyboardProvider>
-        <DeviceThemeProvider>
-          <HapticsProvider>
-            <CustomAlertProvider>
-              <DeviceThemeProvider>
-                <GestureHandlerRootView style={{ flex: 1 }}>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <KeyboardProvider>
+          <DeviceThemeProvider>
+            <HapticsProvider>
+              <CustomAlertProvider>
+                <DeviceThemeProvider>
                   <PushNotificationProvider>
                     <BottomSheetModalProvider>
                       <WithinContext loaded={loaded} />
                     </BottomSheetModalProvider>
                   </PushNotificationProvider>
-                </GestureHandlerRootView>
-              </DeviceThemeProvider>
-            </CustomAlertProvider>
-          </HapticsProvider>
-        </DeviceThemeProvider>
-      </KeyboardProvider>
+                </DeviceThemeProvider>
+              </CustomAlertProvider>
+            </HapticsProvider>
+          </DeviceThemeProvider>
+        </KeyboardProvider>
+      </GestureHandlerRootView>
     </ConvexAuthProvider>
   );
 }

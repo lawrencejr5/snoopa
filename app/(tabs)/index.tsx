@@ -31,6 +31,7 @@ export default function TabOneScreen() {
           alignItems: "center",
         }}
       >
+        {/* Sidenav button */}
         <Pressable>
           <Image
             source={require("@/assets/icons/bars.png")}
