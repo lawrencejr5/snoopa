@@ -1,5 +1,13 @@
 export type SnoopStatus = "active" | "completed";
 
+export interface LogItem {
+  id: string;
+  time: string;
+  action: string;
+  verified: boolean;
+  outcome?: "true" | "false" | "pending";
+}
+
 export interface SnoopItem {
   id: string;
   title: string;
@@ -8,6 +16,7 @@ export interface SnoopItem {
   lastChecked: string; // ISO string 2024-02-04T10:00:00
   image: any; // require path
   source: string;
+  logs?: LogItem[];
 }
 
 export const watchlistData: SnoopItem[] = [
@@ -20,6 +29,29 @@ export const watchlistData: SnoopItem[] = [
     lastChecked: new Date(Date.now() - 1000 * 60 * 15).toISOString(), // 15 mins ago
     image: require("@/assets/images/splash-icon.png"), // Placeholder
     source: "Marca / Real Madrid",
+    logs: [
+      {
+        id: "101",
+        time: "10:15",
+        action: "Found rumour on Twitter about early return",
+        verified: false,
+        outcome: "pending",
+      },
+      {
+        id: "102",
+        time: "10:18",
+        action: "Cross-referenced with Marca daily report",
+        verified: true,
+        outcome: "false",
+      },
+      {
+        id: "103",
+        time: "10:25",
+        action: "Checked Ancelotti press conference transcript",
+        verified: true,
+        outcome: "pending",
+      },
+    ],
   },
   {
     id: "2",

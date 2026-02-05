@@ -18,7 +18,7 @@ const IndexPage = () => {
         overlayColor: "transparent",
         drawerStyle: {
           backgroundColor: Colors[theme].background,
-          width: "75%",
+          width: "80%",
         },
       }}
     >

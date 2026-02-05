@@ -2,6 +2,7 @@ import Container from "@/components/Container";
 import Colors from "@/constants/Colors";
 import { useTheme } from "@/context/ThemeContext";
 import { watchlistData } from "@/dummy_data/watchlist";
+import { useRouter } from "expo-router";
 import { useEffect } from "react";
 import {
   Image,
@@ -70,6 +71,8 @@ const PulsingDot = ({ color }: { color: string }) => {
 
 export default function WatchlistScreen() {
   const { theme } = useTheme();
+  const router = useRouter();
+
   const activeSnoops = watchlistData.filter((i) => i.status === "active");
   const closedSnoops = watchlistData.filter((i) => i.status === "completed");
 
@@ -233,7 +236,14 @@ export default function WatchlistScreen() {
                     Checked {formatTimeAgo(item.lastChecked)}
                   </Text>
                 </View>
-                <Pressable>
+                <Pressable
+                  onPress={() =>
+                    router.push({
+                      pathname: "/snoop/[id]",
+                      params: { id: item.id },
+                    })
+                  }
+                >
                   <Text
                     style={{
                       color: Colors[theme].primary,
