@@ -3,6 +3,7 @@ import { useTheme } from "@/context/ThemeContext";
 import { chatSessions } from "@/dummy_data/sessions";
 import { watchlistData } from "@/dummy_data/watchlist";
 import { DrawerContentComponentProps } from "@react-navigation/drawer";
+import { useRouter } from "expo-router";
 import {
   Image,
   Pressable,
@@ -14,6 +15,7 @@ import {
 
 export const SideMenu = (props: DrawerContentComponentProps) => {
   const { theme } = useTheme();
+  const router = useRouter();
   const activeSnoops = watchlistData.filter((i) => i.status === "active");
 
   return (
@@ -53,7 +55,6 @@ export const SideMenu = (props: DrawerContentComponentProps) => {
           </Text>
         </Pressable>
       </View>
-
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Recent Sessions */}
         <View style={{ marginBottom: 30 }}>
@@ -158,7 +159,6 @@ export const SideMenu = (props: DrawerContentComponentProps) => {
           )}
         </View>
       </ScrollView>
-
       {/* Footer */}
       <View
         style={{
@@ -168,17 +168,13 @@ export const SideMenu = (props: DrawerContentComponentProps) => {
         }}
       >
         <Pressable
-          style={{ flexDirection: "row", alignItems: "center", gap: 10 }}
+          onPress={() => router.push("/account" as any)}
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
         >
-          <Image
-            source={require("@/assets/images/avatar.png")}
-            style={{
-              width: 32,
-              height: 32,
-              borderRadius: 16,
-              backgroundColor: Colors[theme].surface,
-            }} // Placeholder avatar
-          />
           <View>
             <Text
               style={{
@@ -187,7 +183,7 @@ export const SideMenu = (props: DrawerContentComponentProps) => {
                 color: Colors[theme].text,
               }}
             >
-              User Account
+              Oputa Lawrence
             </Text>
             <Text
               style={{
@@ -199,6 +195,10 @@ export const SideMenu = (props: DrawerContentComponentProps) => {
               Free Plan
             </Text>
           </View>
+          <Image
+            source={require("@/assets/icons/settings.png")}
+            style={{ width: 20, height: 20, tintColor: Colors[theme].text }}
+          />
         </Pressable>
       </View>
     </View>
