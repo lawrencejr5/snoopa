@@ -2,8 +2,10 @@ import Container from "@/components/Container";
 import Colors from "@/constants/Colors";
 import { useTheme } from "@/context/ThemeContext";
 import { useRouter } from "expo-router";
+import { useState } from "react";
 import {
   Image,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -12,24 +14,55 @@ import {
 } from "react-native";
 
 export default function AccountScreen() {
-  const { theme } = useTheme();
+  const { theme, toggleTheme } = useTheme();
   const router = useRouter();
+  const [themeModalVisible, setThemeModalVisible] = useState(false);
 
   const menuItems = [
-    { label: "Profile", icon: require("@/assets/icons/profile.png") },
-    { label: "Billing", icon: require("@/assets/icons/card.png") }, // Placeholder for billing/subs
+    {
+      label: "Profile",
+      icon: require("@/assets/icons/profile.png"),
+      route: "/account/profile",
+    },
+    {
+      label: "Billing",
+      icon: require("@/assets/icons/card.png"),
+      route: "/account/billing",
+    },
     {
       label: "Report & Feedback",
       icon: require("@/assets/icons/feedback.png"),
+      route: "/account/feedback",
     },
-    { label: "Theme", icon: require("@/assets/icons/moon.png") },
-    { label: "About Snoopa", icon: require("@/assets/icons/info.png") },
+    {
+      label: "Theme",
+      icon: require("@/assets/icons/moon.png"),
+      route: "modal",
+    },
+    {
+      label: "About Snoopa",
+      icon: require("@/assets/icons/info.png"),
+      route: "/account/about",
+    },
     {
       label: "Terms and Conditions",
       icon: require("@/assets/icons/document.png"),
+      route: "/account/terms",
     },
-    { label: "Privacy Policy", icon: require("@/assets/icons/shield.png") },
+    {
+      label: "Privacy Policy",
+      icon: require("@/assets/icons/shield.png"),
+      route: "/account/privacy",
+    },
   ];
+
+  const handlePress = (item: any) => {
+    if (item.route === "modal") {
+      setThemeModalVisible(true);
+    } else {
+      router.push(item.route);
+    }
+  };
 
   return (
     <Container>
@@ -119,6 +152,7 @@ export default function AccountScreen() {
                 borderColor: Colors[theme].border,
               },
             ]}
+            onPress={() => router.push("/account/billing")}
           >
             <Text
               style={[
@@ -140,6 +174,7 @@ export default function AccountScreen() {
                 styles.menuItem,
                 { borderBottomColor: Colors[theme].border },
               ]}
+              onPress={() => handlePress(item)}
             >
               <View
                 style={{ flexDirection: "row", alignItems: "center", gap: 15 }}
@@ -189,16 +224,68 @@ export default function AccountScreen() {
           </Pressable>
         </View>
       </ScrollView>
+
+      {/* Theme Modal */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={themeModalVisible}
+        onRequestClose={() => setThemeModalVisible(false)}
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setThemeModalVisible(false)}
+        >
+          <View
+            style={[
+              styles.modalContent,
+              {
+                backgroundColor: Colors[theme].card,
+                borderColor: Colors[theme].border,
+              },
+            ]}
+          >
+            <Text style={[styles.modalTitle, { color: Colors[theme].text }]}>
+              Select Theme
+            </Text>
+
+            {["System Default", "Light", "Dark"].map((mode) => (
+              <Pressable
+                key={mode}
+                style={[
+                  styles.themeOption,
+                  { borderBottomColor: Colors[theme].border },
+                ]}
+                onPress={() => {
+                  setThemeModalVisible(false);
+                }}
+              >
+                <Text
+                  style={{
+                    fontFamily: "FontMedium",
+                    fontSize: 16,
+                    color: Colors[theme].text,
+                  }}
+                >
+                  {mode}
+                </Text>
+                {/* Selected Indicator could go here */}
+              </Pressable>
+            ))}
+          </View>
+        </Pressable>
+      </Modal>
     </Container>
   );
 }
 
 const styles = StyleSheet.create({
   header: {
-    paddingVertical: 15,
+    paddingVertical: 20,
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
+    gap: 20,
+    marginBottom: 10,
   },
   backButton: {
     padding: 5,
@@ -223,18 +310,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginTop: 20,
     marginBottom: 20,
-  },
-  avatarContainer: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 15,
-  },
-  avatar: {
-    width: 30,
-    height: 30,
   },
   userName: {
     fontSize: 18,
@@ -295,5 +370,27 @@ const styles = StyleSheet.create({
   menuText: {
     fontSize: 16,
     fontFamily: "GeistMedium",
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  modalContent: {
+    width: "80%",
+    borderRadius: 20,
+    padding: 20,
+    borderWidth: 1,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontFamily: "FontBold",
+    marginBottom: 15,
+  },
+  themeOption: {
+    paddingVertical: 15,
+    borderBottomWidth: 1,
   },
 });
