@@ -204,6 +204,7 @@ export default function AccountScreen() {
 
           {/* Logout */}
           <Pressable
+            onPress={() => router.replace("/")}
             style={[styles.menuItem, { borderBottomWidth: 0, marginTop: 10 }]}
           >
             <View
