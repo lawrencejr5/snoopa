@@ -10,6 +10,7 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
           email: googleProfile.email,
           fullname: googleProfile.name,
           username: googleProfile.name.split(" ")[1],
+          plan: "free",
         };
       },
     }),

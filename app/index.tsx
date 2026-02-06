@@ -124,16 +124,13 @@ const WelcomePage = () => {
               styles.googleButton,
               {
                 backgroundColor: Colors[theme].text,
-                opacity: googleLoading ? 0.6 : 1,
+                opacity: googleLoading ? 0.7 : 1,
               },
             ]}
             onPress={handleGoogleLogin}
           >
             {googleLoading ? (
-              <ActivityIndicator
-                size={"large"}
-                color={Colors[theme].text_secondary}
-              />
+              <ActivityIndicator size={"small"} color={Colors[theme].text} />
             ) : (
               <>
                 <Image

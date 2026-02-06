@@ -1,5 +1,5 @@
 import { useFonts } from "expo-font";
-import { Stack, useRouter } from "expo-router";
+import { Stack, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect, useState } from "react";
 import "react-native-reanimated";
@@ -74,27 +74,31 @@ const convex = new ConvexReactClient(process.env.EXPO_PUBLIC_CONVEX_URL!, {
 
 const WithinContext = ({ loaded }: { loaded: boolean }) => {
   const router = useRouter();
+  const segments = useSegments() as string[];
   const { isAuthenticated, isLoading } = useConvexAuth();
   const [showSplash, setShowSplash] = useState<boolean>(true);
 
   useEffect(() => {
-    if (loaded && !isLoading) {
-      if (isAuthenticated) {
-        router.replace("/(tabs)");
-      } else {
-        router.replace("/");
-      }
-
-      // Hide splash screen after critical logic has run
+    if (loaded || isLoading) {
       const timer = setTimeout(() => {
         SplashScreen.hideAsync();
         setShowSplash(false);
-      }, 500);
-
+      }, 1000);
       return () => clearTimeout(timer);
     }
-  }, [loaded, isLoading, isAuthenticated]);
+  }, [loaded, isLoading]);
 
+  useEffect(() => {
+    if (!loaded || isLoading) return;
+
+    const inAuthGroup = segments[0] === "(tabs)" || segments.length > 0;
+
+    if (!isAuthenticated && inAuthGroup) {
+      router.replace("/");
+    } else if (isAuthenticated && segments.length === 0) {
+      router.replace("/(tabs)");
+    }
+  }, [isAuthenticated, loaded, isLoading, segments]);
   if (!loaded || showSplash) {
     return <CustomSplash />;
   }

@@ -1,9 +1,15 @@
 import Container from "@/components/Container";
 import Colors from "@/constants/Colors";
+import { useCustomAlert } from "@/context/CustomAlertContext";
 import { useTheme } from "@/context/ThemeContext";
+import { api } from "@/convex/_generated/api";
+import { registerForPushNotificationsAsync } from "@/utils/reg_push_notifications";
+import { useAuthActions } from "@convex-dev/auth/react";
+import { useMutation } from "convex/react";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
+  ActivityIndicator,
   Image,
   Modal,
   Pressable,
@@ -16,6 +22,11 @@ import {
 export default function AccountScreen() {
   const { theme, toggleTheme } = useTheme();
   const router = useRouter();
+
+  const { showCustomAlert } = useCustomAlert();
+
+  const { signOut } = useAuthActions();
+
   const [themeModalVisible, setThemeModalVisible] = useState(false);
 
   const menuItems = [
@@ -61,6 +72,29 @@ export default function AccountScreen() {
       setThemeModalVisible(true);
     } else {
       router.push(item.route);
+    }
+  };
+
+  const [signingOut, setSigningOut] = useState<boolean>(false);
+  const remove_push_token = useMutation(api.users.removePushToken);
+
+  const handleSignout = async () => {
+    setSigningOut(true);
+    try {
+      // Removing push token
+      try {
+        const token = await registerForPushNotificationsAsync();
+        if (token) await remove_push_token({ token });
+      } catch (e) {
+        console.warn("Could not remove token from server", e);
+      }
+
+      await signOut();
+    } catch (err) {
+      console.log(err);
+      showCustomAlert("An error occured!", "danger");
+    } finally {
+      setSigningOut(false);
     }
   };
 
@@ -204,20 +238,36 @@ export default function AccountScreen() {
 
           {/* Logout */}
           <Pressable
-            onPress={() => router.replace("/")}
-            style={[styles.menuItem, { borderBottomWidth: 0, marginTop: 10 }]}
+            onPress={handleSignout}
+            disabled={signingOut}
+            style={[
+              styles.menuItem,
+              {
+                borderBottomWidth: 0,
+                marginTop: 10,
+                opacity: signingOut ? 0.5 : 1,
+              },
+            ]}
           >
             <View
               style={{ flexDirection: "row", alignItems: "center", gap: 15 }}
             >
-              <Image
-                source={require("@/assets/icons/logout.png")}
-                style={{
-                  width: 22,
-                  height: 22,
-                  tintColor: Colors[theme].danger,
-                }}
-              />
+              {signingOut ? (
+                <ActivityIndicator
+                  size={"small"}
+                  color={Colors[theme].danger}
+                />
+              ) : (
+                <Image
+                  source={require("@/assets/icons/logout.png")}
+                  style={{
+                    width: 22,
+                    height: 22,
+                    tintColor: Colors[theme].danger,
+                  }}
+                />
+              )}
+
               <Text style={[styles.menuText, { color: Colors[theme].danger }]}>
                 Log Out
               </Text>

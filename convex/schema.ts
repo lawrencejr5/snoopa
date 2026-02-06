@@ -9,7 +9,7 @@ const schema = defineSchema({
     email: v.string(),
     fullname: v.string(),
     username: v.optional(v.string()),
-    plan: v.union(v.literal("free"), v.literal("pro")),
+    plan: v.optional(v.union(v.literal("free"), v.literal("pro"))),
     emailVerificationTime: v.optional(v.number()),
     pushTokens: v.optional(v.array(v.string())),
   }).index("email", ["email"]),
