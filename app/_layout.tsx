@@ -13,6 +13,7 @@ import { StatusBar } from "expo-status-bar";
 
 import { CustomAlertProvider } from "@/context/CustomAlertContext";
 import HapticsProvider from "@/context/HapticsContext";
+import LoadingProvider from "@/context/LoadingContext";
 import { PushNotificationProvider } from "@/context/PushNotification";
 import DeviceThemeProvider from "@/context/ThemeContext";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
@@ -53,13 +54,15 @@ export default function RootLayout() {
         <KeyboardProvider>
           <DeviceThemeProvider>
             <HapticsProvider>
-              <CustomAlertProvider>
-                <PushNotificationProvider>
-                  <BottomSheetModalProvider>
-                    <WithinContext loaded={loaded} />
-                  </BottomSheetModalProvider>
-                </PushNotificationProvider>
-              </CustomAlertProvider>
+              <LoadingProvider>
+                <CustomAlertProvider>
+                  <PushNotificationProvider>
+                    <BottomSheetModalProvider>
+                      <WithinContext loaded={loaded} />
+                    </BottomSheetModalProvider>
+                  </PushNotificationProvider>
+                </CustomAlertProvider>
+              </LoadingProvider>
             </HapticsProvider>
           </DeviceThemeProvider>
         </KeyboardProvider>
@@ -79,14 +82,14 @@ const WithinContext = ({ loaded }: { loaded: boolean }) => {
   const [showSplash, setShowSplash] = useState<boolean>(true);
 
   useEffect(() => {
-    if (loaded || isLoading) {
+    if (loaded) {
       const timer = setTimeout(() => {
         SplashScreen.hideAsync();
         setShowSplash(false);
       }, 1000);
       return () => clearTimeout(timer);
     }
-  }, [loaded, isLoading]);
+  }, [loaded]);
 
   useEffect(() => {
     if (!loaded || isLoading) return;
@@ -94,11 +97,12 @@ const WithinContext = ({ loaded }: { loaded: boolean }) => {
     const inAuthGroup = segments[0] === "(tabs)" || segments.length > 0;
 
     if (!isAuthenticated && inAuthGroup) {
-      router.replace("/");
+      router.replace("/welcome");
     } else if (isAuthenticated && segments.length === 0) {
       router.replace("/(tabs)");
     }
   }, [isAuthenticated, loaded, isLoading, segments]);
+
   if (!loaded || showSplash) {
     return <CustomSplash />;
   }
