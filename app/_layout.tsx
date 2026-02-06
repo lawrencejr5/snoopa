@@ -1,12 +1,12 @@
 import { useFonts } from "expo-font";
-import { Stack } from "expo-router";
+import { Stack, useRouter } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect, useState } from "react";
 import "react-native-reanimated";
 import CustomSplash from "./splashscreen";
 
 import { ConvexAuthProvider } from "@convex-dev/auth/react";
-import { ConvexReactClient } from "convex/react";
+import { ConvexReactClient, useConvexAuth } from "convex/react";
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { StatusBar } from "expo-status-bar";
@@ -14,7 +14,7 @@ import { StatusBar } from "expo-status-bar";
 import { CustomAlertProvider } from "@/context/CustomAlertContext";
 import HapticsProvider from "@/context/HapticsContext";
 import { PushNotificationProvider } from "@/context/PushNotification";
-import DeviceThemeProvider, { useTheme } from "@/context/ThemeContext";
+import DeviceThemeProvider from "@/context/ThemeContext";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
@@ -54,13 +54,11 @@ export default function RootLayout() {
           <DeviceThemeProvider>
             <HapticsProvider>
               <CustomAlertProvider>
-                <DeviceThemeProvider>
-                  <PushNotificationProvider>
-                    <BottomSheetModalProvider>
-                      <WithinContext loaded={loaded} />
-                    </BottomSheetModalProvider>
-                  </PushNotificationProvider>
-                </DeviceThemeProvider>
+                <PushNotificationProvider>
+                  <BottomSheetModalProvider>
+                    <WithinContext loaded={loaded} />
+                  </BottomSheetModalProvider>
+                </PushNotificationProvider>
               </CustomAlertProvider>
             </HapticsProvider>
           </DeviceThemeProvider>
@@ -75,23 +73,27 @@ const convex = new ConvexReactClient(process.env.EXPO_PUBLIC_CONVEX_URL!, {
 });
 
 const WithinContext = ({ loaded }: { loaded: boolean }) => {
-  const { theme } = useTheme();
-
+  const router = useRouter();
+  const { isAuthenticated, isLoading } = useConvexAuth();
   const [showSplash, setShowSplash] = useState<boolean>(true);
 
   useEffect(() => {
-    if (loaded) {
+    if (loaded && !isLoading) {
+      if (isAuthenticated) {
+        router.replace("/(tabs)");
+      } else {
+        router.replace("/");
+      }
+
+      // Hide splash screen after critical logic has run
       const timer = setTimeout(() => {
         SplashScreen.hideAsync();
         setShowSplash(false);
-      }, 2_000);
+      }, 500);
+
       return () => clearTimeout(timer);
     }
-  }, [loaded]);
-
-  if (!loaded) {
-    return null;
-  }
+  }, [loaded, isLoading, isAuthenticated]);
 
   if (!loaded || showSplash) {
     return <CustomSplash />;
