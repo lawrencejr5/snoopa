@@ -40,7 +40,7 @@ const WelcomePage = () => {
       // 1. Create the return URL (must match your app.json scheme)
       const redirectTo = makeRedirectUri({
         scheme: "com.lawrencejr.snoopa",
-        path: "/welcome",
+        path: "welcome",
       });
 
       // 2. Start OAuth with Convex Auth, get redirect URL

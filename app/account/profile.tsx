@@ -1,11 +1,14 @@
 import Container from "@/components/Container";
 import Colors from "@/constants/Colors";
+import { useCustomAlert } from "@/context/CustomAlertContext";
 import { useTheme } from "@/context/ThemeContext";
 import { useUser } from "@/context/UserContext";
+import { api } from "@/convex/_generated/api";
+import { useAuthActions } from "@convex-dev/auth/react";
+import { useMutation } from "convex/react";
 import { useRouter } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
-  Alert,
   Image,
   Modal,
   Pressable,
@@ -21,7 +24,58 @@ export default function ProfileScreen() {
   const router = useRouter();
   const [modalVisible, setModalVisible] = useState(false);
 
+  const { showCustomAlert } = useCustomAlert();
+
+  const { signOut } = useAuthActions();
   const { signedIn } = useUser();
+
+  const [fullname, setFullname] = useState("");
+  const [username, setUsername] = useState("");
+  const [memory, setMemory] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const updateUser = useMutation(api.users.updateUser);
+  const deleteUser = useMutation(api.users.deleteUser);
+
+  useEffect(() => {
+    if (signedIn) {
+      setFullname(signedIn.fullname || "");
+      setUsername(signedIn.username || "");
+      setMemory(signedIn.memory || "");
+    }
+  }, [signedIn]);
+
+  const handleSave = async () => {
+    try {
+      setIsSaving(true);
+      await updateUser({
+        fullname,
+        username,
+        memory,
+      });
+      showCustomAlert("Profile updated successfully", "success");
+    } catch (error) {
+      showCustomAlert("Failed to update profile", "danger");
+      console.error(error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    try {
+      setIsDeleting(true);
+      await deleteUser();
+      await signOut();
+      setModalVisible(false);
+      router.replace("/");
+    } catch (error) {
+      showCustomAlert("Failed to delete account", "danger");
+      console.error(error);
+      setIsDeleting(false);
+    }
+  };
 
   return (
     <Container>
@@ -61,7 +115,10 @@ export default function ProfileScreen() {
                 borderColor: Colors[theme].border,
               },
             ]}
-            defaultValue={signedIn?.fullname}
+            value={fullname}
+            onChangeText={setFullname}
+            placeholder="Enter your full name"
+            placeholderTextColor={Colors[theme].text_secondary}
           />
         </View>
 
@@ -78,7 +135,8 @@ export default function ProfileScreen() {
                 borderColor: Colors[theme].border,
               },
             ]}
-            defaultValue={signedIn?.username}
+            value={username}
+            onChangeText={setUsername}
             placeholder="What should Snoopa call you?"
             placeholderTextColor={Colors[theme].text_secondary}
           />
@@ -102,7 +160,8 @@ export default function ProfileScreen() {
             placeholderTextColor={Colors[theme].text_secondary}
             numberOfLines={6}
             textAlignVertical="top"
-            defaultValue={signedIn?.memory}
+            value={memory}
+            onChangeText={setMemory}
           />
           <Text
             style={{
@@ -132,17 +191,25 @@ export default function ProfileScreen() {
         <Pressable
           style={[
             styles.saveButton,
-            { backgroundColor: Colors[theme].primary },
+            {
+              backgroundColor: isSaving
+                ? Colors[theme].surface
+                : Colors[theme].primary,
+            },
           ]}
+          onPress={handleSave}
+          disabled={isSaving}
         >
           <Text
             style={{
-              color: Colors[theme].background,
+              color: isSaving
+                ? Colors[theme].text_secondary
+                : Colors[theme].background,
               fontFamily: "FontBold",
               fontSize: 16,
             }}
           >
-            Save Changes
+            {isSaving ? "Saving..." : "Save Changes"}
           </Text>
         </Pressable>
       </View>
@@ -205,16 +272,10 @@ export default function ProfileScreen() {
                   styles.modalButton,
                   { backgroundColor: Colors[theme].danger },
                 ]}
-                onPress={() => {
-                  setModalVisible(false);
-                  Alert.alert(
-                    "Account Deleted",
-                    "Your account happens to be fictional right now.",
-                  );
-                }}
+                onPress={handleDelete}
               >
                 <Text style={{ color: "white", fontFamily: "FontBold" }}>
-                  Delete
+                  {isDeleting ? "Deleting..." : "Delete"}
                 </Text>
               </Pressable>
             </View>

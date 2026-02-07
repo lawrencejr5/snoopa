@@ -61,3 +61,38 @@ export const getAllUsersWithTokens = internalQuery({
     return users.filter((u) => u.pushTokens && u.pushTokens.length > 0);
   },
 });
+
+export const updateUser = mutation({
+  args: {
+    fullname: v.optional(v.string()),
+    username: v.optional(v.string()),
+    memory: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const user_id = await getAuthUserId(ctx);
+    if (!user_id) throw new Error("Not authenticated");
+
+    const user = await ctx.db.get(user_id);
+    if (!user) throw new Error("User not found");
+
+    const updates: Partial<typeof user> = {};
+    if (args.fullname !== undefined) updates.fullname = args.fullname;
+    if (args.username !== undefined) updates.username = args.username;
+    if (args.memory !== undefined) updates.memory = args.memory;
+
+    await ctx.db.patch(user_id, updates);
+  },
+});
+
+export const deleteUser = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const user_id = await getAuthUserId(ctx);
+    if (!user_id) throw new Error("Not authenticated");
+
+    const user = await ctx.db.get(user_id);
+    if (!user) throw new Error("User not found");
+
+    await ctx.db.delete(user_id);
+  },
+});
