@@ -43,3 +43,6 @@ yarn-error.*
 #firebase
 google-services.json
 firebase-private-key.json
+
+#convex
+convex/_generated
