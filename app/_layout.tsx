@@ -97,9 +97,9 @@ const WithinContext = ({ loaded }: { loaded: boolean }) => {
   useEffect(() => {
     if (!loaded || isLoading) return;
 
-    const inAuthGroup = segments.length === 0;
+    const inAuthGroup = segments[0] === "welcome";
     if (!isAuthenticated && !inAuthGroup) {
-      router.replace("/");
+      router.replace("/welcome");
     } else if (isAuthenticated && inAuthGroup) {
       router.replace("/(tabs)");
     }
