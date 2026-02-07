@@ -1,6 +1,7 @@
 import Container from "@/components/Container";
 import Colors from "@/constants/Colors";
 import { useTheme } from "@/context/ThemeContext";
+import { useUser } from "@/context/UserContext";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
@@ -19,6 +20,8 @@ export default function ProfileScreen() {
   const { theme } = useTheme();
   const router = useRouter();
   const [modalVisible, setModalVisible] = useState(false);
+
+  const { signedIn } = useUser();
 
   return (
     <Container>
@@ -58,7 +61,7 @@ export default function ProfileScreen() {
                 borderColor: Colors[theme].border,
               },
             ]}
-            defaultValue="Oputa Lawrence"
+            defaultValue={signedIn?.fullname}
           />
         </View>
 
@@ -75,7 +78,7 @@ export default function ProfileScreen() {
                 borderColor: Colors[theme].border,
               },
             ]}
-            defaultValue="Lawrence"
+            defaultValue={signedIn?.username}
             placeholder="What should Snoopa call you?"
             placeholderTextColor={Colors[theme].text_secondary}
           />
@@ -99,6 +102,7 @@ export default function ProfileScreen() {
             placeholderTextColor={Colors[theme].text_secondary}
             numberOfLines={6}
             textAlignVertical="top"
+            defaultValue={signedIn?.memory}
           />
           <Text
             style={{

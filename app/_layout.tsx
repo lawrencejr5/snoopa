@@ -1,20 +1,22 @@
 import { useFonts } from "expo-font";
-import { Stack } from "expo-router";
+import { Stack, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect, useState } from "react";
 import "react-native-reanimated";
 import CustomSplash from "./splashscreen";
 
 import { ConvexAuthProvider } from "@convex-dev/auth/react";
-import { ConvexReactClient } from "convex/react";
+import { ConvexReactClient, useConvexAuth } from "convex/react";
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { StatusBar } from "expo-status-bar";
 
 import { CustomAlertProvider } from "@/context/CustomAlertContext";
 import HapticsProvider from "@/context/HapticsContext";
+import LoadingProvider from "@/context/LoadingContext";
 import { PushNotificationProvider } from "@/context/PushNotification";
-import DeviceThemeProvider, { useTheme } from "@/context/ThemeContext";
+import DeviceThemeProvider from "@/context/ThemeContext";
+import UserProvider from "@/context/UserContext";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
@@ -53,15 +55,17 @@ export default function RootLayout() {
         <KeyboardProvider>
           <DeviceThemeProvider>
             <HapticsProvider>
-              <CustomAlertProvider>
-                <DeviceThemeProvider>
+              <LoadingProvider>
+                <CustomAlertProvider>
                   <PushNotificationProvider>
-                    <BottomSheetModalProvider>
-                      <WithinContext loaded={loaded} />
-                    </BottomSheetModalProvider>
+                    <UserProvider>
+                      <BottomSheetModalProvider>
+                        <WithinContext loaded={loaded} />
+                      </BottomSheetModalProvider>
+                    </UserProvider>
                   </PushNotificationProvider>
-                </DeviceThemeProvider>
-              </CustomAlertProvider>
+                </CustomAlertProvider>
+              </LoadingProvider>
             </HapticsProvider>
           </DeviceThemeProvider>
         </KeyboardProvider>
@@ -75,8 +79,9 @@ const convex = new ConvexReactClient(process.env.EXPO_PUBLIC_CONVEX_URL!, {
 });
 
 const WithinContext = ({ loaded }: { loaded: boolean }) => {
-  const { theme } = useTheme();
-
+  const router = useRouter();
+  const segments = useSegments() as string[];
+  const { isAuthenticated, isLoading } = useConvexAuth();
   const [showSplash, setShowSplash] = useState<boolean>(true);
 
   useEffect(() => {
@@ -84,14 +89,21 @@ const WithinContext = ({ loaded }: { loaded: boolean }) => {
       const timer = setTimeout(() => {
         SplashScreen.hideAsync();
         setShowSplash(false);
-      }, 2_000);
+      }, 1000);
       return () => clearTimeout(timer);
     }
   }, [loaded]);
 
-  if (!loaded) {
-    return null;
-  }
+  useEffect(() => {
+    if (!loaded || isLoading) return;
+
+    const inAuthGroup = segments[0] === "welcome";
+    if (!isAuthenticated && !inAuthGroup) {
+      router.replace("/welcome");
+    } else if (isAuthenticated && inAuthGroup) {
+      router.replace("/(tabs)");
+    }
+  }, [isAuthenticated, loaded, isLoading, segments]);
 
   if (!loaded || showSplash) {
     return <CustomSplash />;

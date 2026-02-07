@@ -1,9 +1,18 @@
 import Container from "@/components/Container";
+import Loading from "@/components/Loading";
 import Colors from "@/constants/Colors";
+import { useCustomAlert } from "@/context/CustomAlertContext";
+import { useLoadingContext } from "@/context/LoadingContext";
 import { useTheme } from "@/context/ThemeContext";
+import { useUser } from "@/context/UserContext";
+import { api } from "@/convex/_generated/api";
+import { registerForPushNotificationsAsync } from "@/utils/reg_push_notifications";
+import { useAuthActions } from "@convex-dev/auth/react";
+import { useConvexAuth, useMutation } from "convex/react";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
+  ActivityIndicator,
   Image,
   Modal,
   Pressable,
@@ -16,6 +25,16 @@ import {
 export default function AccountScreen() {
   const { theme, toggleTheme } = useTheme();
   const router = useRouter();
+
+  const { signedIn } = useUser();
+
+  const { isLoading } = useConvexAuth();
+  const { appLoading } = useLoadingContext();
+
+  const { showCustomAlert } = useCustomAlert();
+
+  const { signOut } = useAuthActions();
+
   const [themeModalVisible, setThemeModalVisible] = useState(false);
 
   const menuItems = [
@@ -64,6 +83,31 @@ export default function AccountScreen() {
     }
   };
 
+  const [signingOut, setSigningOut] = useState<boolean>(false);
+  const remove_push_token = useMutation(api.users.removePushToken);
+
+  const handleSignout = async () => {
+    setSigningOut(true);
+    try {
+      // Removing push token
+      try {
+        const token = await registerForPushNotificationsAsync();
+        if (token) await remove_push_token({ token });
+      } catch (e) {
+        console.warn("Could not remove token from server", e);
+      }
+
+      await signOut();
+    } catch (err) {
+      console.log(err);
+      showCustomAlert("An error occured!", "danger");
+    } finally {
+      setSigningOut(false);
+    }
+  };
+
+  if (isLoading || !signedIn || appLoading) return <Loading />;
+
   return (
     <Container>
       {/* Header */}
@@ -99,7 +143,7 @@ export default function AccountScreen() {
         >
           <View>
             <Text style={[styles.userName, { color: Colors[theme].text }]}>
-              John Doe
+              {signedIn?.fullname}
             </Text>
             <Text
               style={[
@@ -107,7 +151,7 @@ export default function AccountScreen() {
                 { color: Colors[theme].text_secondary },
               ]}
             >
-              john.doe@example.com
+              {signedIn?.email}
             </Text>
           </View>
           <View
@@ -116,8 +160,13 @@ export default function AccountScreen() {
               { backgroundColor: Colors[theme].text_secondary + "15" },
             ]}
           >
-            <Text style={[styles.planText, { color: Colors[theme].text }]}>
-              Free Plan
+            <Text
+              style={[
+                styles.planText,
+                { color: Colors[theme].text, textTransform: "capitalize" },
+              ]}
+            >
+              {signedIn?.plan} Plan
             </Text>
           </View>
         </View>
@@ -204,20 +253,36 @@ export default function AccountScreen() {
 
           {/* Logout */}
           <Pressable
-            onPress={() => router.replace("/")}
-            style={[styles.menuItem, { borderBottomWidth: 0, marginTop: 10 }]}
+            onPress={handleSignout}
+            disabled={signingOut}
+            style={[
+              styles.menuItem,
+              {
+                borderBottomWidth: 0,
+                marginTop: 10,
+                opacity: signingOut ? 0.5 : 1,
+              },
+            ]}
           >
             <View
               style={{ flexDirection: "row", alignItems: "center", gap: 15 }}
             >
-              <Image
-                source={require("@/assets/icons/logout.png")}
-                style={{
-                  width: 22,
-                  height: 22,
-                  tintColor: Colors[theme].danger,
-                }}
-              />
+              {signingOut ? (
+                <ActivityIndicator
+                  size={"small"}
+                  color={Colors[theme].danger}
+                />
+              ) : (
+                <Image
+                  source={require("@/assets/icons/logout.png")}
+                  style={{
+                    width: 22,
+                    height: 22,
+                    tintColor: Colors[theme].danger,
+                  }}
+                />
+              )}
+
               <Text style={[styles.menuText, { color: Colors[theme].danger }]}>
                 Log Out
               </Text>
