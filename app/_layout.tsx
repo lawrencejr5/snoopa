@@ -16,6 +16,7 @@ import HapticsProvider from "@/context/HapticsContext";
 import LoadingProvider from "@/context/LoadingContext";
 import { PushNotificationProvider } from "@/context/PushNotification";
 import DeviceThemeProvider from "@/context/ThemeContext";
+import UserProvider from "@/context/UserContext";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
@@ -57,9 +58,11 @@ export default function RootLayout() {
               <LoadingProvider>
                 <CustomAlertProvider>
                   <PushNotificationProvider>
-                    <BottomSheetModalProvider>
-                      <WithinContext loaded={loaded} />
-                    </BottomSheetModalProvider>
+                    <UserProvider>
+                      <BottomSheetModalProvider>
+                        <WithinContext loaded={loaded} />
+                      </BottomSheetModalProvider>
+                    </UserProvider>
                   </PushNotificationProvider>
                 </CustomAlertProvider>
               </LoadingProvider>
@@ -94,11 +97,10 @@ const WithinContext = ({ loaded }: { loaded: boolean }) => {
   useEffect(() => {
     if (!loaded || isLoading) return;
 
-    const inAuthGroup = segments[0] === "(tabs)" || segments.length > 0;
-
-    if (!isAuthenticated && inAuthGroup) {
-      router.replace("/welcome");
-    } else if (isAuthenticated && segments.length === 0) {
+    const inAuthGroup = segments.length === 0;
+    if (!isAuthenticated && !inAuthGroup) {
+      router.replace("/");
+    } else if (isAuthenticated && inAuthGroup) {
       router.replace("/(tabs)");
     }
   }, [isAuthenticated, loaded, isLoading, segments]);

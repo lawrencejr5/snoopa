@@ -1,7 +1,11 @@
 import Container from "@/components/Container";
+import Loading from "@/components/Loading";
 import Colors from "@/constants/Colors";
+import { useLoadingContext } from "@/context/LoadingContext";
 import { useTheme } from "@/context/ThemeContext";
+import { useUser } from "@/context/UserContext";
 import { watchlistData } from "@/dummy_data/watchlist";
+import { useConvexAuth } from "convex/react";
 import { useRouter } from "expo-router";
 import { useEffect } from "react";
 import {
@@ -73,8 +77,15 @@ export default function WatchlistScreen() {
   const { theme } = useTheme();
   const router = useRouter();
 
+  const { isLoading } = useConvexAuth();
+  const { appLoading } = useLoadingContext();
+
+  const { signedIn } = useUser();
+
   const activeSnoops = watchlistData.filter((i) => i.status === "active");
   const closedSnoops = watchlistData.filter((i) => i.status === "completed");
+
+  if (isLoading || !signedIn || appLoading) return <Loading />;
 
   return (
     <Container>

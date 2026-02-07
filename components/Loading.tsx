@@ -73,7 +73,9 @@ const Loading = () => {
     }));
 
   return (
-    <View style={styles.container}>
+    <View
+      style={[styles.container, { backgroundColor: Colors[theme].background }]}
+    >
       <View style={styles.row}>
         <Animated.View
           style={[

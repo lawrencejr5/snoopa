@@ -12,6 +12,7 @@ const schema = defineSchema({
     plan: v.optional(v.union(v.literal("free"), v.literal("pro"))),
     emailVerificationTime: v.optional(v.number()),
     pushTokens: v.optional(v.array(v.string())),
+    memory: v.optional(v.string()),
   }).index("email", ["email"]),
 });
 

@@ -1,5 +1,6 @@
 import Colors from "@/constants/Colors";
 import { useTheme } from "@/context/ThemeContext";
+import { useUser } from "@/context/UserContext";
 import { chatSessions } from "@/dummy_data/sessions";
 import { watchlistData } from "@/dummy_data/watchlist";
 import { DrawerContentComponentProps } from "@react-navigation/drawer";
@@ -17,6 +18,8 @@ export const SideMenu = (props: DrawerContentComponentProps) => {
   const { theme } = useTheme();
   const router = useRouter();
   const activeSnoops = watchlistData.filter((i) => i.status === "active");
+
+  const { signedIn } = useUser();
 
   return (
     <View
@@ -183,16 +186,17 @@ export const SideMenu = (props: DrawerContentComponentProps) => {
                 color: Colors[theme].text,
               }}
             >
-              Oputa Lawrence
+              {signedIn?.fullname}
             </Text>
             <Text
               style={{
                 fontFamily: "FontRegular",
                 fontSize: 12,
                 color: Colors[theme].text_secondary,
+                textTransform: "capitalize",
               }}
             >
-              Free Plan
+              {signedIn?.plan} Plan
             </Text>
           </View>
           <Image
