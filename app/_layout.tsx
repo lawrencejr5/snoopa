@@ -5,6 +5,8 @@ import { useEffect, useState } from "react";
 import "react-native-reanimated";
 import CustomSplash from "./splashscreen";
 
+import "react-native-url-polyfill/auto";
+
 import { ConvexAuthProvider } from "@convex-dev/auth/react";
 import { ConvexReactClient, useConvexAuth } from "convex/react";
 
@@ -25,10 +27,6 @@ export {
   // Catch any errors thrown by the Layout component.
   ErrorBoundary,
 } from "expo-router";
-
-export const unstable_settings = {
-  initialRouteName: "(tabs)",
-};
 
 const convex = new ConvexReactClient(process.env.EXPO_PUBLIC_CONVEX_URL!, {
   unsavedChangesWarning: false,
@@ -84,7 +82,7 @@ export default function RootLayout() {
 
 const WithinContext = ({ loaded }: { loaded: boolean }) => {
   const router = useRouter();
-  const segments = useSegments() as string[];
+  const segments = useSegments();
   const { isAuthenticated, isLoading } = useConvexAuth();
   const [showSplash, setShowSplash] = useState<boolean>(true);
 
@@ -110,7 +108,7 @@ const WithinContext = ({ loaded }: { loaded: boolean }) => {
     } else if (isAuthenticated && inAuthGroup) {
       router.replace("/(tabs)");
     }
-  }, [isAuthenticated, loaded, isLoading, segments]);
+  }, [isAuthenticated, isLoading, loaded]);
 
   if (!loaded || showSplash) {
     return <CustomSplash />;
@@ -125,7 +123,9 @@ const WithinContext = ({ loaded }: { loaded: boolean }) => {
           presentation: "card",
           animation: "ios_from_right",
         }}
-      />
+      >
+        <Stack.Screen name="welcome" dangerouslySingular />
+      </Stack>
     </>
   );
 };
