@@ -26,6 +26,14 @@ export {
   ErrorBoundary,
 } from "expo-router";
 
+export const unstable_settings = {
+  initialRouteName: "(tabs)",
+};
+
+const convex = new ConvexReactClient(process.env.EXPO_PUBLIC_CONVEX_URL!, {
+  unsavedChangesWarning: false,
+});
+
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
 
@@ -74,10 +82,6 @@ export default function RootLayout() {
   );
 }
 
-const convex = new ConvexReactClient(process.env.EXPO_PUBLIC_CONVEX_URL!, {
-  unsavedChangesWarning: false,
-});
-
 const WithinContext = ({ loaded }: { loaded: boolean }) => {
   const router = useRouter();
   const segments = useSegments() as string[];
@@ -98,6 +102,9 @@ const WithinContext = ({ loaded }: { loaded: boolean }) => {
     if (!loaded || isLoading) return;
 
     const inAuthGroup = segments[0] === "welcome";
+
+    console.log(segments[0]);
+
     if (!isAuthenticated && !inAuthGroup) {
       router.replace("/welcome");
     } else if (isAuthenticated && inAuthGroup) {

@@ -1,7 +1,6 @@
 import Colors from "@/constants/Colors";
 import { useTheme } from "@/context/ThemeContext";
 import { registerForPushNotificationsAsync } from "@/utils/reg_push_notifications";
-import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
   ActivityIndicator,
@@ -24,7 +23,6 @@ WebBrowser.maybeCompleteAuthSession();
 
 const WelcomePage = () => {
   const { theme } = useTheme();
-  const router = useRouter();
 
   const { showCustomAlert } = useCustomAlert();
 
@@ -40,7 +38,7 @@ const WelcomePage = () => {
       // 1. Create the return URL (must match your app.json scheme)
       const redirectTo = makeRedirectUri({
         scheme: "com.lawrencejr.snoopa",
-        path: "welcome",
+        path: "/welcome",
       });
 
       // 2. Start OAuth with Convex Auth, get redirect URL
