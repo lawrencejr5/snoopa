@@ -37,10 +37,9 @@ const WelcomePage = () => {
       // 1. Create the return URL (must match your app.json scheme)
       const redirectTo = makeRedirectUri({
         scheme: "com.lawrencejr.snoopa",
-        path: "welcome",
+        path: "/welcome",
       });
 
-      console.log(redirectTo);
       // 2. Start OAuth with Convex Auth, get redirect URL
       const { redirect } = await signIn("google", { redirectTo });
       if (!redirect) {
@@ -64,7 +63,6 @@ const WelcomePage = () => {
 
       // 4. Extract ?code= from callback URL
       const code = new URL(result.url).searchParams.get("code");
-      console.log(result.url);
       if (!code) {
         throw new Error("Authentication code not found in the URL.");
       }

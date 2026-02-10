@@ -101,14 +101,12 @@ const WithinContext = ({ loaded }: { loaded: boolean }) => {
 
     const inAuthGroup = segments[0] === "welcome";
 
-    console.log(segments[0]);
-
     if (!isAuthenticated && !inAuthGroup) {
       router.replace("/welcome");
     } else if (isAuthenticated && inAuthGroup) {
       router.replace("/(tabs)");
     }
-  }, [isAuthenticated, isLoading, loaded]);
+  }, [isAuthenticated, isLoading, loaded, segments]);
 
   if (!loaded || showSplash) {
     return <CustomSplash />;
