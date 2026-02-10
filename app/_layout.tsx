@@ -5,8 +5,6 @@ import { useEffect, useState } from "react";
 import "react-native-reanimated";
 import CustomSplash from "./splashscreen";
 
-import "react-native-url-polyfill/auto";
-
 import { ConvexAuthProvider } from "@convex-dev/auth/react";
 import { ConvexReactClient, useConvexAuth } from "convex/react";
 

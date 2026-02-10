@@ -1,5 +1,4 @@
 import * as Notifications from "expo-notifications";
-import { router } from "expo-router"; // 👈 Added router import
 import React, {
   createContext,
   ReactNode,
@@ -13,6 +12,7 @@ import { registerForPushNotificationsAsync } from "../utils/reg_push_notificatio
 interface NotificationContextType {
   expoPushToken: string | null;
   notification: Notifications.Notification | null;
+  notificationResponse: Notifications.NotificationResponse | null;
   error: Error | null;
 }
 
@@ -40,6 +40,8 @@ export const PushNotificationProvider: React.FC<
   const [expoPushToken, setExpoPushToken] = useState<string | null>(null);
   const [notification, setNotification] =
     useState<Notifications.Notification | null>(null);
+  const [notificationResponse, setNotificationResponse] =
+    useState<Notifications.NotificationResponse | null>(null);
   const [error, setError] = useState<Error | null>(null);
 
   const notificationListener = useRef<Notifications.EventSubscription | null>(
@@ -52,31 +54,21 @@ export const PushNotificationProvider: React.FC<
     registerForPushNotificationsAsync()
       .then((token) => {
         setExpoPushToken(token ?? null);
-        // if (token) {
-        //   console.log("Token received:", token);
-        // }
       })
       .catch((err) => {
         setError(err);
-        // console.error("Failed to get push token", err);
       });
 
     // 2. Listener: Handle notifications received while app is open
     notificationListener.current =
       Notifications.addNotificationReceivedListener((notification) => {
         setNotification(notification);
-        // You can trigger custom logic here, like refreshing the 'Rides' list
       });
 
     // 3. Listener: Handle user tapping on a notification
     responseListener.current =
       Notifications.addNotificationResponseReceivedListener((response) => {
-        const data = response.notification.request.content.data;
-        try {
-          router.push("/(tabs)");
-        } catch (error) {
-          console.log("Navigation failed", error);
-        }
+        setNotificationResponse(response);
       });
 
     return () => {
@@ -91,7 +83,7 @@ export const PushNotificationProvider: React.FC<
 
   return (
     <NotificationContext.Provider
-      value={{ expoPushToken, notification, error }}
+      value={{ expoPushToken, notification, notificationResponse, error }}
     >
       {children}
     </NotificationContext.Provider>
