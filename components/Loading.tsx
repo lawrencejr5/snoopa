@@ -1,103 +1,101 @@
 import Colors from "@/constants/Colors";
 import { useTheme } from "@/context/ThemeContext";
-import React, { useEffect } from "react";
-import { StyleSheet, View } from "react-native";
+import React, { useEffect, useMemo } from "react";
+import { StyleSheet, Text, View } from "react-native";
 import Animated, {
-  Easing,
-  SharedValue,
   useAnimatedStyle,
   useSharedValue,
-  withDelay,
   withRepeat,
   withSequence,
   withTiming,
 } from "react-native-reanimated";
 
+const LOADING_TEXTS = [
+  "Gathering intel",
+  "Decoding signals",
+  "Analyzing chatter",
+  "Syncing frequencies",
+  "Scanning perimeter",
+  "Extracting insights",
+  "Decrypting payload",
+  "Triangulating data",
+  "Monitoring waves",
+  "Interpolating signals",
+];
+
 const Loading = () => {
   const { theme } = useTheme();
+  const loadingText = useMemo(
+    () => LOADING_TEXTS[Math.floor(Math.random() * LOADING_TEXTS.length)],
+    [],
+  );
 
-  const scale1 = useSharedValue(1);
-  const scale2 = useSharedValue(1);
-  const scale3 = useSharedValue(1);
-
-  const opacity1 = useSharedValue(0.5);
-  const opacity2 = useSharedValue(0.5);
-  const opacity3 = useSharedValue(0.5);
+  const dot2Opacity = useSharedValue(0);
+  const dot3Opacity = useSharedValue(0);
 
   useEffect(() => {
-    const animateDot = (
-      scale: SharedValue<number>,
-      opacity: SharedValue<number>,
-      delay: number,
-    ) => {
-      scale.value = withDelay(
-        delay,
-        withRepeat(
-          withSequence(
-            withTiming(1.4, {
-              duration: 600,
-              easing: Easing.inOut(Easing.ease),
-            }),
-            withTiming(1, { duration: 600, easing: Easing.inOut(Easing.ease) }),
-          ),
-          -1,
-          true,
-        ),
-      );
+    // Dot 2: 0 -> 1 -> 1 -> 1 -> 0
+    dot2Opacity.value = withRepeat(
+      withSequence(
+        withTiming(1, { duration: 400 }), // to 2 dots
+        withTiming(1, { duration: 400 }), // to 3 dots
+        withTiming(1, { duration: 400 }), // back to 2 dots
+        withTiming(0, { duration: 400 }), // back to 1 dot
+      ),
+      -1,
+    );
 
-      opacity.value = withDelay(
-        delay,
-        withRepeat(
-          withSequence(
-            withTiming(1, { duration: 600 }),
-            withTiming(0.4, { duration: 600 }),
-          ),
-          -1,
-          true,
-        ),
-      );
-    };
-
-    animateDot(scale1, opacity1, 0);
-    animateDot(scale2, opacity2, 200);
-    animateDot(scale3, opacity3, 400);
+    // Dot 3: 0 -> 0 -> 1 -> 0 -> 0
+    dot3Opacity.value = withRepeat(
+      withSequence(
+        withTiming(0, { duration: 400 }), // stay at 2 dots
+        withTiming(1, { duration: 400 }), // to 3 dots
+        withTiming(0, { duration: 400 }), // back to 2 dots
+        withTiming(0, { duration: 400 }), // back to 1 dot
+      ),
+      -1,
+    );
   }, []);
 
-  const createDotStyle = (
-    scale: SharedValue<number>,
-    opacity: SharedValue<number>,
-  ) =>
-    useAnimatedStyle(() => ({
-      transform: [{ scale: scale.value }],
-      opacity: opacity.value,
-    }));
+  const dot2Style = useAnimatedStyle(() => ({
+    opacity: dot2Opacity.value,
+  }));
+
+  const dot3Style = useAnimatedStyle(() => ({
+    opacity: dot3Opacity.value,
+  }));
 
   return (
     <View
       style={[styles.container, { backgroundColor: Colors[theme].background }]}
     >
-      <View style={styles.row}>
-        <Animated.View
-          style={[
-            styles.dot,
-            { backgroundColor: Colors[theme].text },
-            createDotStyle(scale1, opacity1),
-          ]}
-        />
-        <Animated.View
-          style={[
-            styles.dot,
-            { backgroundColor: Colors[theme].text },
-            createDotStyle(scale2, opacity2),
-          ]}
-        />
-        <Animated.View
-          style={[
-            styles.dot,
-            { backgroundColor: Colors[theme].text },
-            createDotStyle(scale3, opacity3),
-          ]}
-        />
+      <View style={styles.content}>
+        <Text style={[styles.text, { color: Colors[theme].text_secondary }]}>
+          {loadingText}
+        </Text>
+        <View style={styles.dotsContainer}>
+          <Text style={[styles.dot, { color: Colors[theme].text_secondary }]}>
+            .
+          </Text>
+          <Animated.Text
+            style={[
+              styles.dot,
+              { color: Colors[theme].text_secondary },
+              dot2Style,
+            ]}
+          >
+            .
+          </Animated.Text>
+          <Animated.Text
+            style={[
+              styles.dot,
+              { color: Colors[theme].text_secondary },
+              dot3Style,
+            ]}
+          >
+            .
+          </Animated.Text>
+        </View>
       </View>
     </View>
   );
@@ -108,15 +106,27 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+    width: "100%",
   },
-  row: {
+  content: {
     flexDirection: "row",
-    gap: 15,
+    alignItems: "center",
+  },
+  text: {
+    fontFamily: "FontRegular",
+    fontSize: 16,
+    letterSpacing: 0.5,
+  },
+  dotsContainer: {
+    flexDirection: "row",
+    width: 30,
+    marginBottom: 5,
+    marginLeft: 3,
   },
   dot: {
-    width: 15, // "Big" dots
-    height: 15,
-    borderRadius: 10,
+    fontFamily: "FontRegular",
+    fontSize: 22,
+    lineHeight: 22,
   },
 });
 
