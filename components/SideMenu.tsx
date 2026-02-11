@@ -2,7 +2,7 @@ import Colors from "@/constants/Colors";
 import { useTheme } from "@/context/ThemeContext";
 import { useUser } from "@/context/UserContext";
 import { chatSessions } from "@/dummy_data/sessions";
-import { watchlistData } from "@/dummy_data/watchlist";
+
 import { DrawerContentComponentProps } from "@react-navigation/drawer";
 import { useRouter } from "expo-router";
 import {
@@ -17,7 +17,6 @@ import {
 export const SideMenu = (props: DrawerContentComponentProps) => {
   const { theme } = useTheme();
   const router = useRouter();
-  const activeSnoops = watchlistData.filter((i) => i.status === "active");
 
   const { signedIn } = useUser();
 
@@ -28,18 +27,36 @@ export const SideMenu = (props: DrawerContentComponentProps) => {
         { backgroundColor: Colors[theme].background },
       ]}
     >
+      {/* Logo Section */}
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 10,
+          marginBottom: 35,
+          marginTop: 10,
+        }}
+      >
+        <Text
+          style={{
+            fontFamily: "FontBold",
+            fontSize: 22,
+            color: Colors[theme].text,
+            letterSpacing: -0.5,
+          }}
+        >
+          Snoopa
+        </Text>
+      </View>
+
       {/* Header / New Chat */}
-      <View style={{ marginBottom: 30, marginTop: 10 }}>
+      <View style={{ marginBottom: 25 }}>
         <Pressable
           style={{
             flexDirection: "row",
             alignItems: "center",
             gap: 12,
-            backgroundColor: Colors[theme].surface,
-            padding: 12,
-            borderRadius: 14,
-            borderWidth: 1,
-            borderColor: Colors[theme].border,
+            paddingVertical: 12,
           }}
           onPress={() => {}}
         >
@@ -57,8 +74,39 @@ export const SideMenu = (props: DrawerContentComponentProps) => {
             New Chat
           </Text>
         </Pressable>
+        <Pressable
+          onPress={() => router.push("/watchlist" as any)}
+          style={[
+            styles.menuItem,
+            {
+              marginBottom: 15,
+              paddingHorizontal: 0,
+            },
+          ]}
+        >
+          <Image
+            source={require("@/assets/icons/eyes.png")}
+            style={{
+              width: 20,
+              height: 20,
+              tintColor: Colors[theme].primary,
+              marginRight: 12,
+            }}
+          />
+          <Text
+            style={{
+              fontFamily: "FontBold",
+              fontSize: 15,
+              color: Colors[theme].text,
+            }}
+          >
+            My Watchlist
+          </Text>
+        </Pressable>
       </View>
       <ScrollView showsVerticalScrollIndicator={false}>
+        {/* Watchlist Link */}
+
         {/* Recent Sessions */}
         <View style={{ marginBottom: 30 }}>
           <Text
@@ -79,7 +127,7 @@ export const SideMenu = (props: DrawerContentComponentProps) => {
               ]}
             >
               <Image
-                source={require("@/assets/icons/voice.png")}
+                source={require("@/assets/icons/clock-thick.png")}
                 style={{
                   width: 16,
                   height: 16,
@@ -113,53 +161,6 @@ export const SideMenu = (props: DrawerContentComponentProps) => {
               </View>
             </Pressable>
           ))}
-        </View>
-
-        {/* Watchlist Quick View */}
-        <View>
-          <Text
-            style={[styles.menuHeader, { color: Colors[theme].text_secondary }]}
-          >
-            ACTIVE SNOOPS
-          </Text>
-          {activeSnoops.length > 0 ? (
-            activeSnoops.map((snoop) => (
-              <Pressable key={snoop.id} style={styles.menuItem}>
-                <View
-                  style={{
-                    width: 6,
-                    height: 6,
-                    borderRadius: 3,
-                    backgroundColor: Colors[theme].success,
-                    marginRight: 12,
-                  }}
-                />
-                <View style={{ flex: 1 }}>
-                  <Text
-                    numberOfLines={1}
-                    style={{
-                      fontFamily: "FontMedium",
-                      fontSize: 14,
-                      color: Colors[theme].text,
-                    }}
-                  >
-                    {snoop.title}
-                  </Text>
-                </View>
-              </Pressable>
-            ))
-          ) : (
-            <Text
-              style={{
-                fontFamily: "FontRegular",
-                color: Colors[theme].text_secondary,
-                fontSize: 13,
-                fontStyle: "italic",
-              }}
-            >
-              No active snoops.
-            </Text>
-          )}
         </View>
       </ScrollView>
       {/* Footer */}
