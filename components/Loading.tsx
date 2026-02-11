@@ -70,28 +70,18 @@ const Loading = () => {
       style={[styles.container, { backgroundColor: Colors[theme].background }]}
     >
       <View style={styles.content}>
-        <Text style={[styles.text, { color: Colors[theme].text_secondary }]}>
+        <Text style={[styles.text, { color: Colors[theme].text }]}>
           {loadingText}
         </Text>
         <View style={styles.dotsContainer}>
-          <Text style={[styles.dot, { color: Colors[theme].text_secondary }]}>
-            .
-          </Text>
+          <Text style={[styles.dot, { color: Colors[theme].text }]}>.</Text>
           <Animated.Text
-            style={[
-              styles.dot,
-              { color: Colors[theme].text_secondary },
-              dot2Style,
-            ]}
+            style={[styles.dot, { color: Colors[theme].text }, dot2Style]}
           >
             .
           </Animated.Text>
           <Animated.Text
-            style={[
-              styles.dot,
-              { color: Colors[theme].text_secondary },
-              dot3Style,
-            ]}
+            style={[styles.dot, { color: Colors[theme].text }, dot3Style]}
           >
             .
           </Animated.Text>
@@ -120,13 +110,12 @@ const styles = StyleSheet.create({
   dotsContainer: {
     flexDirection: "row",
     width: 30,
-    marginBottom: 5,
     marginLeft: 3,
   },
   dot: {
     fontFamily: "FontRegular",
-    fontSize: 22,
-    lineHeight: 22,
+    fontSize: 18,
+    lineHeight: 20,
   },
 });
 
