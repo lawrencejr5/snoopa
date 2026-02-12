@@ -1,4 +1,5 @@
 import Container from "@/components/Container";
+import TypeWriter from "@/components/TypeWriter";
 import Colors from "@/constants/Colors";
 import { useTheme } from "@/context/ThemeContext";
 import { api } from "@/convex/_generated/api";
@@ -6,7 +7,7 @@ import { Id } from "@/convex/_generated/dataModel";
 import { useRoute } from "@react-navigation/native";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { useNavigation } from "expo-router";
-import { useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Image,
   Pressable,
@@ -17,6 +18,7 @@ import {
 } from "react-native";
 import { TextInput } from "react-native-gesture-handler";
 import { KeyboardStickyView } from "react-native-keyboard-controller";
+import Markdown from "react-native-markdown-display";
 
 export default function ChatScreen() {
   const { theme } = useTheme();
@@ -35,12 +37,37 @@ export default function ChatScreen() {
   const sendMessage = useAction(api.chat.send_message);
 
   const [sending, setSending] = useState(false);
+  const [typingMessageId, setTypingMessageId] = useState<Id<"chats"> | null>(
+    null,
+  );
+  const lastProcessedMessageIdRef = useRef<string | null>(null);
+  const [isHere, setIsHere] = useState(false);
 
   // If messages is undefined (loading) or empty array, we handle it.
-  const displayMessages = messages || [];
+  const displayMessages = useMemo(() => messages || [], [messages]);
+
+  useEffect(() => {
+    if (displayMessages.length > 0) {
+      if (!isHere) {
+        // First load, don't type anything, just mark the last message as seen
+        lastProcessedMessageIdRef.current =
+          displayMessages[displayMessages.length - 1]._id;
+        setIsHere(true);
+        return;
+      }
+
+      const lastMsg = displayMessages[displayMessages.length - 1];
+      if (lastMsg._id !== lastProcessedMessageIdRef.current) {
+        lastProcessedMessageIdRef.current = lastMsg._id;
+        if (lastMsg.role === "snoopa" && lastMsg.type !== "status") {
+          setTypingMessageId(lastMsg._id);
+        }
+      }
+    }
+  }, [displayMessages]);
 
   const handleSend = async () => {
-    if (!input.trim() || sending) return;
+    if (!input.trim() || sending || typingMessageId) return;
 
     const content = input.trim();
     setInput("");
@@ -66,9 +93,14 @@ export default function ChatScreen() {
     } catch (error) {
       console.error("Failed to send message:", error);
     } finally {
+      // We keep 'sending' true until the typing starts?
+      // Actually, once this returns, the message is in the DB.
+      // The effect above will catch the new message and set typingMessageId.
       setSending(false);
     }
   };
+
+  const isBusy = sending || typingMessageId !== null;
 
   return (
     <Container>
@@ -112,7 +144,7 @@ export default function ChatScreen() {
           scrollViewRef.current?.scrollToEnd({ animated: true })
         }
       >
-        {displayMessages.length === 0 ? (
+        {displayMessages.length === 0 && !sending ? (
           <View
             style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
           >
@@ -263,21 +295,103 @@ export default function ChatScreen() {
                           Snoopa
                         </Text>
                       </View>
-                      <Text
-                        style={{
-                          color: Colors[theme].text,
-                          fontFamily: "FontRegular",
-                          lineHeight: 24,
-                          fontSize: 15,
-                        }}
-                      >
-                        {msg.content}
-                      </Text>
+                      {typingMessageId === msg._id ? (
+                        <TypeWriter
+                          content={msg.content}
+                          onComplete={() => setTypingMessageId(null)}
+                          speed={5}
+                        />
+                      ) : (
+                        <Markdown
+                          style={{
+                            body: {
+                              color: Colors[theme].text,
+                              fontFamily: "FontRegular",
+                              fontSize: 15,
+                              lineHeight: 24,
+                            },
+                            heading1: {
+                              color: Colors[theme].text,
+                              fontFamily: "FontBold",
+                              fontSize: 22,
+                              marginBottom: 10,
+                            },
+                            heading2: {
+                              color: Colors[theme].text,
+                              fontFamily: "FontBold",
+                              fontSize: 20,
+                              marginBottom: 10,
+                            },
+                            strong: {
+                              fontFamily: "FontBold",
+                              color: Colors[theme].text,
+                            },
+                            bullet_list: {
+                              marginBottom: 10,
+                            },
+                            ordered_list: {
+                              marginBottom: 10,
+                            },
+                            code_inline: {
+                              backgroundColor: Colors[theme].surface,
+                              color: Colors[theme].primary,
+                              fontFamily: "FontMedium",
+                            },
+                            fence: {
+                              backgroundColor: Colors[theme].surface,
+                              borderColor: Colors[theme].border,
+                              borderWidth: 1,
+                              padding: 10,
+                              color: Colors[theme].text,
+                            },
+                          }}
+                        >
+                          {msg.content}
+                        </Markdown>
+                      )}
                     </View>
                   )}
                 </View>
               );
             })}
+
+            {/* Snooping... Indicator */}
+            {sending && (
+              <View style={styles.snoopa_container}>
+                <View
+                  style={[
+                    styles.snoopa_bubble,
+                    { backgroundColor: "transparent" },
+                  ]}
+                >
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      marginBottom: 4,
+                      gap: 8,
+                    }}
+                  >
+                    <Image
+                      source={require("@/assets/images/splash-icon.png")}
+                      style={[
+                        styles.snoopa_logo,
+                        { borderColor: Colors[theme].border },
+                      ]}
+                    />
+                    <Text
+                      style={{
+                        fontFamily: "FontBold",
+                        fontSize: 13,
+                        color: Colors[theme].text_secondary,
+                      }}
+                    >
+                      Snooping...
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            )}
           </View>
         )}
       </ScrollView>
@@ -298,8 +412,9 @@ export default function ChatScreen() {
             multiline
             value={input}
             onChangeText={setInput}
-            placeholder="Talk to me boss..."
+            placeholder={isBusy ? "Snooping..." : "Talk to me boss..."}
             placeholderTextColor={Colors[theme].text_secondary}
+            editable={!isBusy}
             style={{
               backgroundColor: "transparent",
               width: "100%",
@@ -333,7 +448,7 @@ export default function ChatScreen() {
 
             <Pressable
               onPress={handleSend}
-              disabled={sending || !input.trim()}
+              disabled={isBusy || !input.trim()}
               style={{
                 padding: 6,
               }}
@@ -344,7 +459,7 @@ export default function ChatScreen() {
                   width: 22,
                   height: 22,
                   tintColor: Colors[theme].text,
-                  opacity: input && !sending ? 1 : 0.5,
+                  opacity: input && !isBusy ? 1 : 0.5,
                 }}
               />
             </Pressable>
