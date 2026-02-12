@@ -136,7 +136,7 @@ export const send_message = action({
     });
 
     // 3. Initialize Gemini
-    const api_key = process.env.GOOGLE_API_KEY;
+    const api_key = process.env.GOOGLE_GEMINI_API_KEY;
     if (!api_key) {
       throw new Error("GOOGLE_API_KEY is not set in environment variables");
     }

@@ -1,9 +1,9 @@
 import Colors from "@/constants/Colors";
 import { useTheme } from "@/context/ThemeContext";
 import { useUser } from "@/context/UserContext";
-import { chatSessions } from "@/dummy_data/sessions";
-
+import { api } from "@/convex/_generated/api";
 import { DrawerContentComponentProps } from "@react-navigation/drawer";
+import { useQuery } from "convex/react";
 import { useRouter } from "expo-router";
 import {
   Image,
@@ -17,8 +17,19 @@ import {
 export const SideMenu = (props: DrawerContentComponentProps) => {
   const { theme } = useTheme();
   const router = useRouter();
+  const sessions = useQuery(api.chat.list_sessions) || [];
 
   const { signedIn } = useUser();
+
+  // Get current session ID from navigation state if possible
+  // This is a bit of a hack for Drawer navigation state
+  const currentRoute = props.state.routes.find((r) => r.name === "Chat");
+  // @ts-ignore
+  const currentSessionId = currentRoute?.params?.sessionId;
+
+  const handleSessionPress = (sessionId: string | null) => {
+    props.navigation.navigate("Chat", { sessionId });
+  };
 
   return (
     <View
@@ -58,7 +69,7 @@ export const SideMenu = (props: DrawerContentComponentProps) => {
             gap: 12,
             paddingVertical: 12,
           }}
-          onPress={() => {}}
+          onPress={() => handleSessionPress(null)}
         >
           <Image
             source={require("@/assets/icons/ai-assistant.png")}
@@ -114,53 +125,57 @@ export const SideMenu = (props: DrawerContentComponentProps) => {
           >
             RECENT SESSIONS
           </Text>
-          {chatSessions.map((session) => (
-            <Pressable
-              key={session.id}
-              style={[
-                styles.menuItem,
-                {
-                  backgroundColor: session.active
-                    ? Colors[theme].surface
-                    : "transparent",
-                },
-              ]}
-            >
-              <Image
-                source={require("@/assets/icons/clock-thick.png")}
-                style={{
-                  width: 16,
-                  height: 16,
-                  tintColor: session.active
-                    ? Colors[theme].primary
-                    : Colors[theme].text_secondary,
-                  marginRight: 10,
-                }}
-              />
-              <View style={{ flex: 1 }}>
-                <Text
-                  numberOfLines={1}
+          {sessions.map((session) => {
+            const isActive = currentSessionId === session._id;
+            return (
+              <Pressable
+                key={session._id}
+                onPress={() => handleSessionPress(session._id)}
+                style={[
+                  styles.menuItem,
+                  {
+                    backgroundColor: isActive
+                      ? Colors[theme].surface
+                      : "transparent",
+                  },
+                ]}
+              >
+                <Image
+                  source={require("@/assets/icons/clock-thick.png")}
                   style={{
-                    fontFamily: session.active ? "FontBold" : "FontMedium",
-                    fontSize: 14,
-                    color: Colors[theme].text,
+                    width: 16,
+                    height: 16,
+                    tintColor: isActive
+                      ? Colors[theme].primary
+                      : Colors[theme].text_secondary,
+                    marginRight: 10,
                   }}
-                >
-                  {session.title}
-                </Text>
-                <Text
-                  numberOfLines={1}
-                  style={{
-                    fontFamily: "FontRegular",
-                    fontSize: 12,
-                    color: Colors[theme].text_secondary,
-                  }}
-                >
-                  {session.excerpt}
-                </Text>
-              </View>
-            </Pressable>
-          ))}
+                />
+                <View style={{ flex: 1 }}>
+                  <Text
+                    numberOfLines={1}
+                    style={{
+                      fontFamily: isActive ? "FontBold" : "FontMedium",
+                      fontSize: 14,
+                      color: Colors[theme].text,
+                    }}
+                  >
+                    {session.title}
+                  </Text>
+                  <Text
+                    numberOfLines={1}
+                    style={{
+                      fontFamily: "FontRegular",
+                      fontSize: 12,
+                      color: Colors[theme].text_secondary,
+                    }}
+                  >
+                    {session.excerpt}
+                  </Text>
+                </View>
+              </Pressable>
+            );
+          })}
         </View>
       </ScrollView>
       {/* Footer */}

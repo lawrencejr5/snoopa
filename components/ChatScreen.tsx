@@ -1,9 +1,12 @@
 import Container from "@/components/Container";
 import Colors from "@/constants/Colors";
 import { useTheme } from "@/context/ThemeContext";
-import { conversation } from "@/dummy_data/conversation";
+import { api } from "@/convex/_generated/api";
+import { Id } from "@/convex/_generated/dataModel";
+import { useRoute } from "@react-navigation/native";
+import { useAction, useMutation, useQuery } from "convex/react";
 import { useNavigation } from "expo-router";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   Image,
   Pressable,
@@ -19,6 +22,53 @@ export default function ChatScreen() {
   const { theme } = useTheme();
   const [input, setInput] = useState<string>("");
   const navigation = useNavigation<any>();
+  const route = useRoute<any>();
+  const scrollViewRef = useRef<ScrollView>(null);
+
+  const sessionId = route.params?.sessionId as Id<"sessions"> | undefined;
+
+  const messages = useQuery(
+    api.chat.get_messages,
+    sessionId ? { session_id: sessionId } : "skip",
+  );
+  const createSession = useMutation(api.chat.create_session);
+  const sendMessage = useAction(api.chat.send_message);
+
+  const [sending, setSending] = useState(false);
+
+  // If messages is undefined (loading) or empty array, we handle it.
+  const displayMessages = messages || [];
+
+  const handleSend = async () => {
+    if (!input.trim() || sending) return;
+
+    const content = input.trim();
+    setInput("");
+    setSending(true);
+
+    try {
+      let currentSessionId = sessionId;
+
+      if (!currentSessionId) {
+        // Create session with first user message as title (truncated)
+        const title =
+          content.length > 30 ? content.substring(0, 27) + "..." : content;
+        currentSessionId = await createSession({ title });
+
+        // Update navigation params so we stay in this session
+        navigation.setParams({ sessionId: currentSessionId });
+      }
+
+      await sendMessage({
+        session_id: currentSessionId!,
+        content,
+      });
+    } catch (error) {
+      console.error("Failed to send message:", error);
+    } finally {
+      setSending(false);
+    }
+  };
 
   return (
     <Container>
@@ -55,10 +105,14 @@ export default function ChatScreen() {
         </Pressable>
       </View>
       <ScrollView
+        ref={scrollViewRef}
         contentContainerStyle={{ flexGrow: 1, paddingBottom: 20 }}
         showsVerticalScrollIndicator={false}
+        onContentSizeChange={() =>
+          scrollViewRef.current?.scrollToEnd({ animated: true })
+        }
       >
-        {conversation.length === 0 ? (
+        {displayMessages.length === 0 ? (
           <View
             style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
           >
@@ -82,11 +136,11 @@ export default function ChatScreen() {
           </View>
         ) : (
           <View style={{ paddingHorizontal: 10 }}>
-            {conversation.map((msg) => {
+            {displayMessages.map((msg) => {
               if (msg.role === "user") {
                 return (
                   <View
-                    key={msg.id}
+                    key={msg._id}
                     style={[
                       styles.user_chat,
                       { backgroundColor: Colors[theme].surface },
@@ -108,7 +162,7 @@ export default function ChatScreen() {
 
               // Snoopa Messages
               return (
-                <View key={msg.id} style={styles.snoopa_container}>
+                <View key={msg._id} style={styles.snoopa_container}>
                   {msg.type === "status" ? (
                     <View
                       style={[
@@ -278,6 +332,8 @@ export default function ChatScreen() {
             </View>
 
             <Pressable
+              onPress={handleSend}
+              disabled={sending || !input.trim()}
               style={{
                 padding: 6,
               }}
@@ -288,7 +344,7 @@ export default function ChatScreen() {
                   width: 22,
                   height: 22,
                   tintColor: Colors[theme].text,
-                  opacity: input ? 1 : 0.5,
+                  opacity: input && !sending ? 1 : 0.5,
                 }}
               />
             </Pressable>
