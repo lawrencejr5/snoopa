@@ -33,7 +33,7 @@ export default function ChatScreen() {
     api.chat.get_messages,
     sessionId ? { session_id: sessionId } : "skip",
   );
-  const createSession = useMutation(api.chat.create_session);
+  const createSession = useMutation(api.session.create_session);
   const sendMessage = useAction(api.chat.send_message);
 
   const [sending, setSending] = useState(false);
