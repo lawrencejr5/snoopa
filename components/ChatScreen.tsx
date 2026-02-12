@@ -43,6 +43,16 @@ export default function ChatScreen() {
   const lastProcessedMessageIdRef = useRef<string | null>(null);
   const [isHere, setIsHere] = useState(false);
 
+  // Check if we are loading messages for an existing session
+  const isLoading = sessionId && messages === undefined;
+
+  // Use this effect to reset internal state when switching sessions
+  useEffect(() => {
+    setIsHere(false);
+    setTypingMessageId(null);
+    lastProcessedMessageIdRef.current = null;
+  }, [sessionId]);
+
   // If messages is undefined (loading) or empty array, we handle it.
   const displayMessages = useMemo(() => messages || [], [messages]);
 
@@ -64,7 +74,7 @@ export default function ChatScreen() {
         }
       }
     }
-  }, [displayMessages]);
+  }, [displayMessages, isHere]); // Added isHere to dependencies
 
   const handleSend = async () => {
     if (!input.trim() || sending || typingMessageId) return;
@@ -144,7 +154,32 @@ export default function ChatScreen() {
           scrollViewRef.current?.scrollToEnd({ animated: true })
         }
       >
-        {displayMessages.length === 0 && !sending ? (
+        {isLoading ? (
+          <View
+            style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
+          >
+            <View style={{ width: "100%", alignItems: "center" }}>
+              <Image
+                source={require("@/assets/images/splash-icon.png")}
+                style={{
+                  height: 80,
+                  width: 80,
+                  opacity: 0.5,
+                  marginBottom: 20,
+                }}
+              />
+              <Text
+                style={{
+                  color: Colors[theme].text_secondary,
+                  fontFamily: "FontMedium",
+                  fontSize: 16,
+                }}
+              >
+                Getting chat ready...
+              </Text>
+            </View>
+          </View>
+        ) : displayMessages.length === 0 && !sending ? (
           <View
             style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
           >
