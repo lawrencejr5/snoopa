@@ -92,14 +92,22 @@ export const send_message = action({
     }
 
     const gen_ai = new GoogleGenerativeAI(api_key);
+
+    // Prepare history for Gemini
+    const mappedHistory = messages.map((msg) => ({
+      role: msg.role,
+      content: msg.content,
+    }));
+
     // Search results from tavily via internal action
     const leanNews = await ctx.runAction(internal.tavily.search, {
       query: args.content,
+      history: mappedHistory,
     });
 
     // User requested gemini-2.5-flash
     const model = gen_ai.getGenerativeModel({
-      model: "gemini-2.5-flash",
+      model: "gemini-2.5-flash-lite",
       systemInstruction:
         "You are Snoopa, a proactive AI agent that hunts for verified facts and 'snoops' them to users. Your mascot is a Greyhound - fast, lean, and sharp. You provide accurate, verified information in a modern, clean, and elegant tone. Be direct but detailed, and also site your sources when giving news. If you snoop something, be sure it's verified. Don't be verbose; be speed-optimized.",
     });
@@ -124,6 +132,17 @@ export const send_message = action({
       const result = await chat_session.sendMessage(prompt);
       const response = result.response;
       const text = response.text();
+
+      if (response.usageMetadata) {
+        console.log(
+          "Chat Response - Input Tokens:",
+          response.usageMetadata.promptTokenCount,
+        );
+        console.log(
+          "Chat Response - Output Tokens:",
+          response.usageMetadata.candidatesTokenCount,
+        );
+      }
 
       // 5. Save AI response
       await ctx.runMutation(internal.chat.save_message, {
