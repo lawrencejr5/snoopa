@@ -33,6 +33,7 @@ export default function ChatScreen() {
     api.chat.get_messages,
     sessionId ? { session_id: sessionId } : "skip",
   );
+
   const createSession = useMutation(api.session.create_session);
   const sendMessage = useAction(api.chat.send_message);
 
@@ -44,7 +45,6 @@ export default function ChatScreen() {
   const [isHere, setIsHere] = useState(false);
 
   // Check if we are loading messages for an existing session
-  const isLoading = sessionId && messages === undefined;
 
   // Use this effect to reset internal state when switching sessions
   useEffect(() => {
@@ -53,8 +53,49 @@ export default function ChatScreen() {
     lastProcessedMessageIdRef.current = null;
   }, [sessionId]);
 
-  // If messages is undefined (loading) or empty array, we handle it.
-  const displayMessages = useMemo(() => messages || [], [messages]);
+  // Optimistic UI: track pending user message
+  const [pendingContent, setPendingContent] = useState<string | null>(null);
+
+  // Merge real messages with optimistic pending message
+  const displayMessages = useMemo(() => {
+    const real = messages || [];
+
+    // If we have a pending message, check if it already appeared in real messages
+    if (pendingContent) {
+      const alreadySaved = real.some(
+        (m) => m.role === "user" && m.content === pendingContent,
+      );
+      if (alreadySaved) {
+        // Will be cleared by the effect below
+        return real;
+      }
+      // Inject a fake optimistic message at the end
+      return [
+        ...real,
+        {
+          _id: "pending" as Id<"chats">,
+          _creationTime: Date.now(),
+          session_id: sessionId as Id<"sessions">,
+          role: "user" as const,
+          content: pendingContent,
+        },
+      ];
+    }
+
+    return real;
+  }, [messages, pendingContent, sessionId]);
+
+  // Clear pending content once the real message appears from the DB
+  useEffect(() => {
+    if (pendingContent && messages) {
+      const alreadySaved = messages.some(
+        (m) => m.role === "user" && m.content === pendingContent,
+      );
+      if (alreadySaved) {
+        setPendingContent(null);
+      }
+    }
+  }, [messages, pendingContent]);
 
   useEffect(() => {
     if (displayMessages.length > 0) {
@@ -81,6 +122,7 @@ export default function ChatScreen() {
 
     const content = input.trim();
     setInput("");
+    setPendingContent(content); // Optimistic: show message immediately
     setSending(true);
 
     try {
@@ -111,6 +153,8 @@ export default function ChatScreen() {
   };
 
   const isBusy = sending || typingMessageId !== null;
+  const isLoading =
+    sessionId && messages === undefined && displayMessages.length === 0;
 
   return (
     <Container>
