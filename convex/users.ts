@@ -25,10 +25,10 @@ export const storePushToken = mutation({
     const user = await ctx.db.get(user_id);
     if (!user) return;
 
-    const currentTokens = user.push_tokens || [];
+    const currentTokens = user.pushTokens || [];
     if (!currentTokens.includes(args.token)) {
       await ctx.db.patch(user_id, {
-        push_tokens: [...currentTokens, args.token],
+        pushTokens: [...currentTokens, args.token],
       });
     }
   },
@@ -41,11 +41,11 @@ export const removePushToken = mutation({
     if (!user_id) return;
 
     const user = await ctx.db.get(user_id);
-    if (!user || !user.push_tokens) return;
+    if (!user || !user.pushTokens) return;
 
-    const newTokens = user.push_tokens.filter((t) => t !== args.token);
+    const newTokens = user.pushTokens.filter((t) => t !== args.token);
     await ctx.db.patch(user_id, {
-      push_tokens: newTokens,
+      pushTokens: newTokens,
     });
   },
 });
@@ -55,10 +55,10 @@ export const getAllUsersWithTokens = internalQuery({
   handler: async (ctx) => {
     const users = await ctx.db
       .query("users")
-      .filter((q) => q.neq(q.field("push_tokens"), undefined))
+      .filter((q) => q.neq(q.field("pushTokens"), undefined))
       .collect();
 
-    return users.filter((u) => u.push_tokens && u.push_tokens.length > 0);
+    return users.filter((u) => u.pushTokens && u.pushTokens.length > 0);
   },
 });
 

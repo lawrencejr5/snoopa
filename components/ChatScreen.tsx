@@ -1,9 +1,13 @@
 import Container from "@/components/Container";
+import TypeWriter from "@/components/TypeWriter";
 import Colors from "@/constants/Colors";
 import { useTheme } from "@/context/ThemeContext";
-import { conversation } from "@/dummy_data/conversation";
+import { api } from "@/convex/_generated/api";
+import { Id } from "@/convex/_generated/dataModel";
+import { useRoute } from "@react-navigation/native";
+import { useAction, useMutation, useQuery } from "convex/react";
 import { useNavigation } from "expo-router";
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Image,
   Pressable,
@@ -14,11 +18,99 @@ import {
 } from "react-native";
 import { TextInput } from "react-native-gesture-handler";
 import { KeyboardStickyView } from "react-native-keyboard-controller";
+import Markdown from "react-native-markdown-display";
 
 export default function ChatScreen() {
   const { theme } = useTheme();
   const [input, setInput] = useState<string>("");
   const navigation = useNavigation<any>();
+  const route = useRoute<any>();
+  const scrollViewRef = useRef<ScrollView>(null);
+
+  const sessionId = route.params?.sessionId as Id<"sessions"> | undefined;
+
+  const messages = useQuery(
+    api.chat.get_messages,
+    sessionId ? { session_id: sessionId } : "skip",
+  );
+  const createSession = useMutation(api.session.create_session);
+  const sendMessage = useAction(api.chat.send_message);
+
+  const [sending, setSending] = useState(false);
+  const [typingMessageId, setTypingMessageId] = useState<Id<"chats"> | null>(
+    null,
+  );
+  const lastProcessedMessageIdRef = useRef<string | null>(null);
+  const [isHere, setIsHere] = useState(false);
+
+  // Check if we are loading messages for an existing session
+  const isLoading = sessionId && messages === undefined;
+
+  // Use this effect to reset internal state when switching sessions
+  useEffect(() => {
+    setIsHere(false);
+    setTypingMessageId(null);
+    lastProcessedMessageIdRef.current = null;
+  }, [sessionId]);
+
+  // If messages is undefined (loading) or empty array, we handle it.
+  const displayMessages = useMemo(() => messages || [], [messages]);
+
+  useEffect(() => {
+    if (displayMessages.length > 0) {
+      if (!isHere) {
+        // First load, don't type anything, just mark the last message as seen
+        lastProcessedMessageIdRef.current =
+          displayMessages[displayMessages.length - 1]._id;
+        setIsHere(true);
+        return;
+      }
+
+      const lastMsg = displayMessages[displayMessages.length - 1];
+      if (lastMsg._id !== lastProcessedMessageIdRef.current) {
+        lastProcessedMessageIdRef.current = lastMsg._id;
+        if (lastMsg.role === "snoopa" && lastMsg.type !== "status") {
+          setTypingMessageId(lastMsg._id);
+        }
+      }
+    }
+  }, [displayMessages, isHere]); // Added isHere to dependencies
+
+  const handleSend = async () => {
+    if (!input.trim() || sending || typingMessageId) return;
+
+    const content = input.trim();
+    setInput("");
+    setSending(true);
+
+    try {
+      let currentSessionId = sessionId;
+
+      if (!currentSessionId) {
+        // Create session with first user message as title (truncated)
+        const title =
+          content.length > 30 ? content.substring(0, 27) + "..." : content;
+        currentSessionId = await createSession({ title });
+
+        // Update navigation params so we stay in this session
+        navigation.setParams({ sessionId: currentSessionId });
+      }
+
+      await sendMessage({
+        session_id: currentSessionId!,
+        content,
+      });
+    } catch (error) {
+      console.error("Failed to send message:", error);
+    } finally {
+      // We keep 'sending' true until the typing starts?
+      // Actually, once this returns, the message is in the DB.
+      // The effect above will catch the new message and set typingMessageId.
+      setSending(false);
+    }
+  };
+
+  const isBusy = sending || typingMessageId !== null;
 
   return (
     <Container>
@@ -55,10 +147,39 @@ export default function ChatScreen() {
         </Pressable>
       </View>
       <ScrollView
+        ref={scrollViewRef}
         contentContainerStyle={{ flexGrow: 1, paddingBottom: 20 }}
         showsVerticalScrollIndicator={false}
+        onContentSizeChange={() =>
+          scrollViewRef.current?.scrollToEnd({ animated: true })
+        }
       >
-        {conversation.length === 0 ? (
+        {isLoading ? (
+          <View
+            style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
+          >
+            <View style={{ width: "100%", alignItems: "center" }}>
+              <Image
+                source={require("@/assets/images/splash-icon.png")}
+                style={{
+                  height: 80,
+                  width: 80,
+                  opacity: 0.5,
+                  marginBottom: 20,
+                }}
+              />
+              <Text
+                style={{
+                  color: Colors[theme].text_secondary,
+                  fontFamily: "FontMedium",
+                  fontSize: 16,
+                }}
+              >
+                Getting chat ready...
+              </Text>
+            </View>
+          </View>
+        ) : displayMessages.length === 0 && !sending ? (
           <View
             style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
           >
@@ -82,11 +203,11 @@ export default function ChatScreen() {
           </View>
         ) : (
           <View style={{ paddingHorizontal: 10 }}>
-            {conversation.map((msg) => {
+            {displayMessages.map((msg) => {
               if (msg.role === "user") {
                 return (
                   <View
-                    key={msg.id}
+                    key={msg._id}
                     style={[
                       styles.user_chat,
                       { backgroundColor: Colors[theme].surface },
@@ -108,7 +229,7 @@ export default function ChatScreen() {
 
               // Snoopa Messages
               return (
-                <View key={msg.id} style={styles.snoopa_container}>
+                <View key={msg._id} style={styles.snoopa_container}>
                   {msg.type === "status" ? (
                     <View
                       style={[
@@ -209,21 +330,103 @@ export default function ChatScreen() {
                           Snoopa
                         </Text>
                       </View>
-                      <Text
-                        style={{
-                          color: Colors[theme].text,
-                          fontFamily: "FontRegular",
-                          lineHeight: 24,
-                          fontSize: 15,
-                        }}
-                      >
-                        {msg.content}
-                      </Text>
+                      {typingMessageId === msg._id ? (
+                        <TypeWriter
+                          content={msg.content}
+                          onComplete={() => setTypingMessageId(null)}
+                          speed={5}
+                        />
+                      ) : (
+                        <Markdown
+                          style={{
+                            body: {
+                              color: Colors[theme].text,
+                              fontFamily: "FontRegular",
+                              fontSize: 15,
+                              lineHeight: 24,
+                            },
+                            heading1: {
+                              color: Colors[theme].text,
+                              fontFamily: "FontBold",
+                              fontSize: 22,
+                              marginBottom: 10,
+                            },
+                            heading2: {
+                              color: Colors[theme].text,
+                              fontFamily: "FontBold",
+                              fontSize: 20,
+                              marginBottom: 10,
+                            },
+                            strong: {
+                              fontFamily: "FontBold",
+                              color: Colors[theme].text,
+                            },
+                            bullet_list: {
+                              marginBottom: 10,
+                            },
+                            ordered_list: {
+                              marginBottom: 10,
+                            },
+                            code_inline: {
+                              backgroundColor: Colors[theme].surface,
+                              color: Colors[theme].primary,
+                              fontFamily: "FontMedium",
+                            },
+                            fence: {
+                              backgroundColor: Colors[theme].surface,
+                              borderColor: Colors[theme].border,
+                              borderWidth: 1,
+                              padding: 10,
+                              color: Colors[theme].text,
+                            },
+                          }}
+                        >
+                          {msg.content}
+                        </Markdown>
+                      )}
                     </View>
                   )}
                 </View>
               );
             })}
+
+            {/* Snooping... Indicator */}
+            {sending && (
+              <View style={styles.snoopa_container}>
+                <View
+                  style={[
+                    styles.snoopa_bubble,
+                    { backgroundColor: "transparent" },
+                  ]}
+                >
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      marginBottom: 4,
+                      gap: 8,
+                    }}
+                  >
+                    <Image
+                      source={require("@/assets/images/splash-icon.png")}
+                      style={[
+                        styles.snoopa_logo,
+                        { borderColor: Colors[theme].border },
+                      ]}
+                    />
+                    <Text
+                      style={{
+                        fontFamily: "FontBold",
+                        fontSize: 13,
+                        color: Colors[theme].text_secondary,
+                      }}
+                    >
+                      Snooping...
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            )}
           </View>
         )}
       </ScrollView>
@@ -244,8 +447,9 @@ export default function ChatScreen() {
             multiline
             value={input}
             onChangeText={setInput}
-            placeholder="Talk to me boss..."
+            placeholder={isBusy ? "Snooping..." : "Talk to me boss..."}
             placeholderTextColor={Colors[theme].text_secondary}
+            editable={!isBusy}
             style={{
               backgroundColor: "transparent",
               width: "100%",
@@ -278,6 +482,8 @@ export default function ChatScreen() {
             </View>
 
             <Pressable
+              onPress={handleSend}
+              disabled={isBusy || !input.trim()}
               style={{
                 padding: 6,
               }}
@@ -288,7 +494,7 @@ export default function ChatScreen() {
                   width: 22,
                   height: 22,
                   tintColor: Colors[theme].text,
-                  opacity: input ? 1 : 0.5,
+                  opacity: input && !isBusy ? 1 : 0.5,
                 }}
               />
             </Pressable>
