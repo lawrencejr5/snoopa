@@ -227,7 +227,13 @@ export default function ChatScreen() {
           <View
             style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
           >
-            <View style={{ width: "100%" }}>
+            <View
+              style={{
+                width: "100%",
+                justifyContent: "center",
+                alignItems: "center",
+              }}
+            >
               <Image
                 source={require("@/assets/images/splash-icon.png")}
                 style={{ height: 150, width: 150, alignSelf: "center" }}
@@ -239,6 +245,7 @@ export default function ChatScreen() {
                   fontSize: 22,
                   textAlign: "center",
                   marginTop: 20,
+                  width: "90%",
                 }}
               >
                 I’ve got the scent. What am I tracking today?

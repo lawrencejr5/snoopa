@@ -31,11 +31,19 @@ export const search = internalAction({
       try {
         const genAI = new GoogleGenerativeAI(geminiKey);
         const model = genAI.getGenerativeModel({
-          model: "gemini-2.5-flash-lite",
+          model: "gemini-2.0-flash-lite",
         });
 
-        const historySummary = args.history
-          .slice(-3) // Last 3 exchanges
+        let prunedForTavily;
+        if (args.history.length <= 4) {
+          prunedForTavily = args.history;
+        } else {
+          const head = args.history.slice(0, 1); // Just the very first message
+          const tail = args.history.slice(-3); // The most recent context
+          prunedForTavily = [...head, ...tail];
+        }
+
+        const historySummary = prunedForTavily
           .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
           .join("\n");
 
@@ -45,8 +53,7 @@ export const search = internalAction({
           
           New User Message: ${args.query}
           
-         Based on the following chat history, rewrite the user's latest question into a descriptive standalone search query for a news search engine.
-         Return ONLY the search query text.
+          Based on the following chat history, rewrite the user's latest question into a descriptive standalone search query for a news search engine.
         `;
 
         const result = await model.generateContent(prompt);
@@ -54,11 +61,9 @@ export const search = internalAction({
 
         if (result.response.usageMetadata) {
           console.log(
-            "Tavily Query Refinement - Input Tokens:",
+            "Tavily Query Refinement - Input: ",
             result.response.usageMetadata.promptTokenCount,
-          );
-          console.log(
-            "Tavily Query Refinement - Output Tokens:",
+            " Output: ",
             result.response.usageMetadata.candidatesTokenCount,
           );
         }
@@ -76,7 +81,7 @@ export const search = internalAction({
 
     // Search results from tavily api
     const searchResult = await tvly.search(refinedQuery, {
-      topic: "news",
+      topic: "general",
       searchDepth: "advanced",
       includeAnswer: false,
       maxResults: 5,
@@ -86,7 +91,7 @@ export const search = internalAction({
     return searchResult.results
       .map(
         (r: any, i: number) =>
-          `SOURCE [${i}]: ${r.title}\nContent: ${r.content}\nURL: ${r.url}`,
+          `SOURCE [${i + 1}]: ${r.title}\nContent: ${r.content}\nURL: ${r.url}`,
       )
       .join("\n\n");
   },
