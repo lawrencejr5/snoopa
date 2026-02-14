@@ -54,6 +54,7 @@ export const search = internalAction({
           New User Message: ${args.query}
           
           Based on the following chat history, rewrite the user's latest question into a descriptive standalone search query for a news search engine.
+          Standalone Query (One line only).
         `;
 
         const result = await model.generateContent(prompt);
