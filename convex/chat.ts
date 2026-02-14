@@ -81,10 +81,21 @@ export const send_message = action({
     });
 
     // 2. Fetch history for context
-    const messages = await ctx.runQuery(api.chat.get_messages, {
+    const dbMessages = await ctx.runQuery(api.chat.get_messages, {
       session_id: args.session_id,
     });
+    let messages;
+    if (dbMessages.length <= 6) {
+      // If the chat is short, just send everything
+      messages = dbMessages;
+    } else {
+      // KEEP: First 2 messages (First Question + First Answer)
+      const head = dbMessages.slice(0, 2);
+      // KEEP: Last 4 messages (Current Context)
+      const tail = dbMessages.slice(-4);
 
+      messages = [...head, ...tail];
+    }
     // 3. Initialize Gemini
     const api_key = process.env.GOOGLE_GEMINI_API_KEY;
     if (!api_key) {
@@ -125,10 +136,8 @@ export const send_message = action({
 
     // 4. Get AI Response
     try {
-      const prompt = `
-          SEARCH RESULTS: ${leanNews}
-          USER QUESTION: ${args.content}
-        `;
+      const prompt = `SEARCH RESULTS: ${leanNews}\nUSER QUESTION: ${args.content}`;
+
       const result = await chat_session.sendMessage(prompt);
       const response = result.response;
       const text = response.text();
@@ -156,7 +165,7 @@ export const send_message = action({
       console.error("Gemini Error:", error);
 
       const error_message =
-        "Sorry, I hit a snag while snitching. Try again in a bit.";
+        "Sorry, I hit a snag while snooping. Try again in a bit.";
       await ctx.runMutation(internal.chat.save_message, {
         session_id: args.session_id,
         role: "snoopa",
