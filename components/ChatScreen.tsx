@@ -5,7 +5,7 @@ import { useTheme } from "@/context/ThemeContext";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { useRoute } from "@react-navigation/native";
-import { useAction, useMutation, useQuery } from "convex/react";
+import { useAction, useQuery } from "convex/react";
 import { useNavigation } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -34,7 +34,6 @@ export default function ChatScreen() {
     sessionId ? { session_id: sessionId } : "skip",
   );
 
-  const createSession = useMutation(api.session.create_session);
   const sendMessage = useAction(api.chat.send_message);
 
   const [sending, setSending] = useState(false);
@@ -78,6 +77,8 @@ export default function ChatScreen() {
           session_id: sessionId as Id<"sessions">,
           role: "user" as const,
           content: pendingContent,
+          type: undefined,
+          sources: undefined,
         },
       ];
     }
@@ -126,28 +127,18 @@ export default function ChatScreen() {
     setSending(true);
 
     try {
-      let currentSessionId = sessionId;
-
-      if (!currentSessionId) {
-        // Create session with first user message as title (truncated)
-        const title =
-          content.length > 30 ? content.substring(0, 27) + "..." : content;
-        currentSessionId = await createSession({ title });
-
-        // Update navigation params so we stay in this session
-        navigation.setParams({ sessionId: currentSessionId });
-      }
-
-      await sendMessage({
-        session_id: currentSessionId!,
+      const result = (await sendMessage({
+        session_id: sessionId ?? undefined,
         content,
-      });
+      })) as { response: string; session_id: string };
+
+      // If this was a new session, navigate to it
+      if (!sessionId && result?.session_id) {
+        navigation.setParams({ sessionId: result.session_id });
+      }
     } catch (error) {
       console.error("Failed to send message:", error);
     } finally {
-      // We keep 'sending' true until the typing starts?
-      // Actually, once this returns, the message is in the DB.
-      // The effect above will catch the new message and set typingMessageId.
       setSending(false);
     }
   };
@@ -385,7 +376,7 @@ export default function ChatScreen() {
                         <TypeWriter
                           content={msg.content}
                           onComplete={() => setTypingMessageId(null)}
-                          speed={5}
+                          speed={10}
                         />
                       ) : (
                         <Markdown
@@ -410,6 +401,7 @@ export default function ChatScreen() {
                             },
                             strong: {
                               fontFamily: "FontBold",
+                              fontWeight: "normal",
                               color: Colors[theme].text,
                             },
                             bullet_list: {
