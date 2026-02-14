@@ -64,6 +64,7 @@ export default function TypeWriter({
           },
           strong: {
             fontFamily: "FontBold",
+            fontWeight: "normal",
             color: Colors[theme].text,
           },
           bullet_list: {

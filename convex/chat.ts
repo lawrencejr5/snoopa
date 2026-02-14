@@ -118,19 +118,50 @@ export const send_message = action({
 
     const gen_ai = new GoogleGenerativeAI(api_key);
 
-    // Prepare history for Tavily
+    // Prepare history for context
     const mappedHistory = messages.map((msg) => ({
       role: msg.role,
       content: msg.content,
     }));
 
-    // Search results from tavily via internal action
-    const leanNews = await ctx.runAction(internal.tavily.search, {
-      query: args.content,
-      history: mappedHistory,
-    });
+    // 5. Detect intent: Does this query need web search?
+    let needsSearch = false;
+    try {
+      const intentModel = gen_ai.getGenerativeModel({
+        model: "gemini-2.0-flash-lite",
+      });
 
-    // 5. Try models in order with automatic fallback
+      const intentPrompt = `Analyze this user question and determine if it requires current/live information from the web.
+          USER QUESTION: "${args.content}"
+
+          Reply with ONLY "YES" if the question needs web search (news, current events, recent facts, statistics, live data, specific products/services).
+          Reply with ONLY "NO" if it's conversational, general knowledge, greetings, opinions, or can be answered without current web data.
+
+          Answer (YES or NO):`;
+
+      const intentResult = await intentModel.generateContent(intentPrompt);
+      const intentResponse = intentResult.response.text().trim().toUpperCase();
+      console.log(intentResponse);
+      needsSearch = intentResponse.includes("YES");
+
+      console.log(
+        `🔍 Intent Detection: Query "${args.content.substring(0, 50)}..." → ${needsSearch ? "NEEDS SEARCH" : "DIRECT ANSWER"}`,
+      );
+    } catch (err) {
+      console.warn("Intent detection failed, defaulting to search:", err);
+      needsSearch = true; // Default to search if intent detection fails
+    }
+
+    // 6. Conditionally fetch search results from Tavily
+    let leanNews = "";
+    if (needsSearch) {
+      leanNews = await ctx.runAction(internal.tavily.search, {
+        query: args.content,
+        history: mappedHistory,
+      });
+    }
+
+    // 7. Try models in order with automatic fallback
     const modelsToTry = ["gemini-2.5-flash-lite", "gemini-2.0-flash"];
     let response_text = "";
     let lastError: any = null;
@@ -138,8 +169,9 @@ export const send_message = action({
     const instructions = `You are Snoopa, a proactive AI agent that hunts for verified facts and 'snoops' them to users developed my Lawjun Technologies.
       Your mascot is a Greyhound - fast, lean, and sharp. You provide accurate, verified information in a modern, clean, and elegant tone.
       Determine from the user's prompt if you need to be descriptive or very direct.
-      Always site your sources when giving news.
+      ${needsSearch ? "Always cite your sources when giving news or factual information." : "Be conversational and friendly for general chat."}
       If you snoop something, be sure it's verified. Don't be verbose; be speed-optimized.`;
+
     for (const model_name of modelsToTry) {
       try {
         const model = gen_ai.getGenerativeModel({
@@ -156,7 +188,11 @@ export const send_message = action({
           history: history.slice(0, -1),
         });
 
-        const prompt = `SEARCH RESULTS: ${leanNews}\nUSER QUESTION: ${args.content}`;
+        // Adjust prompt based on whether we have search results
+        const prompt = needsSearch
+          ? `SEARCH RESULTS: ${leanNews}\nUSER QUESTION: ${args.content}`
+          : args.content;
+
         const result = await chat_session.sendMessage(prompt);
         const response = result.response;
         response_text = response.text();
