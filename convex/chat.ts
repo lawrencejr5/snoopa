@@ -2,6 +2,7 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { v } from "convex/values";
 import { api, internal } from "./_generated/api";
+import { Id } from "./_generated/dataModel";
 import { action, internalMutation, query } from "./_generated/server";
 
 // --- Queries ---
@@ -66,37 +67,50 @@ export const save_message = internalMutation({
  */
 export const send_message = action({
   args: {
-    session_id: v.id("sessions"),
+    session_id: v.optional(v.id("sessions")),
     content: v.string(),
   },
   handler: async (ctx, args) => {
     const user_id = await getAuthUserId(ctx);
     if (!user_id) throw new Error("Not authenticated");
 
-    // 1. Save user message
+    // 1. Create session if needed
+    const isNewSession = !args.session_id;
+    let currentSessionId: Id<"sessions">;
+
+    if (args.session_id) {
+      currentSessionId = args.session_id;
+    } else {
+      currentSessionId = await ctx.runMutation(
+        internal.session.create_session,
+        {
+          user_id,
+          title: "New Chat",
+        },
+      );
+    }
+
+    // 2. Save user message
     await ctx.runMutation(internal.chat.save_message, {
-      session_id: args.session_id,
+      session_id: currentSessionId,
       role: "user",
       content: args.content,
     });
 
-    // 2. Fetch history for context
+    // 3. Fetch history for context
     const dbMessages = await ctx.runQuery(api.chat.get_messages, {
-      session_id: args.session_id,
+      session_id: currentSessionId,
     });
     let messages;
     if (dbMessages.length <= 6) {
-      // If the chat is short, just send everything
       messages = dbMessages;
     } else {
-      // KEEP: First 2 messages (First Question + First Answer)
       const head = dbMessages.slice(0, 2);
-      // KEEP: Last 4 messages (Current Context)
       const tail = dbMessages.slice(-4);
-
       messages = [...head, ...tail];
     }
-    // 3. Initialize Gemini
+
+    // 4. Initialize Gemini
     const api_key = process.env.GOOGLE_GEMINI_API_KEY;
     if (!api_key) {
       throw new Error("GOOGLE_API_KEY is not set in environment variables");
@@ -104,7 +118,7 @@ export const send_message = action({
 
     const gen_ai = new GoogleGenerativeAI(api_key);
 
-    // Prepare history for Gemini
+    // Prepare history for Tavily
     const mappedHistory = messages.map((msg) => ({
       role: msg.role,
       content: msg.content,
@@ -116,7 +130,7 @@ export const send_message = action({
       history: mappedHistory,
     });
 
-    // 4. Try models in order with automatic fallback
+    // 5. Try models in order with automatic fallback
     const modelsToTry = ["gemini-2.5-flash-lite", "gemini-2.0-flash"];
     let response_text = "";
     let lastError: any = null;
@@ -133,13 +147,11 @@ export const send_message = action({
           systemInstruction: instructions,
         });
 
-        // Prepare history for Gemini
         const history = messages.map((msg) => ({
           role: msg.role === "user" ? "user" : "model",
           parts: [{ text: msg.content }],
         }));
 
-        // Remove the last message from history as it's the one we're sending now
         const chat_session = model.startChat({
           history: history.slice(0, -1),
         });
@@ -155,7 +167,6 @@ export const send_message = action({
           );
         }
 
-        // Success! Break out of the loop
         break;
       } catch (error: any) {
         lastError = error;
@@ -164,31 +175,51 @@ export const send_message = action({
           error.message?.split(":")[0] || error.message || "Unknown error",
         );
 
-        // If it's the last model in the list, we have to give up
         if (model_name === modelsToTry[modelsToTry.length - 1]) {
           console.error("All AI models failed. Last error:", lastError);
 
           const error_message =
             "Sorry, I hit a snag while snooping. Try again in a bit.";
           await ctx.runMutation(internal.chat.save_message, {
-            session_id: args.session_id,
+            session_id: currentSessionId,
             role: "snoopa",
             content: error_message,
           });
 
           throw new Error("All AI models failed.");
         }
-        // Otherwise, continue to the next model
       }
     }
 
-    // 5. Save AI response
+    // 6. Save AI response
     await ctx.runMutation(internal.chat.save_message, {
-      session_id: args.session_id,
+      session_id: currentSessionId,
       role: "snoopa",
       content: response_text,
     });
 
-    return response_text;
+    // 7. Generate session title with Gemini if this is a new session
+    if (isNewSession) {
+      try {
+        const titleModel = gen_ai.getGenerativeModel({
+          model: "gemini-2.0-flash",
+        });
+        const titleResult = await titleModel.generateContent(
+          `Generate a short, concise title (max 6 words) for a chat that starts with this question: "${args.content}". Return ONLY the title text, nothing else. No quotes.`,
+        );
+        const title = titleResult.response.text().trim();
+        if (title) {
+          await ctx.runMutation(internal.session.set_title, {
+            session_id: currentSessionId,
+            title,
+          });
+        }
+      } catch (err) {
+        console.warn("Failed to generate session title:", err);
+        // Not critical — the session still works with "New Chat"
+      }
+    }
+
+    return { response: response_text, session_id: currentSessionId };
   },
 });
