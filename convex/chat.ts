@@ -116,63 +116,79 @@ export const send_message = action({
       history: mappedHistory,
     });
 
-    // User requested gemini-2.5-flash
-    const model = gen_ai.getGenerativeModel({
-      model: "gemini-2.5-flash-lite",
-      systemInstruction:
-        "You are Snoopa, a proactive AI agent that hunts for verified facts and 'snoops' them to users. Your mascot is a Greyhound - fast, lean, and sharp. You provide accurate, verified information in a modern, clean, and elegant tone. Be direct but detailed, and also site your sources when giving news. If you snoop something, be sure it's verified. Don't be verbose; be speed-optimized.",
-    });
+    // 4. Try models in order with automatic fallback
+    const modelsToTry = ["gemini-2.5-flash-lite", "gemini-2.0-flash"];
+    let response_text = "";
+    let lastError: any = null;
 
-    // Prepare history for Gemini
-    const history = messages.map((msg) => ({
-      role: msg.role === "user" ? "user" : "model",
-      parts: [{ text: msg.content }],
-    }));
+    const instructions = `You are Snoopa, a proactive AI agent that hunts for verified facts and 'snoops' them to users developed my Lawjun Technologies.
+      Your mascot is a Greyhound - fast, lean, and sharp. You provide accurate, verified information in a modern, clean, and elegant tone.
+      Determine from the user's prompt if you need to be descriptive or very direct.
+      Always site your sources when giving news.
+      If you snoop something, be sure it's verified. Don't be verbose; be speed-optimized.`;
+    for (const model_name of modelsToTry) {
+      try {
+        const model = gen_ai.getGenerativeModel({
+          model: model_name,
+          systemInstruction: instructions,
+        });
 
-    // Remove the last message from history as it's the one we're sending now
-    const chat_session = model.startChat({
-      history: history.slice(0, -1),
-    });
+        // Prepare history for Gemini
+        const history = messages.map((msg) => ({
+          role: msg.role === "user" ? "user" : "model",
+          parts: [{ text: msg.content }],
+        }));
 
-    // 4. Get AI Response
-    try {
-      const prompt = `SEARCH RESULTS: ${leanNews}\nUSER QUESTION: ${args.content}`;
+        // Remove the last message from history as it's the one we're sending now
+        const chat_session = model.startChat({
+          history: history.slice(0, -1),
+        });
 
-      const result = await chat_session.sendMessage(prompt);
-      const response = result.response;
-      const text = response.text();
+        const prompt = `SEARCH RESULTS: ${leanNews}\nUSER QUESTION: ${args.content}`;
+        const result = await chat_session.sendMessage(prompt);
+        const response = result.response;
+        response_text = response.text();
 
-      if (response.usageMetadata) {
-        console.log(
-          "Chat Response - Input Tokens:",
-          response.usageMetadata.promptTokenCount,
+        if (response.usageMetadata) {
+          console.log(
+            `✅ Success (${model_name}) - Input: ${response.usageMetadata.promptTokenCount}, Output: ${response.usageMetadata.candidatesTokenCount}`,
+          );
+        }
+
+        // Success! Break out of the loop
+        break;
+      } catch (error: any) {
+        lastError = error;
+        console.warn(
+          `⚠️ Failed with ${model_name}:`,
+          error.message?.split(":")[0] || error.message || "Unknown error",
         );
-        console.log(
-          "Chat Response - Output Tokens:",
-          response.usageMetadata.candidatesTokenCount,
-        );
+
+        // If it's the last model in the list, we have to give up
+        if (model_name === modelsToTry[modelsToTry.length - 1]) {
+          console.error("All AI models failed. Last error:", lastError);
+
+          const error_message =
+            "Sorry, I hit a snag while snooping. Try again in a bit.";
+          await ctx.runMutation(internal.chat.save_message, {
+            session_id: args.session_id,
+            role: "snoopa",
+            content: error_message,
+          });
+
+          throw new Error("All AI models failed.");
+        }
+        // Otherwise, continue to the next model
       }
-
-      // 5. Save AI response
-      await ctx.runMutation(internal.chat.save_message, {
-        session_id: args.session_id,
-        role: "snoopa",
-        content: text,
-      });
-
-      return text;
-    } catch (error) {
-      console.error("Gemini Error:", error);
-
-      const error_message =
-        "Sorry, I hit a snag while snooping. Try again in a bit.";
-      await ctx.runMutation(internal.chat.save_message, {
-        session_id: args.session_id,
-        role: "snoopa",
-        content: error_message,
-      });
-
-      throw new Error("Failed to get AI response");
     }
+
+    // 5. Save AI response
+    await ctx.runMutation(internal.chat.save_message, {
+      session_id: args.session_id,
+      role: "snoopa",
+      content: response_text,
+    });
+
+    return response_text;
   },
 });

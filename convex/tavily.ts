@@ -53,8 +53,7 @@ export const search = internalAction({
           
           New User Message: ${args.query}
           
-         Based on the following chat history, rewrite the user's latest question into a descriptive standalone search query for a news search engine.
-         Return ONLY the search query text.
+          Based on the following chat history, rewrite the user's latest question into a descriptive standalone search query for a news search engine.
         `;
 
         const result = await model.generateContent(prompt);
@@ -62,11 +61,9 @@ export const search = internalAction({
 
         if (result.response.usageMetadata) {
           console.log(
-            "Tavily Query Refinement - Input Tokens:",
+            "Tavily Query Refinement - Input: ",
             result.response.usageMetadata.promptTokenCount,
-          );
-          console.log(
-            "Tavily Query Refinement - Output Tokens:",
+            " Output: ",
             result.response.usageMetadata.candidatesTokenCount,
           );
         }
