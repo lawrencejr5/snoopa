@@ -128,7 +128,7 @@ export default function ChatScreen() {
 
     try {
       const result = (await sendMessage({
-        session_id: sessionId,
+        session_id: sessionId ?? undefined,
         content,
       })) as { response: string; session_id: string };
 
@@ -376,7 +376,7 @@ export default function ChatScreen() {
                         <TypeWriter
                           content={msg.content}
                           onComplete={() => setTypingMessageId(null)}
-                          speed={5}
+                          speed={10}
                         />
                       ) : (
                         <Markdown
@@ -401,6 +401,7 @@ export default function ChatScreen() {
                             },
                             strong: {
                               fontFamily: "FontBold",
+                              fontWeight: "normal",
                               color: Colors[theme].text,
                             },
                             bullet_list: {
