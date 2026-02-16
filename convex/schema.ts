@@ -37,6 +37,7 @@ const schema = defineSchema({
     status: v.union(v.literal("active"), v.literal("completed")),
     last_checked: v.number(),
     sources: v.array(v.string()),
+    message_id: v.optional(v.id("chats")), // Track which message created this
   }).index("by_user", ["user_id"]),
 
   logs: defineTable({

@@ -7,7 +7,7 @@ import { mutation, query } from "./_generated/server";
 /**
  * Get all watchlist items for the current user.
  */
-export const get_watchlist = query({
+export const get_watchlists = query({
   args: {},
   handler: async (ctx) => {
     const user_id = await getAuthUserId(ctx);
@@ -58,6 +58,37 @@ export const get_watchlist_logs = query({
   },
 });
 
+/**
+ * Get all message IDs that have been saved as watchlist items for the current user.
+ * Used to show which messages have already been saved.
+ */
+export const get_saved_message_ids = query({
+  args: { session_id: v.id("sessions") },
+  handler: async (ctx, args) => {
+    const user_id = await getAuthUserId(ctx);
+    if (!user_id) return [];
+
+    const watchlistItems = await ctx.db
+      .query("watchlist")
+      .withIndex("by_user", (q) => q.eq("user_id", user_id))
+      .collect();
+
+    // Filter for items that have message_id and belong to this session
+    const messageIds: string[] = [];
+    for (const item of watchlistItems) {
+      if (item.message_id) {
+        // Verify the message belongs to this session
+        const message = await ctx.db.get(item.message_id);
+        if (message && message.session_id === args.session_id) {
+          messageIds.push(item.message_id);
+        }
+      }
+    }
+
+    return messageIds;
+  },
+});
+
 // --- Mutations ---
 
 /**
@@ -69,6 +100,7 @@ export const add_watchlist_item = mutation({
     title: v.string(),
     description: v.string(),
     sources: v.optional(v.array(v.string())),
+    message_id: v.optional(v.id("chats")),
   },
   handler: async (ctx, args) => {
     const id = await ctx.db.insert("watchlist", {
@@ -78,6 +110,7 @@ export const add_watchlist_item = mutation({
       status: "active",
       last_checked: Date.now(),
       sources: args.sources ?? [],
+      message_id: args.message_id,
     });
 
     // Create an initial log entry

@@ -82,12 +82,13 @@ export default function WatchlistScreen() {
   const { signedIn } = useUser();
 
   // Fetch watchlist data from backend
-  const watchlistData = useQuery(api.watchlist.get_watchlist) || [];
+  const watchlistData = useQuery(api.watchlist.get_watchlists) || [];
 
   const activeSnoops = watchlistData.filter((i) => i.status === "active");
   const closedSnoops = watchlistData.filter((i) => i.status === "completed");
 
-  if (isLoading || !signedIn || appLoading) return <Loading />;
+  if (isLoading || !signedIn || appLoading || !watchlistData)
+    return <Loading />;
 
   return (
     <Container>

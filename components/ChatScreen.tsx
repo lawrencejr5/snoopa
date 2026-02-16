@@ -36,6 +36,12 @@ export default function ChatScreen() {
     sessionId ? { session_id: sessionId } : "skip",
   );
 
+  // Get saved message IDs to restore saved state
+  const savedMessageIds = useQuery(
+    api.watchlist.get_saved_message_ids,
+    sessionId ? { session_id: sessionId } : "skip",
+  );
+
   const sendMessage = useAction(api.chat.send_message);
   const addWatchlist = useMutation(api.watchlist.add_watchlist_item);
   const { signedIn } = useUser();
@@ -57,6 +63,17 @@ export default function ChatScreen() {
   const [expandedWatchlist, setExpandedWatchlist] = useState<{
     [key: string]: boolean;
   }>({});
+
+  // Populate savedWatchlist from database when savedMessageIds loads
+  useEffect(() => {
+    if (savedMessageIds && savedMessageIds.length > 0) {
+      const savedState: { [key: string]: boolean } = {};
+      savedMessageIds.forEach((msgId) => {
+        savedState[msgId] = true;
+      });
+      setSavedWatchlist(savedState);
+    }
+  }, [savedMessageIds]);
 
   // Check if we are loading messages for an existing session
 
@@ -189,6 +206,7 @@ export default function ChatScreen() {
         user_id: signedIn._id,
         title: watchlistData.title,
         description: watchlistData.description,
+        message_id: msgId,
       });
 
       setSavedWatchlist((prev) => ({

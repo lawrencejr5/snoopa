@@ -5,8 +5,9 @@ import Colors from "@/constants/Colors";
 import { useLoadingContext } from "@/context/LoadingContext";
 import { useTheme } from "@/context/ThemeContext";
 import { useUser } from "@/context/UserContext";
+import { api } from "@/convex/_generated/api";
 import { createDrawerNavigator } from "@react-navigation/drawer";
-import { useConvexAuth } from "convex/react";
+import { useConvexAuth, useQuery } from "convex/react";
 
 const Drawer = createDrawerNavigator();
 
@@ -16,8 +17,9 @@ const IndexPage = () => {
   const { theme } = useTheme();
 
   const { signedIn } = useUser();
+  const watchlists = useQuery(api.watchlist.get_watchlists) || [];
 
-  if (isLoading || !signedIn || appLoading) return <Loading />;
+  if (isLoading || !signedIn || appLoading || !watchlists) return <Loading />;
 
   return (
     <Drawer.Navigator
