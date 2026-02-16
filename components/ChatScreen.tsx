@@ -18,7 +18,7 @@ import {
 } from "react-native";
 import { TextInput } from "react-native-gesture-handler";
 import { KeyboardStickyView } from "react-native-keyboard-controller";
-import Markdown from "react-native-markdown-display";
+import FormatText from "./FormatText";
 
 export default function ChatScreen() {
   const { theme } = useTheme();
@@ -379,53 +379,7 @@ export default function ChatScreen() {
                           speed={10}
                         />
                       ) : (
-                        <Markdown
-                          style={{
-                            body: {
-                              color: Colors[theme].text,
-                              fontFamily: "FontRegular",
-                              fontSize: 15,
-                              lineHeight: 24,
-                            },
-                            heading1: {
-                              color: Colors[theme].text,
-                              fontFamily: "FontBold",
-                              fontSize: 22,
-                              marginBottom: 10,
-                            },
-                            heading2: {
-                              color: Colors[theme].text,
-                              fontFamily: "FontBold",
-                              fontSize: 20,
-                              marginBottom: 10,
-                            },
-                            strong: {
-                              fontFamily: "FontBold",
-                              fontWeight: "normal",
-                              color: Colors[theme].text,
-                            },
-                            bullet_list: {
-                              marginBottom: 10,
-                            },
-                            ordered_list: {
-                              marginBottom: 10,
-                            },
-                            code_inline: {
-                              backgroundColor: Colors[theme].surface,
-                              color: Colors[theme].primary,
-                              fontFamily: "FontMedium",
-                            },
-                            fence: {
-                              backgroundColor: Colors[theme].surface,
-                              borderColor: Colors[theme].border,
-                              borderWidth: 1,
-                              padding: 10,
-                              color: Colors[theme].text,
-                            },
-                          }}
-                        >
-                          {msg.content}
-                        </Markdown>
+                        <FormatText>{msg.content}</FormatText>
                       )}
                     </View>
                   )}
