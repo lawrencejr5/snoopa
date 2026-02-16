@@ -124,35 +124,49 @@ export const send_message = action({
       content: msg.content,
     }));
 
-    // 5. Detect intent: Does this query need web search?
-    let needsSearch = false;
+    // 5. Detect intent: SEARCH, WATCHLIST, or CHAT
+    let intent: "SEARCH" | "WATCHLIST" | "CHAT" = "CHAT";
     try {
       const intentModel = gen_ai.getGenerativeModel({
         model: "gemini-2.0-flash-lite",
       });
 
-      const intentPrompt = `Analyze this user question and determine if it requires current/live information from the web.
-          USER QUESTION: "${args.content}"
+      const intentPrompt = `Analyze this user message and determine the intent. Consider the conversation history for context.
 
-          Reply with ONLY "YES" if the question needs web search (news, current events, recent facts, statistics, live data, specific products/services).
-          Reply with ONLY "NO" if it's conversational, general knowledge, greetings, opinions, or can be answered without current web data.
+        CONVERSATION HISTORY:
+        ${mappedHistory.map((m) => `${m.role.toUpperCase()}: ${m.content}`).join("\n")}
 
-          Answer (YES or NO):`;
+        USER MESSAGE: "${args.content}"
+
+        Classify the intent as ONE of:
+        - SEARCH: The user wants current/live information from the web (news, current events, recent facts, statistics, live data, specific products/services, prices, scores, weather).
+        - WATCHLIST: The user wants to save, track, monitor, or add something to their watchlist. Examples: "track Bitcoin price", "watch for iPhone deals", "monitor this stock", "add X to my watchlist", "keep an eye on Y", "notify me when Z happens", "snoop on X for me".
+        - CHAT: The message is conversational, general knowledge, greetings, opinions, or can be answered without web data and is NOT a watchlist request.
+
+        Reply with ONLY one word: SEARCH, WATCHLIST, or CHAT.`;
 
       const intentResult = await intentModel.generateContent(intentPrompt);
       const intentResponse = intentResult.response.text().trim().toUpperCase();
-      console.log(intentResponse);
-      needsSearch = intentResponse.includes("YES");
+      console.log("Intent raw:", intentResponse);
+
+      if (intentResponse.includes("WATCHLIST")) {
+        intent = "WATCHLIST";
+      } else if (intentResponse.includes("SEARCH")) {
+        intent = "SEARCH";
+      } else {
+        intent = "CHAT";
+      }
 
       console.log(
-        `🔍 Intent Detection: Query "${args.content.substring(0, 50)}..." → ${needsSearch ? "NEEDS SEARCH" : "DIRECT ANSWER"}`,
+        `🔍 Intent Detection: Query "${args.content.substring(0, 50)}..." → ${intent}`,
       );
     } catch (err) {
-      console.warn("Intent detection failed, defaulting to search:", err);
-      needsSearch = true; // Default to search if intent detection fails
+      console.warn("Intent detection failed, defaulting to CHAT:", err);
+      intent = "CHAT";
     }
 
-    // 6. Conditionally fetch search results from Tavily
+    // 6. Conditionally fetch search results from Tavily (only for SEARCH intent)
+    const needsSearch = intent === "SEARCH";
     let leanNews = "";
     if (needsSearch) {
       leanNews = await ctx.runAction(internal.tavily.search, {
@@ -161,16 +175,33 @@ export const send_message = action({
       });
     }
 
-    // 7. Try models in order with automatic fallback
+    // 8. Try models in order with automatic fallback
     const modelsToTry = ["gemini-2.5-flash-lite", "gemini-2.0-flash"];
     let response_text = "";
     let lastError: any = null;
 
-    const instructions = `You are Snoopa, a proactive AI agent that hunts for verified facts and 'snoops' them to users developed my Lawjun Technologies.
+    // Build adaptive system instructions based on intent
+    let instructions = `You are Snoopa, a proactive AI agent that hunts for verified facts and 'snoops' them to users developed by Lawjun Technologies.
       Your mascot is a Greyhound - fast, lean, and sharp. You provide accurate, verified information in a modern, clean, and elegant tone.
-      Determine from the user's prompt if you need to be descriptive or very direct.
-      ${needsSearch ? "Always cite your sources when giving news or factual information." : "Be conversational and friendly for general chat."}
-      If you snoop something, be sure it's verified. Don't be verbose; be speed-optimized.`;
+      Determine from the user's prompt if you need to be descriptive or very direct. Don't be verbose; be speed-optimized.`;
+
+    if (intent === "SEARCH") {
+      instructions += `\n\nYou are being provided with web search results. Always cite your sources when giving news or factual information.`;
+    } else if (intent === "WATCHLIST") {
+      instructions += `\n\nThe user wants to add something to their watchlist. Extract the watchlist item details and respond with EXACTLY this format:
+
+        <Your friendly confirmation message here, 1-2 sentences acknowledging what you're tracking for them>
+        ---WATCHLIST_DATA---
+        {"title": "<concise title, max 8 words>", "description": "<1-2 sentence description of what to track and why>"}
+
+        Rules:
+        - The title should be clear and specific (e.g. "Bitcoin Price Movement", "iPhone 16 Pro Deals")
+        - The description should explain what exactly is being monitored
+        - The confirmation message should be in Snoopa's voice — sharp, proactive, and cool
+        - Do NOT include markdown formatting in the response`;
+    } else {
+      instructions += `\n\nBe conversational and friendly for general chat.`;
+    }
 
     for (const model_name of modelsToTry) {
       try {
@@ -188,10 +219,11 @@ export const send_message = action({
           history: history.slice(0, -1),
         });
 
-        // Adjust prompt based on whether we have search results
-        const prompt = needsSearch
-          ? `SEARCH RESULTS: ${leanNews}\nUSER QUESTION: ${args.content}`
-          : args.content;
+        // Adjust prompt based on intent
+        let prompt = args.content;
+        if (intent === "SEARCH") {
+          prompt = `SEARCH RESULTS: ${leanNews}\n\nUSER QUESTION: ${args.content}`;
+        }
 
         const result = await chat_session.sendMessage(prompt);
         const response = result.response;
@@ -227,18 +259,19 @@ export const send_message = action({
       }
     }
 
-    // 6. Save AI response
+    // 9. Save AI response (with type "status" for watchlist items)
     await ctx.runMutation(internal.chat.save_message, {
       session_id: currentSessionId,
       role: "snoopa",
       content: response_text,
+      type: intent === "WATCHLIST" ? "status" : undefined,
     });
 
-    // 7. Generate session title with Gemini if this is a new session
+    // 10. Generate session title with Gemini if this is a new session
     if (isNewSession) {
       try {
         const titleModel = gen_ai.getGenerativeModel({
-          model: "gemini-2.0-flash",
+          model: "gemini-2.0-flash-lite",
         });
         const titleResult = await titleModel.generateContent(
           `Generate a short, concise title (max 6 words) for a chat that starts with this question: "${args.content}". Return ONLY the title text, nothing else. No quotes.`,
