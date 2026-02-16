@@ -1,7 +1,9 @@
 import Container from "@/components/Container";
 import Colors from "@/constants/Colors";
 import { useTheme } from "@/context/ThemeContext";
-import { LogItem, watchlistData } from "@/dummy_data/watchlist";
+import { api } from "@/convex/_generated/api";
+import { Id } from "@/convex/_generated/dataModel";
+import { useQuery } from "convex/react";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   Image,
@@ -16,7 +18,17 @@ export default function SnoopDetailsScreen() {
   const { theme } = useTheme();
   const router = useRouter();
   const { id } = useLocalSearchParams();
-  const snoop = watchlistData.find((item) => item.id === id);
+
+  // Fetch watchlist item and logs from backend
+  const snoop = useQuery(
+    api.watchlist.get_watchlist_item,
+    id ? { watchlist_id: id as Id<"watchlist"> } : "skip",
+  );
+
+  const logs = useQuery(
+    api.watchlist.get_watchlist_logs,
+    id ? { watchlist_id: id as Id<"watchlist"> } : "skip",
+  );
 
   if (!snoop) {
     return (
@@ -112,7 +124,7 @@ export default function SnoopDetailsScreen() {
                 color: Colors[theme].text_secondary,
               }}
             >
-              Source: {snoop.source}
+              Sources: {snoop.sources.length > 0 ? snoop.sources[0] : "None"}
             </Text>
           </View>
         </View>
@@ -137,13 +149,13 @@ export default function SnoopDetailsScreen() {
               },
             ]}
           >
-            {snoop.logs && snoop.logs.length > 0 ? (
-              snoop.logs.map((log: LogItem, index: number) => (
+            {logs && logs.length > 0 ? (
+              logs.map((log, index) => (
                 <View
-                  key={log.id}
+                  key={log._id}
                   style={[
                     styles.logItem,
-                    index !== snoop.logs!.length - 1 && {
+                    index !== logs.length - 1 && {
                       borderBottomWidth: 1,
                       borderBottomColor: Colors[theme].border + "50",
                     },
@@ -156,7 +168,10 @@ export default function SnoopDetailsScreen() {
                         { color: Colors[theme].text_secondary },
                       ]}
                     >
-                      {log.time}
+                      {new Date(log.timestamp).toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
                     </Text>
                   </View>
                   <View style={{ flex: 1 }}>

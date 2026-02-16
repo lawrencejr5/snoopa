@@ -2,13 +2,15 @@ import Container from "@/components/Container";
 import TypeWriter from "@/components/TypeWriter";
 import Colors from "@/constants/Colors";
 import { useTheme } from "@/context/ThemeContext";
+import { useUser } from "@/context/UserContext";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { useRoute } from "@react-navigation/native";
-import { useAction, useQuery } from "convex/react";
+import { useAction, useMutation, useQuery } from "convex/react";
 import { useNavigation } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Image,
   Pressable,
   ScrollView,
@@ -18,7 +20,7 @@ import {
 } from "react-native";
 import { TextInput } from "react-native-gesture-handler";
 import { KeyboardStickyView } from "react-native-keyboard-controller";
-import Markdown from "react-native-markdown-display";
+import FormatText from "./FormatText";
 
 export default function ChatScreen() {
   const { theme } = useTheme();
@@ -34,7 +36,15 @@ export default function ChatScreen() {
     sessionId ? { session_id: sessionId } : "skip",
   );
 
+  // Get saved message IDs to restore saved state
+  const savedMessageIds = useQuery(
+    api.watchlist.get_saved_message_ids,
+    sessionId ? { session_id: sessionId } : "skip",
+  );
+
   const sendMessage = useAction(api.chat.send_message);
+  const addWatchlist = useMutation(api.watchlist.add_watchlist_item);
+  const { signedIn } = useUser();
 
   const [sending, setSending] = useState(false);
   const [typingMessageId, setTypingMessageId] = useState<Id<"chats"> | null>(
@@ -42,6 +52,28 @@ export default function ChatScreen() {
   );
   const lastProcessedMessageIdRef = useRef<string | null>(null);
   const [isHere, setIsHere] = useState(false);
+
+  // Track saving and saved state for watchlist items
+  const [savingWatchlist, setSavingWatchlist] = useState<{
+    [key: string]: boolean;
+  }>({});
+  const [savedWatchlist, setSavedWatchlist] = useState<{
+    [key: string]: boolean;
+  }>({});
+  const [expandedWatchlist, setExpandedWatchlist] = useState<{
+    [key: string]: boolean;
+  }>({});
+
+  // Populate savedWatchlist from database when savedMessageIds loads
+  useEffect(() => {
+    if (savedMessageIds && savedMessageIds.length > 0) {
+      const savedState: { [key: string]: boolean } = {};
+      savedMessageIds.forEach((msgId) => {
+        savedState[msgId] = true;
+      });
+      setSavedWatchlist(savedState);
+    }
+  }, [savedMessageIds]);
 
   // Check if we are loading messages for an existing session
 
@@ -146,6 +178,50 @@ export default function ChatScreen() {
   const isBusy = sending || typingMessageId !== null;
   const isLoading =
     sessionId && messages === undefined && displayMessages.length === 0;
+
+  // Delimiter function
+  const extractConfirmationMessage = (content: string) => {
+    const delimiterIndex = content.indexOf("---WATCHLIST_DATA---");
+    if (delimiterIndex !== -1) {
+      return content.substring(0, delimiterIndex).trim();
+    }
+    return content;
+  };
+
+  // Handle save
+  const handleSaveWatchlist = async (
+    msgId: Id<"chats">,
+    watchlistData: { title: string; description: string },
+  ) => {
+    if (savedWatchlist[msgId] || savingWatchlist[msgId] || !signedIn?._id)
+      return;
+
+    setSavingWatchlist((prev) => ({
+      ...prev,
+      [msgId]: true,
+    }));
+
+    try {
+      await addWatchlist({
+        user_id: signedIn._id,
+        title: watchlistData.title,
+        description: watchlistData.description,
+        message_id: msgId,
+      });
+
+      setSavedWatchlist((prev) => ({
+        ...prev,
+        [msgId]: true,
+      }));
+    } catch (error) {
+      console.error("Failed to save watchlist:", error);
+    } finally {
+      setSavingWatchlist((prev) => ({
+        ...prev,
+        [msgId]: false,
+      }));
+    }
+  };
 
   return (
     <Container>
@@ -273,73 +349,191 @@ export default function ChatScreen() {
               return (
                 <View key={msg._id} style={styles.snoopa_container}>
                   {msg.type === "status" ? (
-                    <View
-                      style={[
-                        styles.status_card,
-                        {
-                          backgroundColor: Colors[theme].card,
-                          borderColor: Colors[theme].border,
-                        },
-                      ]}
-                    >
+                    <>
+                      {/* Confirmation Message (Regular Chat Style) */}
                       <View
-                        style={{
-                          flexDirection: "row",
-                          alignItems: "center",
-                          marginBottom: 8,
-                          gap: 6,
-                        }}
+                        style={[
+                          styles.snoopa_bubble,
+                          { backgroundColor: "transparent" },
+                        ]}
                       >
-                        <Image
-                          source={require("@/assets/icons/eyes.png")}
-                          style={{
-                            width: 14,
-                            height: 14,
-                            tintColor: Colors[theme].text_secondary,
-                          }}
-                        />
-                        <Text
-                          style={{
-                            color: Colors[theme].text_secondary,
-                            fontSize: 11,
-                            fontFamily: "FontBold",
-                            textTransform: "uppercase",
-                            letterSpacing: 0.5,
-                          }}
-                        >
-                          STATUS UPDATE
-                        </Text>
+                        <SnoopaHead />
+
+                        <FormatText>
+                          {extractConfirmationMessage(msg.content)}
+                        </FormatText>
                       </View>
-                      <Text
-                        style={{
-                          color: Colors[theme].text,
-                          fontFamily: "FontMedium",
-                          fontSize: 14,
-                          lineHeight: 20,
-                        }}
-                      >
-                        {msg.content}
-                      </Text>
-                      <Pressable
-                        style={{
-                          marginTop: 15,
-                          backgroundColor: Colors[theme].primary,
-                          paddingVertical: 10,
-                          borderRadius: 10,
-                          alignItems: "center",
-                        }}
-                      >
-                        <Text
-                          style={{
-                            color: Colors[theme].background,
-                            fontFamily: "FontBold",
-                            fontSize: 13,
-                          }}
-                        >
-                          View watch list
-                        </Text>
-                      </Pressable>
-                    </View>
+
+                      {/* Watchlist Card */}
+                      {(() => {
+                        try {
+                          const delimiterIndex = msg.content.indexOf(
+                            "---WATCHLIST_DATA---",
+                          );
+                          if (delimiterIndex !== -1) {
+                            const jsonStr = msg.content
+                              .substring(delimiterIndex + 20)
+                              .trim();
+                            const watchlistData = JSON.parse(jsonStr);
+
+                            const isSaving = savingWatchlist[msg._id] || false;
+                            const isSaved = savedWatchlist[msg._id] || false;
+
+                            return (
+                              <View
+                                style={[
+                                  styles.status_card,
+                                  {
+                                    backgroundColor: Colors[theme].surface,
+                                    borderColor: Colors[theme].border,
+                                    marginTop: 12,
+                                  },
+                                ]}
+                              >
+                                <View
+                                  style={{
+                                    flexDirection: "row",
+                                    alignItems: "center",
+                                    marginBottom: 10,
+                                    gap: 6,
+                                  }}
+                                >
+                                  <Image
+                                    source={require("@/assets/icons/eyes.png")}
+                                    style={{
+                                      width: 14,
+                                      height: 14,
+                                      tintColor: Colors[theme].primary,
+                                    }}
+                                  />
+                                  <Text
+                                    style={{
+                                      color: Colors[theme].primary,
+                                      fontSize: 11,
+                                      fontFamily: "FontBold",
+                                      textTransform: "uppercase",
+                                      letterSpacing: 0.5,
+                                    }}
+                                  >
+                                    WATCHLIST ITEM
+                                  </Text>
+                                </View>
+
+                                <Text
+                                  style={{
+                                    color: Colors[theme].text,
+                                    fontFamily: "FontBold",
+                                    fontSize: 16,
+                                    marginBottom: 8,
+                                    letterSpacing: -0.3,
+                                  }}
+                                >
+                                  {watchlistData.title}
+                                </Text>
+
+                                {/* Toggle Details Button */}
+                                <Pressable
+                                  onPress={() =>
+                                    setExpandedWatchlist((prev) => ({
+                                      ...prev,
+                                      [msg._id]: !prev[msg._id],
+                                    }))
+                                  }
+                                  style={{
+                                    flexDirection: "row",
+                                    alignItems: "center",
+                                    justifyContent: "flex-end",
+                                    gap: 4,
+                                  }}
+                                >
+                                  <Text
+                                    style={{
+                                      color: Colors[theme].primary,
+                                      fontFamily: "FontMedium",
+                                      fontSize: 13,
+                                    }}
+                                  >
+                                    View Details
+                                  </Text>
+                                  <Image
+                                    source={require("@/assets/icons/chevron-up.png")}
+                                    style={{
+                                      width: 12,
+                                      height: 12,
+                                      tintColor: Colors[theme].primary,
+                                      transform: [
+                                        {
+                                          rotate: expandedWatchlist[msg._id]
+                                            ? "0deg"
+                                            : "180deg",
+                                        },
+                                      ],
+                                    }}
+                                  />
+                                </Pressable>
+
+                                {/* Collapsible Description */}
+                                {expandedWatchlist[msg._id] && (
+                                  <Text
+                                    style={{
+                                      color: Colors[theme].text_secondary,
+                                      fontFamily: "FontRegular",
+                                      fontSize: 14,
+                                      lineHeight: 20,
+                                      marginBottom: 16,
+                                    }}
+                                  >
+                                    {watchlistData.description}
+                                  </Text>
+                                )}
+
+                                <Pressable
+                                  onPress={() =>
+                                    handleSaveWatchlist(msg._id, watchlistData)
+                                  }
+                                  disabled={isSaved || isSaving}
+                                  style={{
+                                    backgroundColor: Colors[theme].primary,
+                                    paddingVertical: 12,
+                                    marginTop: 20,
+                                    borderRadius: 10,
+                                    alignItems: "center",
+                                    flexDirection: "row",
+                                    justifyContent: "center",
+                                    gap: 8,
+                                    opacity: isSaved ? 0.7 : 1,
+                                  }}
+                                >
+                                  {isSaving && (
+                                    <ActivityIndicator
+                                      size="small"
+                                      color={Colors[theme].background}
+                                    />
+                                  )}
+                                  <Text
+                                    style={{
+                                      color: Colors[theme].background,
+                                      fontFamily: "FontBold",
+                                      fontSize: 14,
+                                    }}
+                                  >
+                                    {isSaved
+                                      ? "Saved!"
+                                      : isSaving
+                                        ? "Saving..."
+                                        : "Save to Watchlist"}
+                                  </Text>
+                                </Pressable>
+                              </View>
+                            );
+                          }
+                        } catch (e) {
+                          console.error("Failed to parse watchlist data:", e);
+                          return null;
+                        }
+                        return null;
+                      })()}
+                    </>
                   ) : (
                     <View
                       style={[
@@ -347,31 +541,7 @@ export default function ChatScreen() {
                         { backgroundColor: "transparent" },
                       ]}
                     >
-                      <View
-                        style={{
-                          flexDirection: "row",
-                          alignItems: "center",
-                          marginBottom: 4,
-                          gap: 8,
-                        }}
-                      >
-                        <Image
-                          source={require("@/assets/images/splash-icon.png")}
-                          style={[
-                            styles.snoopa_logo,
-                            { borderColor: Colors[theme].border },
-                          ]}
-                        />
-                        <Text
-                          style={{
-                            fontFamily: "FontBold",
-                            fontSize: 13,
-                            color: Colors[theme].text_secondary,
-                          }}
-                        >
-                          Snoopa
-                        </Text>
-                      </View>
+                      <SnoopaHead />
                       {typingMessageId === msg._id ? (
                         <TypeWriter
                           content={msg.content}
@@ -379,53 +549,7 @@ export default function ChatScreen() {
                           speed={10}
                         />
                       ) : (
-                        <Markdown
-                          style={{
-                            body: {
-                              color: Colors[theme].text,
-                              fontFamily: "FontRegular",
-                              fontSize: 15,
-                              lineHeight: 24,
-                            },
-                            heading1: {
-                              color: Colors[theme].text,
-                              fontFamily: "FontBold",
-                              fontSize: 22,
-                              marginBottom: 10,
-                            },
-                            heading2: {
-                              color: Colors[theme].text,
-                              fontFamily: "FontBold",
-                              fontSize: 20,
-                              marginBottom: 10,
-                            },
-                            strong: {
-                              fontFamily: "FontBold",
-                              fontWeight: "normal",
-                              color: Colors[theme].text,
-                            },
-                            bullet_list: {
-                              marginBottom: 10,
-                            },
-                            ordered_list: {
-                              marginBottom: 10,
-                            },
-                            code_inline: {
-                              backgroundColor: Colors[theme].surface,
-                              color: Colors[theme].primary,
-                              fontFamily: "FontMedium",
-                            },
-                            fence: {
-                              backgroundColor: Colors[theme].surface,
-                              borderColor: Colors[theme].border,
-                              borderWidth: 1,
-                              padding: 10,
-                              color: Colors[theme].text,
-                            },
-                          }}
-                        >
-                          {msg.content}
-                        </Markdown>
+                        <FormatText>{msg.content}</FormatText>
                       )}
                     </View>
                   )}
@@ -547,6 +671,34 @@ export default function ChatScreen() {
     </Container>
   );
 }
+
+const SnoopaHead = () => {
+  const { theme } = useTheme();
+  return (
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        marginBottom: 4,
+        gap: 8,
+      }}
+    >
+      <Image
+        source={require("@/assets/images/splash-icon.png")}
+        style={[styles.snoopa_logo, { borderColor: Colors[theme].border }]}
+      />
+      <Text
+        style={{
+          fontFamily: "FontBold",
+          fontSize: 13,
+          color: Colors[theme].text_secondary,
+        }}
+      >
+        Snoopa
+      </Text>
+    </View>
+  );
+};
 
 const styles = StyleSheet.create({
   user_chat: {
