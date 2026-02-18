@@ -315,39 +315,6 @@ export default function WatchlistScreen() {
                     {item.condition}
                   </Text>
 
-                  {item.keywords && item.keywords.length > 0 && (
-                    <View
-                      style={{
-                        flexDirection: "row",
-                        flexWrap: "wrap",
-                        gap: 6,
-                        marginBottom: 16,
-                      }}
-                    >
-                      {item.keywords.map((kw, i) => (
-                        <View
-                          key={i}
-                          style={{
-                            backgroundColor: Colors[theme].primary + "20",
-                            borderRadius: 6,
-                            paddingHorizontal: 8,
-                            paddingVertical: 3,
-                          }}
-                        >
-                          <Text
-                            style={{
-                              color: Colors[theme].primary,
-                              fontFamily: "FontMedium",
-                              fontSize: 12,
-                            }}
-                          >
-                            {kw}
-                          </Text>
-                        </View>
-                      ))}
-                    </View>
-                  )}
-
                   <View
                     style={[
                       styles.cardFooter,
