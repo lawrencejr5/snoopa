@@ -33,7 +33,8 @@ const schema = defineSchema({
   watchlist: defineTable({
     user_id: v.id("users"),
     title: v.string(),
-    description: v.string(),
+    keywords: v.array(v.string()),
+    condition: v.string(),
     status: v.union(v.literal("active"), v.literal("completed")),
     last_checked: v.number(),
     sources: v.array(v.string()),

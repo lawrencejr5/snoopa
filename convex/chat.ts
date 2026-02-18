@@ -192,11 +192,12 @@ export const send_message = action({
 
         <Your friendly confirmation message here, 1-2 sentences acknowledging what you're tracking for them>
         ---WATCHLIST_DATA---
-        {"title": "<concise title, max 8 words>", "description": "<1-2 sentence description of what to track and why>"}
+        {"title": "<concise title, max 8 words>", "keywords": ["<keyword1>", "<keyword2>", "<keyword3>"], "condition": "<clear, specific condition or rule that defines when this watchlist item should trigger an alert>"}
 
         Rules:
         - The title should be clear and specific (e.g. "Bitcoin Price Movement", "iPhone 16 Pro Deals")
-        - The description should explain what exactly is being monitored
+        - The keywords array should contain 3-6 targeted search terms relevant to tracking this item
+        - The condition should be a precise, actionable rule (e.g. "Alert when Bitcoin price drops below $80,000" or "Notify when a new iPhone 16 Pro deal appears under $900")
         - The confirmation message should be in Snoopa's voice — sharp, proactive, and cool
         - Do NOT include markdown formatting in the response`;
     } else {

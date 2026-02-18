@@ -98,7 +98,8 @@ export const add_watchlist_item = mutation({
   args: {
     user_id: v.id("users"),
     title: v.string(),
-    description: v.string(),
+    keywords: v.array(v.string()),
+    condition: v.string(),
     sources: v.optional(v.array(v.string())),
     message_id: v.optional(v.id("chats")),
   },
@@ -106,7 +107,8 @@ export const add_watchlist_item = mutation({
     const id = await ctx.db.insert("watchlist", {
       user_id: args.user_id,
       title: args.title,
-      description: args.description,
+      keywords: args.keywords,
+      condition: args.condition,
       status: "active",
       last_checked: Date.now(),
       sources: args.sources ?? [],
@@ -127,13 +129,14 @@ export const add_watchlist_item = mutation({
 });
 
 /**
- * Update a watchlist item (title, description).
+ * Update a watchlist item (title, keywords, condition).
  */
 export const update_watchlist_item = mutation({
   args: {
     watchlist_id: v.id("watchlist"),
     title: v.optional(v.string()),
-    description: v.optional(v.string()),
+    keywords: v.optional(v.array(v.string())),
+    condition: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const user_id = await getAuthUserId(ctx);
@@ -148,7 +151,8 @@ export const update_watchlist_item = mutation({
       last_checked: Date.now(),
     };
     if (args.title !== undefined) updates.title = args.title;
-    if (args.description !== undefined) updates.description = args.description;
+    if (args.keywords !== undefined) updates.keywords = args.keywords;
+    if (args.condition !== undefined) updates.condition = args.condition;
 
     await ctx.db.patch(args.watchlist_id, updates);
   },
