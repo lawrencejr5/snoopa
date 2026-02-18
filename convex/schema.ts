@@ -38,8 +38,13 @@ const schema = defineSchema({
     status: v.union(v.literal("active"), v.literal("completed")),
     last_checked: v.number(),
     sources: v.array(v.string()),
-    message_id: v.optional(v.id("chats")), // Track which message created this
+    message_id: v.optional(v.id("chats")),
   }).index("by_user", ["user_id"]),
+
+  processed_headlines: defineTable({
+    urlHash: v.string(),
+    createdAt: v.number(),
+  }).index("by_hash", ["urlHash"]),
 
   logs: defineTable({
     watchlist_id: v.id("watchlist"),
