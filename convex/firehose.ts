@@ -9,11 +9,10 @@ import { hashString } from "./utils";
 // ---------------------------------------------------------------------------
 
 const FIREHOSE_QUERIES = [
-  "latest news today",
-  "football soccer transfer news",
-  "politics government world news",
-  "finance markets stocks crypto",
-  "technology AI science news",
+  "Nigeria trending news today",
+  "football transfer injury news",
+  "Nigeria economy naira market",
+  "Nigerian politics government policy",
 ];
 
 // ---------------------------------------------------------------------------
@@ -40,26 +39,48 @@ interface SerperNewsResult {
   date?: string;
 }
 
+const RESULTS_PER_PAGE = 10; // Serper news hard cap per request
+const MAX_PAGES = 3; // 3 pages × 10 = 30 results per query
+
 async function fetchHeadlines(
   query: string,
   apiKey: string,
 ): Promise<SerperNewsResult[]> {
-  const res = await fetch("https://google.serper.dev/news", {
-    method: "POST",
-    headers: {
-      "X-API-KEY": apiKey,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ q: query, num: 50 }),
-  });
+  const all: SerperNewsResult[] = [];
 
-  if (!res.ok) {
-    console.error(`Serper error for query "${query}": ${res.status}`);
-    return [];
+  for (let page = 1; page <= MAX_PAGES; page++) {
+    const res = await fetch("https://google.serper.dev/news", {
+      method: "POST",
+      headers: {
+        "X-API-KEY": apiKey,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        q: query,
+        num: RESULTS_PER_PAGE,
+        page,
+        gl: "ng",
+        tbs: "qdr:d",
+      }),
+    });
+
+    if (!res.ok) {
+      console.error(
+        `Serper error for query "${query}" page ${page}: ${res.status} ${res.statusText}`,
+      );
+      break;
+    }
+
+    const data = await res.json();
+    const results = (data.news ?? []) as SerperNewsResult[];
+    all.push(...results);
+
+    // Stop early if Serper returned fewer results than requested
+    if (results.length < RESULTS_PER_PAGE) break;
   }
 
-  const data = await res.json();
-  return (data.news ?? []) as SerperNewsResult[];
+  console.log(`Serper: "${query}" → ${all.length} results`);
+  return all;
 }
 
 // ---------------------------------------------------------------------------
