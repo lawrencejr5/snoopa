@@ -43,8 +43,11 @@ const schema = defineSchema({
 
   processed_headlines: defineTable({
     urlHash: v.string(),
+    watchlist_id: v.id("watchlist"),
     createdAt: v.number(),
-  }).index("by_hash", ["urlHash"]),
+  })
+    .index("by_hash_and_watchlist", ["urlHash", "watchlist_id"])
+    .index("by_watchlist", ["watchlist_id"]),
 
   logs: defineTable({
     watchlist_id: v.id("watchlist"),

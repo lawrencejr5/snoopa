@@ -128,11 +128,16 @@ export const get_active_watchlist_items = internalQuery({
 });
 
 export const is_headline_processed = internalQuery({
-  args: { urlHash: v.string() },
+  args: {
+    urlHash: v.string(),
+    watchlist_id: v.id("watchlist"),
+  },
   handler: async (ctx, args) => {
     const existing = await ctx.db
       .query("processed_headlines")
-      .withIndex("by_hash", (q) => q.eq("urlHash", args.urlHash))
+      .withIndex("by_hash_and_watchlist", (q) =>
+        q.eq("urlHash", args.urlHash).eq("watchlist_id", args.watchlist_id),
+      )
       .first();
     return existing !== null;
   },
@@ -153,7 +158,7 @@ export const run_firehose = internalAction({
       return;
     }
 
-    // 1. Load all active watchlist items
+    // 1. Load all active watchlist items — 1 query
     const activeItems = await ctx.runQuery(
       internal.firehose.get_active_watchlist_items,
     );
@@ -163,7 +168,16 @@ export const run_firehose = internalAction({
       return;
     }
 
-    // 2. Fetch headlines from all topic queries in parallel
+    // 2. Bulk-load all processed hashes for all active items — 1 query
+    //    Builds an in-memory Set of "urlHash::watchlist_id" keys
+    const watchlistIds = activeItems.map((i) => i._id);
+    const processedKeys = await ctx.runQuery(
+      internal.log.get_processed_hashes_for_items,
+      { watchlist_ids: watchlistIds },
+    );
+    const processedSet = new Set<string>(processedKeys);
+
+    // 3. Fetch headlines from Serper in parallel — 4 fetches
     const headlineArrays = await Promise.all(
       FIREHOSE_QUERIES.map((q) => fetchHeadlines(q, serperKey)),
     );
@@ -173,44 +187,45 @@ export const run_firehose = internalAction({
       `Firehose: fetched ${allHeadlines.length} headlines across ${FIREHOSE_QUERIES.length} queries.`,
     );
 
-    // 3. Deduplicate by URL hash
+    // 4. Within-run dedup — in-memory only, zero DB cost
     const seen = new Set<string>();
-    const uniqueHeadlines: SerperNewsResult[] = [];
+    const uniqueHeadlines: Array<SerperNewsResult & { hash: string }> = [];
 
     for (const h of allHeadlines) {
       const hash = await hashString(h.link);
-
-      const alreadyProcessed = await ctx.runQuery(
-        internal.firehose.is_headline_processed,
-        { urlHash: hash },
-      );
-
-      if (alreadyProcessed || seen.has(hash)) continue;
+      if (seen.has(hash)) continue;
       seen.add(hash);
-      uniqueHeadlines.push(h);
-
-      await ctx.runMutation(internal.log.mark_headline_processed, {
-        urlHash: hash,
-      });
+      uniqueHeadlines.push({ ...h, hash });
     }
 
     console.log(
-      `Firehose: ${uniqueHeadlines.length} new unique headlines to process.`,
+      `Firehose: ${uniqueHeadlines.length} unique headlines to check.`,
     );
 
-    // 4. For each watchlist item, run keyword filter then Gemini verification
+    // 5. Process — all checks are in-memory, accumulate writes
+    const toMarkProcessed: Array<{
+      urlHash: string;
+      watchlist_id: (typeof activeItems)[0]["_id"];
+    }> = [];
+    const toInsertLogs: Array<{
+      watchlist_id: (typeof activeItems)[0]["_id"];
+      action: string;
+    }> = [];
+
     for (const item of activeItems) {
-      let matchCount = 0;
+      let keywordMatches = 0;
+      let verified = 0;
 
       for (const headline of uniqueHeadlines) {
-        const headlineText = `${headline.title} ${headline.snippet ?? ""}`;
+        const compositeKey = `${headline.hash}::${item._id}`;
 
+        // In-memory check — zero DB cost
+        if (processedSet.has(compositeKey)) continue;
+
+        const headlineText = `${headline.title} ${headline.snippet ?? ""}`;
         if (!headlineMatchesKeywords(headlineText, item.keywords)) continue;
 
-        matchCount++;
-        console.log(
-          `Firehose: keyword match for "${item.title}" → "${headline.title}"`,
-        );
+        keywordMatches++;
 
         const satisfied = await verifyHeadlineWithGemini(
           headline.title,
@@ -219,33 +234,50 @@ export const run_firehose = internalAction({
           geminiKey,
         );
 
+        // Stage the processed entry — written in one batch at end
+        toMarkProcessed.push({
+          urlHash: headline.hash,
+          watchlist_id: item._id,
+        });
+        // Add to in-memory set so subsequent items in same run don't re-check
+        processedSet.add(compositeKey);
+
         if (satisfied) {
-          await ctx.runMutation(internal.log.insert_log, {
+          verified++;
+          toInsertLogs.push({
             watchlist_id: item._id,
             action: `${headline.title}${headline.source ? ` — ${headline.source}` : ""}`,
-            verified: true,
-            outcome: "true",
           });
-          console.log(
-            `Firehose: ✓ saved log for "${item.title}" → "${headline.title}"`,
-          );
-        } else {
-          console.log(
-            `Firehose: ✗ condition not met, skipping "${headline.title}"`,
-          );
+          console.log(`Firehose: ✓ "${item.title}" → "${headline.title}"`);
         }
       }
 
-      await ctx.runMutation(internal.log.update_last_checked, {
-        watchlist_id: item._id,
-      });
-
       console.log(
-        `Firehose: "${item.title}" — ${matchCount} keyword matches processed.`,
+        `Firehose: "${item.title}" — ${keywordMatches} keyword matches, ${verified} verified.`,
       );
     }
 
-    console.log("Firehose: run complete.");
+    // 6. Flush all writes — 2 mutations total, regardless of scale
+    if (toMarkProcessed.length > 0) {
+      await ctx.runMutation(internal.log.batch_mark_processed, {
+        entries: toMarkProcessed,
+      });
+    }
+
+    if (toInsertLogs.length > 0) {
+      await ctx.runMutation(internal.log.batch_insert_logs, {
+        entries: toInsertLogs,
+      });
+    }
+
+    // 7. Update last_checked for all active items — 1 mutation
+    await ctx.runMutation(internal.log.batch_update_last_checked, {
+      watchlist_ids: watchlistIds,
+    });
+
+    console.log(
+      `Firehose: complete. ${toInsertLogs.length} logs saved, ${toMarkProcessed.length} headlines marked processed.`,
+    );
   },
 });
 
