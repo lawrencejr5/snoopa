@@ -238,9 +238,7 @@ export default function SnoopDetailsScreen() {
                           { color: Colors[theme].text_secondary },
                         ]}
                       >
-                        {log.verified
-                          ? `Verified (${log.outcome})`
-                          : "Unverified"}
+                        {log.verified ? "Verified" : "Unverified"}
                       </Text>
                     </View>
                   </View>

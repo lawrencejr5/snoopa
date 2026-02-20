@@ -94,7 +94,7 @@ async function verifyHeadlineWithGemini(
   geminiKey: string,
 ): Promise<boolean> {
   const genAI = new GoogleGenerativeAI(geminiKey);
-  const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+  const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-lite" });
 
   const prompt = `You are a strict fact-checker. Given a news headline and snippet, determine whether it satisfies the following condition.
         Condition: "${condition}"
@@ -219,16 +219,21 @@ export const run_firehose = internalAction({
           geminiKey,
         );
 
-        await ctx.runMutation(internal.log.insert_log, {
-          watchlist_id: item._id,
-          action: `${headline.title}${headline.source ? ` — ${headline.source}` : ""}`,
-          verified: satisfied,
-          outcome: satisfied ? "true" : "false",
-        });
-
-        console.log(
-          `Firehose: logged "${headline.title}" for "${item.title}" — condition ${satisfied ? "MET ✓" : "NOT met ✗"}`,
-        );
+        if (satisfied) {
+          await ctx.runMutation(internal.log.insert_log, {
+            watchlist_id: item._id,
+            action: `${headline.title}${headline.source ? ` — ${headline.source}` : ""}`,
+            verified: true,
+            outcome: "true",
+          });
+          console.log(
+            `Firehose: ✓ saved log for "${item.title}" → "${headline.title}"`,
+          );
+        } else {
+          console.log(
+            `Firehose: ✗ condition not met, skipping "${headline.title}"`,
+          );
+        }
       }
 
       await ctx.runMutation(internal.log.update_last_checked, {

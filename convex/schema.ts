@@ -51,9 +51,6 @@ const schema = defineSchema({
     timestamp: v.number(),
     action: v.string(),
     verified: v.boolean(),
-    outcome: v.optional(
-      v.union(v.literal("true"), v.literal("false"), v.literal("pending")),
-    ),
   }).index("by_watchlist", ["watchlist_id"]),
 
   notifications: defineTable({

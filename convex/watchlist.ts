@@ -120,8 +120,7 @@ export const add_watchlist_item = mutation({
       watchlist_id: id,
       timestamp: Date.now(),
       action: "Watchlist item created",
-      verified: false,
-      outcome: "pending",
+      verified: true,
     });
 
     return id;
@@ -187,7 +186,6 @@ export const toggle_watchlist_status = mutation({
       timestamp: Date.now(),
       action: `Status changed to ${newStatus}`,
       verified: true,
-      outcome: newStatus === "completed" ? "true" : "pending",
     });
   },
 });
