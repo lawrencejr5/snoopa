@@ -231,6 +231,11 @@ export const run_firehose = internalAction({
       watchlist_id: (typeof activeItems)[0]["_id"];
       action: string;
     }> = [];
+    const toSendNotifications: Array<{
+      user_id: (typeof activeItems)[0]["user_id"];
+      title: string;
+      message: string;
+    }> = [];
 
     for (const item of activeItems) {
       let keywordMatches = 0;
@@ -264,9 +269,15 @@ export const run_firehose = internalAction({
 
         if (satisfied) {
           verified++;
+          const logAction = `${headline.title}${headline.source ? ` — ${headline.source}` : ""}`;
           toInsertLogs.push({
             watchlist_id: item._id,
-            action: `${headline.title}${headline.source ? ` — ${headline.source}` : ""}`,
+            action: logAction,
+          });
+          toSendNotifications.push({
+            user_id: item.user_id,
+            title: `Snoopa: ${item.title}`,
+            message: headline.title,
           });
           console.log(`Firehose: ✓ "${item.title}" → "${headline.title}"`);
         }
@@ -277,7 +288,7 @@ export const run_firehose = internalAction({
       );
     }
 
-    // 6. Flush all writes — 2 mutations total, regardless of scale
+    // 6. Flush all writes — 2 batch mutations
     if (toMarkProcessed.length > 0) {
       await ctx.runMutation(internal.log.batch_mark_processed, {
         entries: toMarkProcessed,
@@ -290,13 +301,25 @@ export const run_firehose = internalAction({
       });
     }
 
-    // 7. Update last_checked for all active items — 1 mutation
+    // 7. Send notifications for all verified hits
+    await Promise.all(
+      toSendNotifications.map((n) =>
+        ctx.runMutation(internal.notifications.send_alert, {
+          user_id: n.user_id,
+          title: n.title,
+          message: n.message,
+          type: "alert",
+        }),
+      ),
+    );
+
+    // 8. Update last_checked for all active items — 1 mutation
     await ctx.runMutation(internal.log.batch_update_last_checked, {
       watchlist_ids: watchlistIds,
     });
 
     console.log(
-      `Firehose: complete. ${toInsertLogs.length} logs saved, ${toMarkProcessed.length} headlines marked processed.`,
+      `Firehose: complete. ${toInsertLogs.length} alerts sent, ${toMarkProcessed.length} headlines marked processed.`,
     );
   },
 });
