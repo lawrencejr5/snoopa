@@ -96,7 +96,7 @@ export const get_saved_message_ids = query({
 export const get_recent_canonical_topics = query({
   args: {},
   handler: async (ctx) => {
-    const items = await ctx.db.query("watchlist").order("desc").take(200); // take a large enough sample to find 20 unique topics
+    const items = await ctx.db.query("watchlist").order("desc").collect(); // take a large enough sample to find 20 unique topics
 
     const seen = new Set<string>();
     const topics: string[] = [];
@@ -125,6 +125,7 @@ export const add_watchlist_item = mutation({
     canonical_topic: v.optional(v.string()),
     sources: v.optional(v.array(v.string())),
     message_id: v.optional(v.id("chats")),
+    session_id: v.optional(v.id("sessions")),
   },
   handler: async (ctx, args) => {
     const id = await ctx.db.insert("watchlist", {
@@ -137,6 +138,7 @@ export const add_watchlist_item = mutation({
       last_checked: Date.now(),
       sources: args.sources ?? [],
       message_id: args.message_id,
+      session_id: args.session_id,
     });
 
     // Create an initial log entry
@@ -145,6 +147,7 @@ export const add_watchlist_item = mutation({
       timestamp: Date.now(),
       action: "Watchlist item created",
       verified: true,
+      session_id: args.session_id,
     });
 
     return id;

@@ -77,16 +77,42 @@ export const delete_session = mutation({
       throw new Error("Unauthorized");
     }
 
-    // Delete all messages in the session
-    const messages = await ctx.db
-      .query("chats")
-      .withIndex("by_session", (q) => q.eq("session_id", args.session_id))
-      .collect();
+    // 1. Load everything linked to this session in parallel
+    const [messages, watchlistItems, logs] = await Promise.all([
+      ctx.db
+        .query("chats")
+        .withIndex("by_session", (q) => q.eq("session_id", args.session_id))
+        .collect(),
+      ctx.db
+        .query("watchlist")
+        .withIndex("by_session", (q) => q.eq("session_id", args.session_id))
+        .collect(),
+      ctx.db
+        .query("logs")
+        .withIndex("by_session", (q) => q.eq("session_id", args.session_id))
+        .collect(),
+    ]);
 
-    await Promise.all(messages.map((msg) => ctx.db.delete(msg._id)));
+    // 2. Load processed_headlines for the watchlist items
+    const processedHeadlines = (
+      await Promise.all(
+        watchlistItems.map((item) =>
+          ctx.db
+            .query("processed_headlines")
+            .withIndex("by_watchlist", (q) => q.eq("watchlist_id", item._id))
+            .collect(),
+        ),
+      )
+    ).flat();
 
-    // Delete the session itself
-    await ctx.db.delete(args.session_id);
+    // 3. Delete everything at once
+    await Promise.all([
+      ...messages.map((m) => ctx.db.delete(m._id)),
+      ...watchlistItems.map((w) => ctx.db.delete(w._id)),
+      ...logs.map((l) => ctx.db.delete(l._id)),
+      ...processedHeadlines.map((p) => ctx.db.delete(p._id)),
+      ctx.db.delete(args.session_id),
+    ]);
   },
 });
 

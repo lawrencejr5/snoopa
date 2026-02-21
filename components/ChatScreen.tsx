@@ -197,6 +197,7 @@ export default function ChatScreen() {
       condition: string;
       canonical_topic?: string;
     },
+    sessionId: Id<"sessions">,
   ) => {
     if (savedWatchlist[msgId] || savingWatchlist[msgId] || !signedIn?._id)
       return;
@@ -214,6 +215,7 @@ export default function ChatScreen() {
         condition: watchlistData.condition,
         canonical_topic: watchlistData.canonical_topic,
         message_id: msgId,
+        session_id: sessionId,
       });
 
       setSavedWatchlist((prev) => ({
@@ -557,7 +559,11 @@ export default function ChatScreen() {
 
                                 <Pressable
                                   onPress={() =>
-                                    handleSaveWatchlist(msg._id, watchlistData)
+                                    handleSaveWatchlist(
+                                      msg._id,
+                                      watchlistData,
+                                      sessionId!,
+                                    )
                                   }
                                   disabled={isSaved || isSaving}
                                   style={{

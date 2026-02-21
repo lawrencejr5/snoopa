@@ -40,7 +40,10 @@ const schema = defineSchema({
     last_checked: v.number(),
     sources: v.array(v.string()),
     message_id: v.optional(v.id("chats")),
-  }).index("by_user", ["user_id"]),
+    session_id: v.optional(v.id("sessions")),
+  })
+    .index("by_user", ["user_id"])
+    .index("by_session", ["session_id"]),
 
   processed_headlines: defineTable({
     urlHash: v.string(),
@@ -55,7 +58,10 @@ const schema = defineSchema({
     timestamp: v.number(),
     action: v.string(),
     verified: v.boolean(),
-  }).index("by_watchlist", ["watchlist_id"]),
+    session_id: v.optional(v.id("sessions")),
+  })
+    .index("by_watchlist", ["watchlist_id"])
+    .index("by_session", ["session_id"]),
 
   notifications: defineTable({
     user_id: v.id("users"),

@@ -39,9 +39,7 @@ export const insert_log = internalMutation({
     watchlist_id: v.id("watchlist"),
     action: v.string(),
     verified: v.boolean(),
-    outcome: v.optional(
-      v.union(v.literal("true"), v.literal("false"), v.literal("pending")),
-    ),
+    session_id: v.optional(v.id("sessions")),
   },
   handler: async (ctx, args) => {
     return await ctx.db.insert("logs", {
@@ -49,6 +47,7 @@ export const insert_log = internalMutation({
       timestamp: Date.now(),
       action: args.action,
       verified: args.verified,
+      session_id: args.session_id,
     });
   },
 });
@@ -175,6 +174,7 @@ export const batch_insert_logs = internalMutation({
       v.object({
         watchlist_id: v.id("watchlist"),
         action: v.string(),
+        session_id: v.optional(v.id("sessions")),
       }),
     ),
   },
@@ -187,6 +187,7 @@ export const batch_insert_logs = internalMutation({
           timestamp: now,
           action: e.action,
           verified: true,
+          session_id: e.session_id,
         }),
       ),
     );
