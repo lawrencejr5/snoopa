@@ -89,7 +89,29 @@ export const get_saved_message_ids = query({
   },
 });
 
-// --- Mutations ---
+/**
+ * Get the last 20 unique canonical topics from all watchlist items.
+ * Used as context when generating new watchlist items in the chat.
+ */
+export const get_recent_canonical_topics = query({
+  args: {},
+  handler: async (ctx) => {
+    const items = await ctx.db.query("watchlist").order("desc").take(200); // take a large enough sample to find 20 unique topics
+
+    const seen = new Set<string>();
+    const topics: string[] = [];
+
+    for (const item of items) {
+      if (item.canonical_topic && !seen.has(item.canonical_topic)) {
+        seen.add(item.canonical_topic);
+        topics.push(item.canonical_topic);
+        if (topics.length === 20) break;
+      }
+    }
+
+    return topics;
+  },
+});
 
 /**
  * Internal mutation to add a watchlist item (called from chat action).
@@ -100,6 +122,7 @@ export const add_watchlist_item = mutation({
     title: v.string(),
     keywords: v.array(v.string()),
     condition: v.string(),
+    canonical_topic: v.optional(v.string()),
     sources: v.optional(v.array(v.string())),
     message_id: v.optional(v.id("chats")),
   },
@@ -109,6 +132,7 @@ export const add_watchlist_item = mutation({
       title: args.title,
       keywords: args.keywords,
       condition: args.condition,
+      canonical_topic: args.canonical_topic,
       status: "active",
       last_checked: Date.now(),
       sources: args.sources ?? [],

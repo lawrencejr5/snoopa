@@ -8,12 +8,7 @@ import { hashString } from "./utils";
 // Constants
 // ---------------------------------------------------------------------------
 
-const FIREHOSE_QUERIES = [
-  "Nigeria trending news today",
-  "football transfer injury news",
-  "Nigeria economy naira market",
-  "Nigerian politics government policy",
-];
+const RESULTS_PER_PAGE = 10; // 10 results per topic query
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -39,48 +34,36 @@ interface SerperNewsResult {
   date?: string;
 }
 
-const RESULTS_PER_PAGE = 10; // Serper news hard cap per request
-const MAX_PAGES = 3; // 3 pages × 10 = 30 results per query
-
 async function fetchHeadlines(
   query: string,
   apiKey: string,
 ): Promise<SerperNewsResult[]> {
-  const all: SerperNewsResult[] = [];
+  const res = await fetch("https://google.serper.dev/news", {
+    method: "POST",
+    headers: {
+      "X-API-KEY": apiKey,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      q: query,
+      num: RESULTS_PER_PAGE,
+      page: 1,
+      gl: "ng",
+      tbs: "qdr:d",
+    }),
+  });
 
-  for (let page = 1; page <= MAX_PAGES; page++) {
-    const res = await fetch("https://google.serper.dev/news", {
-      method: "POST",
-      headers: {
-        "X-API-KEY": apiKey,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        q: query,
-        num: RESULTS_PER_PAGE,
-        page,
-        gl: "ng",
-        tbs: "qdr:d",
-      }),
-    });
-
-    if (!res.ok) {
-      console.error(
-        `Serper error for query "${query}" page ${page}: ${res.status} ${res.statusText}`,
-      );
-      break;
-    }
-
-    const data = await res.json();
-    const results = (data.news ?? []) as SerperNewsResult[];
-    all.push(...results);
-
-    // Stop early if Serper returned fewer results than requested
-    if (results.length < RESULTS_PER_PAGE) break;
+  if (!res.ok) {
+    console.error(
+      `Serper error for query "${query}": ${res.status} ${res.statusText}`,
+    );
+    return [];
   }
 
-  console.log(`Serper: "${query}" → ${all.length} results`);
-  return all;
+  const data = await res.json();
+  const results = (data.news ?? []) as SerperNewsResult[];
+  console.log(`Serper: "${query}" → ${results.length} results`);
+  return results;
 }
 
 // ---------------------------------------------------------------------------
@@ -143,6 +126,30 @@ export const is_headline_processed = internalQuery({
   },
 });
 
+/**
+ * Extract unique canonical topics from active watchlist items.
+ * These become the Serper search queries for the firehose run.
+ */
+export const get_unique_canonical_topics = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    const items = await ctx.db
+      .query("watchlist")
+      .filter((q) => q.eq(q.field("status"), "active"))
+      .collect();
+
+    const seen = new Set<string>();
+    const topics: string[] = [];
+    for (const item of items) {
+      if (item.canonical_topic && !seen.has(item.canonical_topic)) {
+        seen.add(item.canonical_topic);
+        topics.push(item.canonical_topic);
+      }
+    }
+    return topics;
+  },
+});
+
 // ---------------------------------------------------------------------------
 // Core internal action — runs the full firehose pipeline
 // ---------------------------------------------------------------------------
@@ -177,14 +184,27 @@ export const run_firehose = internalAction({
     );
     const processedSet = new Set<string>(processedKeys);
 
-    // 3. Fetch headlines from Serper in parallel — 4 fetches
+    // 3. Build dynamic Serper queries from unique canonical topics — 1 query
+    const canonicalTopics = await ctx.runQuery(
+      internal.firehose.get_unique_canonical_topics,
+    );
+
+    // Fallback: if no items have canonical_topic yet, run nothing
+    if (canonicalTopics.length === 0) {
+      console.log(
+        "Firehose: no canonical topics found, skipping Serper fetch.",
+      );
+      return;
+    }
+
+    // Fetch headlines for each unique topic in parallel
     const headlineArrays = await Promise.all(
-      FIREHOSE_QUERIES.map((q) => fetchHeadlines(q, serperKey)),
+      canonicalTopics.map((topic) => fetchHeadlines(topic, serperKey)),
     );
     const allHeadlines = headlineArrays.flat();
 
     console.log(
-      `Firehose: fetched ${allHeadlines.length} headlines across ${FIREHOSE_QUERIES.length} queries.`,
+      `Firehose: fetched ${allHeadlines.length} headlines across ${canonicalTopics.length} topics.`,
     );
 
     // 4. Within-run dedup — in-memory only, zero DB cost

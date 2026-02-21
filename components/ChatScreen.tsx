@@ -191,7 +191,12 @@ export default function ChatScreen() {
   // Handle save
   const handleSaveWatchlist = async (
     msgId: Id<"chats">,
-    watchlistData: { title: string; keywords: string[]; condition: string },
+    watchlistData: {
+      title: string;
+      keywords: string[];
+      condition: string;
+      canonical_topic?: string;
+    },
   ) => {
     if (savedWatchlist[msgId] || savingWatchlist[msgId] || !signedIn?._id)
       return;
@@ -207,6 +212,7 @@ export default function ChatScreen() {
         title: watchlistData.title,
         keywords: watchlistData.keywords,
         condition: watchlistData.condition,
+        canonical_topic: watchlistData.canonical_topic,
         message_id: msgId,
       });
 

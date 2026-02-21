@@ -175,6 +175,14 @@ export const send_message = action({
       });
     }
 
+    // 7. For WATCHLIST intent, fetch recent canonical topics for context
+    let recentTopics: string[] = [];
+    if (intent === "WATCHLIST") {
+      recentTopics = await ctx.runQuery(
+        api.watchlist.get_recent_canonical_topics,
+      );
+    }
+
     // 8. Try models in order with automatic fallback
     const modelsToTry = ["gemini-2.5-flash-lite", "gemini-2.0-flash"];
     let response_text = "";
@@ -188,16 +196,22 @@ export const send_message = action({
     if (intent === "SEARCH") {
       instructions += `\n\nYou are being provided with web search results. Always cite your sources when giving news or factual information.`;
     } else if (intent === "WATCHLIST") {
+      const topicsContext =
+        recentTopics.length > 0
+          ? `\n\n        Existing canonical topics in the system (use these to group similar items, or create a new one if no match):\n        ${recentTopics.map((t) => `"${t}"`).join(", ")}`
+          : "";
+
       instructions += `\n\nThe user wants to add something to their watchlist. Extract the watchlist item details and respond with EXACTLY this format:
 
         <Your friendly confirmation message here, 1-2 sentences acknowledging what you're tracking for them>
         ---WATCHLIST_DATA---
-        {"title": "<concise title, max 8 words>", "keywords": ["<keyword1>", "<keyword2>", "<keyword3>"], "condition": "<clear, specific condition or rule that defines when this watchlist item should trigger an alert>"}
+        {"title": "<concise title, max 8 words>", "keywords": ["<keyword1>", "<keyword2>", "<keyword3>"], "condition": "<clear, specific condition or rule that defines when this watchlist item should trigger an alert>", "canonical_topic": "<2-4 word topic label, e.g. 'Bitcoin Price', 'Nigeria Politics', 'Premier League'>"}
 
         Rules:
         - The title should be clear and specific (e.g. "Bitcoin Price Movement", "iPhone 16 Pro Deals")
         - The keywords array should contain 3-6 targeted search terms relevant to tracking this item
         - The condition should be a precise, actionable rule (e.g. "Alert when Bitcoin price drops below $80,000" or "Notify when a new iPhone 16 Pro deal appears under $900")
+        - The canonical_topic must be a short 2-4 word label that categorises the subject broadly (e.g. "Bitcoin Price", "Premier League", "Nigeria Fuel Price"). Reuse an existing topic if it fits, otherwise create a new one.${topicsContext}
         - The confirmation message should be in Snoopa's voice — sharp, proactive, and cool
         - Do NOT include markdown formatting in the response`;
     } else {
