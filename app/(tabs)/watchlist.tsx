@@ -72,6 +72,147 @@ const PulsingDot = ({ color }: { color: string }) => {
   );
 };
 
+// ---------------------------------------------------------------------------
+// ActiveSnoopCard — has its own hook so we can conditionally query per item
+// ---------------------------------------------------------------------------
+type WatchlistItem = {
+  _id: import("@/convex/_generated/dataModel").Id<"watchlist">;
+  title: string;
+  condition: string;
+  status: "active" | "completed";
+  last_checked: number;
+  [key: string]: unknown;
+};
+
+function ActiveSnoopCard({
+  item,
+  router,
+}: {
+  item: WatchlistItem;
+  theme: string;
+  router: ReturnType<typeof useRouter>;
+}) {
+  // Count verified logs since last_checked — the "new" updates
+  const newCount =
+    useQuery(api.log.get_new_logs_count, {
+      watchlist_id: item._id,
+      since: item.last_checked,
+    }) ?? 0;
+
+  const { theme } = useTheme();
+  return (
+    <View
+      style={[
+        styles.card,
+        {
+          backgroundColor: Colors[theme].surface,
+          borderColor: Colors[theme].border,
+        },
+      ]}
+    >
+      <View style={styles.cardHeader}>
+        <Text style={[styles.cardTitle, { color: Colors[theme].text }]}>
+          {item.title}
+        </Text>
+        <View style={styles.statusBadge}>
+          <PulsingDot color={Colors[theme].success} />
+          <Text
+            style={{
+              color: Colors[theme].success,
+              fontSize: 11,
+              fontFamily: "FontBold",
+            }}
+          >
+            WATCHING
+          </Text>
+        </View>
+      </View>
+
+      <Text
+        style={[
+          styles.cardDescription,
+          { color: Colors[theme].text_secondary },
+        ]}
+        numberOfLines={2}
+      >
+        {item.condition}
+      </Text>
+
+      {newCount > 0 && (
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 6,
+            marginBottom: 12,
+          }}
+        >
+          <View
+            style={{
+              width: 6,
+              height: 6,
+              borderRadius: 3,
+              backgroundColor: Colors[theme].success,
+            }}
+          />
+          <Text
+            style={{
+              fontSize: 12,
+              fontFamily: "FontBold",
+              color: Colors[theme].success,
+            }}
+          >
+            {newCount} new {newCount === 1 ? "update" : "updates"}
+          </Text>
+        </View>
+      )}
+
+      <View
+        style={[styles.cardFooter, { borderTopColor: Colors[theme].border }]}
+      >
+        <View style={{ flexDirection: "row", alignItems: "center" }}>
+          <Image
+            source={require("@/assets/icons/clock.png")}
+            style={{
+              width: 14,
+              height: 14,
+              tintColor: Colors[theme].text_secondary,
+              marginRight: 6,
+            }}
+          />
+          <Text
+            style={{
+              color: Colors[theme].text_secondary,
+              fontFamily: "FontMedium",
+              fontSize: 13,
+            }}
+          >
+            Checked {formatTimeAgo(item.last_checked)}
+          </Text>
+        </View>
+        <Pressable
+          onPress={() =>
+            router.push({
+              pathname: "/snoop/[id]",
+              params: { id: item._id },
+            })
+          }
+        >
+          <Text
+            style={{
+              color: Colors[theme].primary,
+              fontFamily: "FontBold",
+              fontSize: 13,
+            }}
+          >
+            View Details
+          </Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
 export default function WatchlistScreen() {
   const { theme } = useTheme();
   const router = useRouter();
@@ -275,94 +416,12 @@ export default function WatchlistScreen() {
                 Active Snoops
               </Text>
               {activeSnoops.map((item) => (
-                <View
+                <ActiveSnoopCard
                   key={item._id}
-                  style={[
-                    styles.card,
-                    {
-                      backgroundColor: Colors[theme].surface,
-                      borderColor: Colors[theme].border,
-                    },
-                  ]}
-                >
-                  <View style={styles.cardHeader}>
-                    <Text
-                      style={[styles.cardTitle, { color: Colors[theme].text }]}
-                    >
-                      {item.title}
-                    </Text>
-                    <View style={styles.statusBadge}>
-                      <PulsingDot color={Colors[theme].success} />
-                      <Text
-                        style={{
-                          color: Colors[theme].success,
-                          fontSize: 11,
-                          fontFamily: "FontBold",
-                        }}
-                      >
-                        WATCHING
-                      </Text>
-                    </View>
-                  </View>
-
-                  <Text
-                    style={[
-                      styles.cardDescription,
-                      { color: Colors[theme].text_secondary },
-                    ]}
-                    numberOfLines={2}
-                  >
-                    {item.condition}
-                  </Text>
-
-                  <View
-                    style={[
-                      styles.cardFooter,
-                      { borderTopColor: Colors[theme].border },
-                    ]}
-                  >
-                    <View
-                      style={{ flexDirection: "row", alignItems: "center" }}
-                    >
-                      <Image
-                        source={require("@/assets/icons/clock.png")}
-                        style={{
-                          width: 14,
-                          height: 14,
-                          tintColor: Colors[theme].text_secondary,
-                          marginRight: 6,
-                        }}
-                      />
-                      <Text
-                        style={{
-                          color: Colors[theme].text_secondary,
-                          fontFamily: "FontMedium",
-                          fontSize: 13,
-                        }}
-                      >
-                        Checked {formatTimeAgo(item.last_checked)}
-                      </Text>
-                    </View>
-                    <Pressable
-                      onPress={() =>
-                        router.push({
-                          pathname: "/snoop/[id]",
-                          params: { id: item._id },
-                        })
-                      }
-                    >
-                      <Text
-                        style={{
-                          color: Colors[theme].primary,
-                          fontFamily: "FontBold",
-                          fontSize: 13,
-                        }}
-                      >
-                        View Details
-                      </Text>
-                    </Pressable>
-                  </View>
-                </View>
+                  item={item as WatchlistItem}
+                  theme={theme}
+                  router={router}
+                />
               ))}
             </View>
 

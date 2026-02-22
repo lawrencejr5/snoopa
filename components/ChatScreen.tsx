@@ -44,6 +44,7 @@ export default function ChatScreen() {
 
   const sendMessage = useAction(api.chat.send_message);
   const addWatchlist = useMutation(api.watchlist.add_watchlist_item);
+  const unreadCount = useQuery(api.notifications.unread_count) ?? 0;
   const { signedIn } = useUser();
 
   const [sending, setSending] = useState(false);
@@ -259,11 +260,27 @@ export default function ChatScreen() {
         >
           Snoopa
         </Text>
-        <Pressable onPress={() => navigation.push("notifications/index")}>
+        <Pressable
+          onPress={() => navigation.push("notifications/index")}
+          style={{ position: "relative" }}
+        >
           <Image
             source={require("@/assets/icons/bells.png")}
             style={{ width: 25, height: 25, tintColor: Colors[theme].text }}
           />
+          {unreadCount > 0 && (
+            <View
+              style={{
+                position: "absolute",
+                top: -2,
+                right: -2,
+                width: 8,
+                height: 8,
+                borderRadius: 4,
+                backgroundColor: "#FF3B30",
+              }}
+            />
+          )}
         </Pressable>
       </View>
       <ScrollView

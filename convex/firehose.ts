@@ -2,6 +2,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { action, internalAction, internalQuery } from "./_generated/server";
+import { sendExpoPush } from "./notifications";
 import { hashString } from "./utils";
 
 // ---------------------------------------------------------------------------
@@ -230,7 +231,18 @@ export const run_firehose = internalAction({
     const toInsertLogs: Array<{
       watchlist_id: (typeof activeItems)[0]["_id"];
       action: string;
+      url: string;
     }> = [];
+    // One notification per watchlist item per run — keyed by watchlist _id
+    const toSendNotifications = new Map<
+      string,
+      {
+        user_id: (typeof activeItems)[0]["user_id"];
+        watchlist_id: (typeof activeItems)[0]["_id"];
+        title: string;
+        message: string;
+      }
+    >();
 
     for (const item of activeItems) {
       let keywordMatches = 0;
@@ -264,10 +276,21 @@ export const run_firehose = internalAction({
 
         if (satisfied) {
           verified++;
+          const logAction = `${headline.title}${headline.source ? ` — ${headline.source}` : ""}`;
           toInsertLogs.push({
             watchlist_id: item._id,
-            action: `${headline.title}${headline.source ? ` — ${headline.source}` : ""}`,
+            action: logAction,
+            url: headline.link,
           });
+          // Only queue one notification per watchlist item per run
+          if (!toSendNotifications.has(item._id)) {
+            toSendNotifications.set(item._id, {
+              user_id: item.user_id,
+              watchlist_id: item._id,
+              title: item.title,
+              message: headline.title,
+            });
+          }
           console.log(`Firehose: ✓ "${item.title}" → "${headline.title}"`);
         }
       }
@@ -277,7 +300,7 @@ export const run_firehose = internalAction({
       );
     }
 
-    // 6. Flush all writes — 2 mutations total, regardless of scale
+    // 6. Flush all writes — 2 batch mutations
     if (toMarkProcessed.length > 0) {
       await ctx.runMutation(internal.log.batch_mark_processed, {
         entries: toMarkProcessed,
@@ -290,13 +313,31 @@ export const run_firehose = internalAction({
       });
     }
 
-    // 7. Update last_checked for all active items — 1 mutation
+    // 7. Save notifications to DB + fire push — one per watchlist item
+    const notifications = [...toSendNotifications.values()];
+    if (notifications.length > 0) {
+      for (const n of notifications) {
+        await ctx.runMutation(internal.notifications.save_notification, {
+          user_id: n.user_id,
+          title: n.title,
+          message: n.message,
+          type: "alert",
+          watchlist_id: n.watchlist_id,
+        });
+        const pushTokens = await ctx.runQuery(internal.users.get_push_tokens, {
+          user_id: n.user_id,
+        });
+        await sendExpoPush(pushTokens, n.title, n.message);
+      }
+    }
+
+    // 8. Update last_checked for all active items — 1 mutation
     await ctx.runMutation(internal.log.batch_update_last_checked, {
       watchlist_ids: watchlistIds,
     });
 
     console.log(
-      `Firehose: complete. ${toInsertLogs.length} logs saved, ${toMarkProcessed.length} headlines marked processed.`,
+      `Firehose: complete. ${toInsertLogs.length} alerts sent, ${toMarkProcessed.length} headlines marked processed.`,
     );
   },
 });

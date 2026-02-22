@@ -1,9 +1,13 @@
 import Container from "@/components/Container";
 import Colors from "@/constants/Colors";
 import { useTheme } from "@/context/ThemeContext";
-import { notificationsData } from "@/dummy_data/notifications";
+import { api } from "@/convex/_generated/api";
+import { Id } from "@/convex/_generated/dataModel";
+import { useMutation, useQuery } from "convex/react";
 import { Stack, useRouter } from "expo-router";
+import { useEffect } from "react";
 import {
+  ActivityIndicator,
   Image,
   Pressable,
   ScrollView,
@@ -12,9 +16,49 @@ import {
   View,
 } from "react-native";
 
+function timeAgo(timestamp: number): string {
+  const diff = Date.now() - timestamp;
+  const minutes = Math.floor(diff / 60000);
+  if (minutes < 1) return "Just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
 export default function NotificationsScreen() {
   const { theme } = useTheme();
   const router = useRouter();
+
+  const notifications = useQuery(api.notifications.get_notifications);
+  const markAllSeen = useMutation(api.notifications.mark_all_seen);
+  const markRead = useMutation(api.notifications.mark_read);
+
+  // Mark all as SEEN when the screen opens — clears the bell dot
+  useEffect(() => {
+    markAllSeen();
+  }, []);
+
+  const isLoading = notifications === undefined;
+
+  const handleNotificationPress = (item: {
+    _id: Id<"notifications">;
+    watchlist_id?: Id<"watchlist">;
+    read: boolean;
+  }) => {
+    // Mark this individual notification as read
+    if (!item.read) {
+      markRead({ notification_id: item._id });
+    }
+    // Navigate to the snoop detail if it has a watchlist_id
+    if (item.watchlist_id) {
+      router.push({
+        pathname: "/snoop/[id]",
+        params: { id: item.watchlist_id },
+      });
+    }
+  };
 
   return (
     <Container>
@@ -22,7 +66,7 @@ export default function NotificationsScreen() {
 
       {/* Header */}
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={[styles.backButton]}>
+        <Pressable onPress={() => router.back()} style={styles.backButton}>
           <Image
             source={require("@/assets/icons/arrow-up.png")}
             style={{
@@ -42,65 +86,75 @@ export default function NotificationsScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {notificationsData.map((item) => (
-          <View
-            key={item.id}
-            style={[
-              styles.notificationItem,
-              {
-                backgroundColor: item.read
-                  ? "transparent"
-                  : Colors[theme].surface,
-                borderColor: Colors[theme].border,
-              },
-            ]}
-          >
-            <View style={styles.notificationHeader}>
-              <View
-                style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
-              >
+        {isLoading && (
+          <View style={{ marginTop: 80, alignItems: "center" }}>
+            <ActivityIndicator color={Colors[theme].primary} />
+          </View>
+        )}
+
+        {!isLoading &&
+          notifications.map((item) => (
+            <Pressable
+              key={item._id}
+              onPress={() => handleNotificationPress(item)}
+              style={({ pressed }) => [
+                styles.notificationItem,
+                {
+                  // Unread = hasn't been tapped yet → highlighted
+                  backgroundColor: item.read
+                    ? "transparent"
+                    : Colors[theme].surface,
+                  borderColor: Colors[theme].border,
+                  opacity: pressed ? 0.75 : 1,
+                },
+              ]}
+            >
+              <View style={styles.notificationHeader}>
                 <View
-                  style={[
-                    styles.typeIndicator,
-                    {
-                      backgroundColor:
-                        item.type === "alert"
-                          ? Colors[theme].success
-                          : item.type === "system"
-                            ? Colors[theme].warning
-                            : Colors[theme].text_secondary,
-                    },
-                  ]}
-                />
+                  style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
+                >
+                  <View
+                    style={[
+                      styles.typeIndicator,
+                      {
+                        backgroundColor:
+                          item.type === "alert"
+                            ? Colors[theme].success
+                            : item.type === "system"
+                              ? Colors[theme].warning
+                              : Colors[theme].text_secondary,
+                      },
+                    ]}
+                  />
+                  <Text
+                    style={[
+                      styles.typeText,
+                      { color: Colors[theme].text_secondary },
+                    ]}
+                  >
+                    {item.type === "alert" ? "SNOOPA" : item.type.toUpperCase()}
+                  </Text>
+                </View>
                 <Text
                   style={[
-                    styles.typeText,
+                    styles.timestamp,
                     { color: Colors[theme].text_secondary },
                   ]}
                 >
-                  {item.type.toUpperCase()}
+                  {timeAgo(item._creationTime)}
                 </Text>
               </View>
-              <Text
-                style={[
-                  styles.timestamp,
-                  { color: Colors[theme].text_secondary },
-                ]}
-              >
-                {item.timestamp}
+
+              <Text style={[styles.title, { color: Colors[theme].text }]}>
+                {item.title}
               </Text>
-            </View>
+              <Text style={[styles.message, { color: Colors[theme].text }]}>
+                {item.message}
+              </Text>
+            </Pressable>
+          ))}
 
-            <Text style={[styles.title, { color: Colors[theme].text }]}>
-              {item.title}
-            </Text>
-            <Text style={[styles.message, { color: Colors[theme].text }]}>
-              {item.message}
-            </Text>
-          </View>
-        ))}
-
-        {notificationsData.length === 0 && (
+        {!isLoading && notifications.length === 0 && (
           <View style={{ marginTop: 100, alignItems: "center", opacity: 0.5 }}>
             <Image
               source={require("@/assets/icons/bells.png")}

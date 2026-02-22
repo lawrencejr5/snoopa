@@ -62,6 +62,14 @@ export const getAllUsersWithTokens = internalQuery({
   },
 });
 
+export const get_push_tokens = internalQuery({
+  args: { user_id: v.id("users") },
+  handler: async (ctx, args) => {
+    const user = await ctx.db.get(args.user_id);
+    return user?.pushTokens ?? [];
+  },
+});
+
 export const updateUser = mutation({
   args: {
     fullname: v.optional(v.string()),
