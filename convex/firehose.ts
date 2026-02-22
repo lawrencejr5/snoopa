@@ -2,6 +2,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { action, internalAction, internalQuery } from "./_generated/server";
+import { sendExpoPush } from "./notifications";
 import { hashString } from "./utils";
 
 // ---------------------------------------------------------------------------
@@ -231,11 +232,15 @@ export const run_firehose = internalAction({
       watchlist_id: (typeof activeItems)[0]["_id"];
       action: string;
     }> = [];
-    const toSendNotifications: Array<{
-      user_id: (typeof activeItems)[0]["user_id"];
-      title: string;
-      message: string;
-    }> = [];
+    // One notification per watchlist item per run — keyed by watchlist _id
+    const toSendNotifications = new Map<
+      string,
+      {
+        user_id: (typeof activeItems)[0]["user_id"];
+        title: string;
+        message: string;
+      }
+    >();
 
     for (const item of activeItems) {
       let keywordMatches = 0;
@@ -274,11 +279,14 @@ export const run_firehose = internalAction({
             watchlist_id: item._id,
             action: logAction,
           });
-          toSendNotifications.push({
-            user_id: item.user_id,
-            title: `Snoopa: ${item.title}`,
-            message: headline.title,
-          });
+          // Only queue one notification per watchlist item per run
+          if (!toSendNotifications.has(item._id)) {
+            toSendNotifications.set(item._id, {
+              user_id: item.user_id,
+              title: `${item.title}`,
+              message: headline.title,
+            });
+          }
           console.log(`Firehose: ✓ "${item.title}" → "${headline.title}"`);
         }
       }
@@ -301,17 +309,24 @@ export const run_firehose = internalAction({
       });
     }
 
-    // 7. Send notifications for all verified hits
-    await Promise.all(
-      toSendNotifications.map((n) =>
-        ctx.runMutation(internal.notifications.send_alert, {
+    // 7. Save notifications to DB + fire push — one per watchlist item
+    const notifications = [...toSendNotifications.values()];
+    if (notifications.length > 0) {
+      for (const n of notifications) {
+        // Save to DB (mutation — no fetch allowed in mutations)
+        await ctx.runMutation(internal.notifications.save_notification, {
           user_id: n.user_id,
           title: n.title,
           message: n.message,
           type: "alert",
-        }),
-      ),
-    );
+        });
+        // Fetch push tokens via query, then fire push directly from action
+        const pushTokens = await ctx.runQuery(internal.users.get_push_tokens, {
+          user_id: n.user_id,
+        });
+        await sendExpoPush(pushTokens, n.title, n.message);
+      }
+    }
 
     // 8. Update last_checked for all active items — 1 mutation
     await ctx.runMutation(internal.log.batch_update_last_checked, {

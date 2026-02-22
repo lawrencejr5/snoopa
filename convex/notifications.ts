@@ -68,10 +68,11 @@ export const mark_all_read = mutation({
 });
 
 /**
- * Internal mutation — save a notification to the DB and fire an Expo push.
- * Called from the firehose action after a verified headline is found.
+ * Internal mutation — only saves a notification record to the DB.
+ * fetch() is NOT allowed in mutations, so push delivery is handled
+ * separately via sendExpoPush() called directly from the firehose action.
  */
-export const send_alert = internalMutation({
+export const save_notification = internalMutation({
   args: {
     user_id: v.id("users"),
     title: v.string(),
@@ -79,7 +80,6 @@ export const send_alert = internalMutation({
     type: v.union(v.literal("system"), v.literal("alert"), v.literal("info")),
   },
   handler: async (ctx, args) => {
-    // 1. Save to notifications table
     await ctx.db.insert("notifications", {
       user_id: args.user_id,
       type: args.type,
@@ -88,39 +88,47 @@ export const send_alert = internalMutation({
       seen: false,
       read: false,
     });
-
-    // 2. Look up user's push tokens and fire Expo push for each
-    const user = await ctx.db.get(args.user_id);
-    if (!user?.pushTokens || user.pushTokens.length === 0) return;
-
-    const payload = {
-      to: user.pushTokens,
-      sound: "default",
-      title: args.title,
-      body: args.message,
-      data: { type: args.type },
-    };
-
-    try {
-      const res = await fetch("https://exp.host/--/api/v2/push/send", {
-        method: "POST",
-        headers: {
-          Accept: "application/json",
-          "Accept-encoding": "gzip, deflate",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) {
-        console.error(
-          `Expo push failed for user ${args.user_id}: ${res.status}`,
-        );
-      } else {
-        console.log(`Push sent to user ${args.user_id}: "${args.title}"`);
-      }
-    } catch (err) {
-      console.error("Expo push fetch error:", err);
-    }
   },
 });
+
+// ---------------------------------------------------------------------------
+// Plain async helper — called directly from actions (fetch is allowed there)
+// ---------------------------------------------------------------------------
+
+/**
+ * Fire an Expo push notification to one or more device tokens.
+ * Must be called from an action, not a mutation or query.
+ */
+export async function sendExpoPush(
+  pushTokens: string[],
+  title: string,
+  message: string,
+) {
+  if (pushTokens.length === 0) return;
+
+  try {
+    const res = await fetch("https://exp.host/--/api/v2/push/send", {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Accept-encoding": "gzip, deflate",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        to: pushTokens,
+        sound: "default",
+        title,
+        body: message,
+        data: { type: "alert" },
+      }),
+    });
+
+    if (!res.ok) {
+      console.error(`Expo push failed: ${res.status} ${res.statusText}`);
+    } else {
+      console.log(`Push sent: "${title}"`);
+    }
+  } catch (err) {
+    console.error("Expo push error:", err);
+  }
+}
