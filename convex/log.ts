@@ -29,6 +29,34 @@ export const get_logs = query({
   },
 });
 
+/**
+ * Count log entries newer than `since` for a watchlist item.
+ * Used to display "N new updates" on the watchlist card.
+ */
+export const get_new_logs_count = query({
+  args: {
+    watchlist_id: v.id("watchlist"),
+    since: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const user_id = await getAuthUserId(ctx);
+    if (!user_id) return 0;
+
+    const item = await ctx.db.get(args.watchlist_id);
+    if (!item || item.user_id !== user_id) return 0;
+
+    const recent = await ctx.db
+      .query("logs")
+      .withIndex("by_watchlist_time", (q) =>
+        q.eq("watchlist_id", args.watchlist_id).gt("timestamp", args.since),
+      )
+      .filter((q) => q.eq(q.field("verified"), true))
+      .collect();
+
+    return recent.length;
+  },
+});
+
 // --- Mutations ---
 
 /**
@@ -39,6 +67,7 @@ export const insert_log = internalMutation({
     watchlist_id: v.id("watchlist"),
     action: v.string(),
     verified: v.boolean(),
+    url: v.optional(v.string()),
     session_id: v.optional(v.id("sessions")),
   },
   handler: async (ctx, args) => {
@@ -47,6 +76,7 @@ export const insert_log = internalMutation({
       timestamp: Date.now(),
       action: args.action,
       verified: args.verified,
+      url: args.url,
       session_id: args.session_id,
     });
   },
@@ -174,6 +204,7 @@ export const batch_insert_logs = internalMutation({
       v.object({
         watchlist_id: v.id("watchlist"),
         action: v.string(),
+        url: v.optional(v.string()),
         session_id: v.optional(v.id("sessions")),
       }),
     ),
@@ -187,6 +218,7 @@ export const batch_insert_logs = internalMutation({
           timestamp: now,
           action: e.action,
           verified: true,
+          url: e.url,
           session_id: e.session_id,
         }),
       ),

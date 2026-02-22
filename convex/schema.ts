@@ -58,10 +58,12 @@ const schema = defineSchema({
     timestamp: v.number(),
     action: v.string(),
     verified: v.boolean(),
+    url: v.optional(v.string()),
     session_id: v.optional(v.id("sessions")),
   })
     .index("by_watchlist", ["watchlist_id"])
-    .index("by_session", ["session_id"]),
+    .index("by_session", ["session_id"])
+    .index("by_watchlist_time", ["watchlist_id", "timestamp"]),
 
   notifications: defineTable({
     user_id: v.id("users"),
@@ -70,6 +72,7 @@ const schema = defineSchema({
     message: v.string(),
     seen: v.boolean(),
     read: v.boolean(),
+    watchlist_id: v.optional(v.id("watchlist")),
   }).index("by_user", ["user_id"]),
 });
 

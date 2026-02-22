@@ -78,6 +78,7 @@ export const save_notification = internalMutation({
     title: v.string(),
     message: v.string(),
     type: v.union(v.literal("system"), v.literal("alert"), v.literal("info")),
+    watchlist_id: v.optional(v.id("watchlist")),
   },
   handler: async (ctx, args) => {
     await ctx.db.insert("notifications", {
@@ -87,6 +88,7 @@ export const save_notification = internalMutation({
       message: args.message,
       seen: false,
       read: false,
+      watchlist_id: args.watchlist_id,
     });
   },
 });

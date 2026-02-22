@@ -2,6 +2,7 @@ import Container from "@/components/Container";
 import Colors from "@/constants/Colors";
 import { useTheme } from "@/context/ThemeContext";
 import { api } from "@/convex/_generated/api";
+import { Id } from "@/convex/_generated/dataModel";
 import { useMutation, useQuery } from "convex/react";
 import { Stack, useRouter } from "expo-router";
 import { useEffect } from "react";
@@ -40,13 +41,24 @@ export default function NotificationsScreen() {
 
   const isLoading = notifications === undefined;
 
+  const handleNotificationPress = (item: {
+    watchlist_id?: Id<"watchlist">;
+  }) => {
+    if (item.watchlist_id) {
+      router.push({
+        pathname: "/snoop/[id]",
+        params: { id: item.watchlist_id },
+      });
+    }
+  };
+
   return (
     <Container>
       <Stack.Screen options={{ headerShown: false }} />
 
       {/* Header */}
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={[styles.backButton]}>
+        <Pressable onPress={() => router.back()} style={styles.backButton}>
           <Image
             source={require("@/assets/icons/arrow-up.png")}
             style={{
@@ -74,15 +86,17 @@ export default function NotificationsScreen() {
 
         {!isLoading &&
           notifications.map((item) => (
-            <View
+            <Pressable
               key={item._id}
-              style={[
+              onPress={() => handleNotificationPress(item)}
+              style={({ pressed }) => [
                 styles.notificationItem,
                 {
                   backgroundColor: item.read
                     ? "transparent"
                     : Colors[theme].surface,
                   borderColor: Colors[theme].border,
+                  opacity: pressed ? 0.75 : 1,
                 },
               ]}
             >
@@ -90,6 +104,17 @@ export default function NotificationsScreen() {
                 <View
                   style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
                 >
+                  {/* Unread dot */}
+                  {!item.read && (
+                    <View
+                      style={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: 3,
+                        backgroundColor: "#FF3B30",
+                      }}
+                    />
+                  )}
                   <View
                     style={[
                       styles.typeIndicator,
@@ -128,7 +153,20 @@ export default function NotificationsScreen() {
               <Text style={[styles.message, { color: Colors[theme].text }]}>
                 {item.message}
               </Text>
-            </View>
+
+              {item.watchlist_id && (
+                <Text
+                  style={{
+                    marginTop: 10,
+                    fontSize: 12,
+                    fontFamily: "FontMedium",
+                    color: Colors[theme].primary,
+                  }}
+                >
+                  Tap to view snoop →
+                </Text>
+              )}
+            </Pressable>
           ))}
 
         {!isLoading && notifications.length === 0 && (

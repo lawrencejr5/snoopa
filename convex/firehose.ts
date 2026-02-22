@@ -231,12 +231,14 @@ export const run_firehose = internalAction({
     const toInsertLogs: Array<{
       watchlist_id: (typeof activeItems)[0]["_id"];
       action: string;
+      url: string;
     }> = [];
     // One notification per watchlist item per run — keyed by watchlist _id
     const toSendNotifications = new Map<
       string,
       {
         user_id: (typeof activeItems)[0]["user_id"];
+        watchlist_id: (typeof activeItems)[0]["_id"];
         title: string;
         message: string;
       }
@@ -278,12 +280,14 @@ export const run_firehose = internalAction({
           toInsertLogs.push({
             watchlist_id: item._id,
             action: logAction,
+            url: headline.link,
           });
           // Only queue one notification per watchlist item per run
           if (!toSendNotifications.has(item._id)) {
             toSendNotifications.set(item._id, {
               user_id: item.user_id,
-              title: `${item.title}`,
+              watchlist_id: item._id,
+              title: item.title,
               message: headline.title,
             });
           }
@@ -313,14 +317,13 @@ export const run_firehose = internalAction({
     const notifications = [...toSendNotifications.values()];
     if (notifications.length > 0) {
       for (const n of notifications) {
-        // Save to DB (mutation — no fetch allowed in mutations)
         await ctx.runMutation(internal.notifications.save_notification, {
           user_id: n.user_id,
           title: n.title,
           message: n.message,
           type: "alert",
+          watchlist_id: n.watchlist_id,
         });
-        // Fetch push tokens via query, then fire push directly from action
         const pushTokens = await ctx.runQuery(internal.users.get_push_tokens, {
           user_id: n.user_id,
         });
