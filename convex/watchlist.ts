@@ -89,7 +89,29 @@ export const get_saved_message_ids = query({
   },
 });
 
-// --- Mutations ---
+/**
+ * Get the last 20 unique canonical topics from all watchlist items.
+ * Used as context when generating new watchlist items in the chat.
+ */
+export const get_recent_canonical_topics = query({
+  args: {},
+  handler: async (ctx) => {
+    const items = await ctx.db.query("watchlist").order("desc").collect(); // take a large enough sample to find 20 unique topics
+
+    const seen = new Set<string>();
+    const topics: string[] = [];
+
+    for (const item of items) {
+      if (item.canonical_topic && !seen.has(item.canonical_topic)) {
+        seen.add(item.canonical_topic);
+        topics.push(item.canonical_topic);
+        if (topics.length === 20) break;
+      }
+    }
+
+    return topics;
+  },
+});
 
 /**
  * Internal mutation to add a watchlist item (called from chat action).
@@ -98,19 +120,25 @@ export const add_watchlist_item = mutation({
   args: {
     user_id: v.id("users"),
     title: v.string(),
-    description: v.string(),
+    keywords: v.array(v.string()),
+    condition: v.string(),
+    canonical_topic: v.optional(v.string()),
     sources: v.optional(v.array(v.string())),
     message_id: v.optional(v.id("chats")),
+    session_id: v.optional(v.id("sessions")),
   },
   handler: async (ctx, args) => {
     const id = await ctx.db.insert("watchlist", {
       user_id: args.user_id,
       title: args.title,
-      description: args.description,
+      keywords: args.keywords,
+      condition: args.condition,
+      canonical_topic: args.canonical_topic,
       status: "active",
       last_checked: Date.now(),
       sources: args.sources ?? [],
       message_id: args.message_id,
+      session_id: args.session_id,
     });
 
     // Create an initial log entry
@@ -118,8 +146,8 @@ export const add_watchlist_item = mutation({
       watchlist_id: id,
       timestamp: Date.now(),
       action: "Watchlist item created",
-      verified: false,
-      outcome: "pending",
+      verified: true,
+      session_id: args.session_id,
     });
 
     return id;
@@ -127,13 +155,14 @@ export const add_watchlist_item = mutation({
 });
 
 /**
- * Update a watchlist item (title, description).
+ * Update a watchlist item (title, keywords, condition).
  */
 export const update_watchlist_item = mutation({
   args: {
     watchlist_id: v.id("watchlist"),
     title: v.optional(v.string()),
-    description: v.optional(v.string()),
+    keywords: v.optional(v.array(v.string())),
+    condition: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const user_id = await getAuthUserId(ctx);
@@ -148,7 +177,8 @@ export const update_watchlist_item = mutation({
       last_checked: Date.now(),
     };
     if (args.title !== undefined) updates.title = args.title;
-    if (args.description !== undefined) updates.description = args.description;
+    if (args.keywords !== undefined) updates.keywords = args.keywords;
+    if (args.condition !== undefined) updates.condition = args.condition;
 
     await ctx.db.patch(args.watchlist_id, updates);
   },
@@ -183,7 +213,6 @@ export const toggle_watchlist_status = mutation({
       timestamp: Date.now(),
       action: `Status changed to ${newStatus}`,
       verified: true,
-      outcome: newStatus === "completed" ? "true" : "pending",
     });
   },
 });

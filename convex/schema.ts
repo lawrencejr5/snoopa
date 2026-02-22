@@ -33,22 +33,35 @@ const schema = defineSchema({
   watchlist: defineTable({
     user_id: v.id("users"),
     title: v.string(),
-    description: v.string(),
+    keywords: v.array(v.string()),
+    condition: v.string(),
+    canonical_topic: v.optional(v.string()),
     status: v.union(v.literal("active"), v.literal("completed")),
     last_checked: v.number(),
     sources: v.array(v.string()),
-    message_id: v.optional(v.id("chats")), // Track which message created this
-  }).index("by_user", ["user_id"]),
+    message_id: v.optional(v.id("chats")),
+    session_id: v.optional(v.id("sessions")),
+  })
+    .index("by_user", ["user_id"])
+    .index("by_session", ["session_id"]),
+
+  processed_headlines: defineTable({
+    urlHash: v.string(),
+    watchlist_id: v.id("watchlist"),
+    createdAt: v.number(),
+  })
+    .index("by_hash_and_watchlist", ["urlHash", "watchlist_id"])
+    .index("by_watchlist", ["watchlist_id"]),
 
   logs: defineTable({
     watchlist_id: v.id("watchlist"),
     timestamp: v.number(),
     action: v.string(),
     verified: v.boolean(),
-    outcome: v.optional(
-      v.union(v.literal("true"), v.literal("false"), v.literal("pending")),
-    ),
-  }).index("by_watchlist", ["watchlist_id"]),
+    session_id: v.optional(v.id("sessions")),
+  })
+    .index("by_watchlist", ["watchlist_id"])
+    .index("by_session", ["session_id"]),
 
   notifications: defineTable({
     user_id: v.id("users"),

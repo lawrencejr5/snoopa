@@ -312,7 +312,7 @@ export default function WatchlistScreen() {
                     ]}
                     numberOfLines={2}
                   >
-                    {item.description}
+                    {item.condition}
                   </Text>
 
                   <View
@@ -420,7 +420,7 @@ export default function WatchlistScreen() {
                       ]}
                       numberOfLines={1}
                     >
-                      {item.description}
+                      {item.condition}
                     </Text>
                   </View>
                 ))}

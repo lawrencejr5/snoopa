@@ -98,8 +98,42 @@ export default function SnoopDetailsScreen() {
               { color: Colors[theme].text_secondary },
             ]}
           >
-            {snoop.description}
+            {snoop.condition}
           </Text>
+
+          {/* Keywords */}
+          {snoop.keywords && snoop.keywords.length > 0 && (
+            <View
+              style={{
+                flexDirection: "row",
+                flexWrap: "wrap",
+                gap: 6,
+                marginTop: 14,
+              }}
+            >
+              {snoop.keywords.map((kw, i) => (
+                <View
+                  key={i}
+                  style={{
+                    backgroundColor: Colors[theme].primary + "20",
+                    borderRadius: 6,
+                    paddingHorizontal: 8,
+                    paddingVertical: 4,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: Colors[theme].primary,
+                      fontFamily: "FontMedium",
+                      fontSize: 12,
+                    }}
+                  >
+                    {kw}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          )}
 
           <View
             style={{
@@ -204,9 +238,7 @@ export default function SnoopDetailsScreen() {
                           { color: Colors[theme].text_secondary },
                         ]}
                       >
-                        {log.verified
-                          ? `Verified (${log.outcome})`
-                          : "Unverified"}
+                        {log.verified ? "Verified" : "Unverified"}
                       </Text>
                     </View>
                   </View>

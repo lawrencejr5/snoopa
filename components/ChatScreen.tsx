@@ -191,7 +191,13 @@ export default function ChatScreen() {
   // Handle save
   const handleSaveWatchlist = async (
     msgId: Id<"chats">,
-    watchlistData: { title: string; description: string },
+    watchlistData: {
+      title: string;
+      keywords: string[];
+      condition: string;
+      canonical_topic?: string;
+    },
+    sessionId: Id<"sessions">,
   ) => {
     if (savedWatchlist[msgId] || savingWatchlist[msgId] || !signedIn?._id)
       return;
@@ -205,8 +211,11 @@ export default function ChatScreen() {
       await addWatchlist({
         user_id: signedIn._id,
         title: watchlistData.title,
-        description: watchlistData.description,
+        keywords: watchlistData.keywords,
+        condition: watchlistData.condition,
+        canonical_topic: watchlistData.canonical_topic,
         message_id: msgId,
+        session_id: sessionId,
       });
 
       setSavedWatchlist((prev) => ({
@@ -472,24 +481,89 @@ export default function ChatScreen() {
                                   />
                                 </Pressable>
 
-                                {/* Collapsible Description */}
+                                {/* Collapsible Details */}
                                 {expandedWatchlist[msg._id] && (
-                                  <Text
-                                    style={{
-                                      color: Colors[theme].text_secondary,
-                                      fontFamily: "FontRegular",
-                                      fontSize: 14,
-                                      lineHeight: 20,
-                                      marginBottom: 16,
-                                    }}
-                                  >
-                                    {watchlistData.description}
-                                  </Text>
+                                  <View style={{ marginTop: 12, gap: 10 }}>
+                                    <View>
+                                      <Text
+                                        style={{
+                                          color: Colors[theme].text_secondary,
+                                          fontFamily: "FontBold",
+                                          fontSize: 11,
+                                          textTransform: "uppercase",
+                                          letterSpacing: 0.5,
+                                          marginBottom: 4,
+                                        }}
+                                      >
+                                        Condition
+                                      </Text>
+                                      <Text
+                                        style={{
+                                          color: Colors[theme].text,
+                                          fontFamily: "FontRegular",
+                                          fontSize: 13,
+                                          lineHeight: 18,
+                                        }}
+                                      >
+                                        {watchlistData.condition}
+                                      </Text>
+                                    </View>
+                                    <View>
+                                      <Text
+                                        style={{
+                                          color: Colors[theme].text_secondary,
+                                          fontFamily: "FontBold",
+                                          fontSize: 11,
+                                          textTransform: "uppercase",
+                                          letterSpacing: 0.5,
+                                          marginBottom: 6,
+                                        }}
+                                      >
+                                        Keywords
+                                      </Text>
+                                      <View
+                                        style={{
+                                          flexDirection: "row",
+                                          flexWrap: "wrap",
+                                          gap: 6,
+                                        }}
+                                      >
+                                        {watchlistData.keywords.map(
+                                          (kw: string, i: number) => (
+                                            <View
+                                              key={i}
+                                              style={{
+                                                backgroundColor:
+                                                  Colors[theme].primary + "20",
+                                                borderRadius: 6,
+                                                paddingHorizontal: 8,
+                                                paddingVertical: 3,
+                                              }}
+                                            >
+                                              <Text
+                                                style={{
+                                                  color: Colors[theme].primary,
+                                                  fontFamily: "FontMedium",
+                                                  fontSize: 12,
+                                                }}
+                                              >
+                                                {kw}
+                                              </Text>
+                                            </View>
+                                          ),
+                                        )}
+                                      </View>
+                                    </View>
+                                  </View>
                                 )}
 
                                 <Pressable
                                   onPress={() =>
-                                    handleSaveWatchlist(msg._id, watchlistData)
+                                    handleSaveWatchlist(
+                                      msg._id,
+                                      watchlistData,
+                                      sessionId!,
+                                    )
                                   }
                                   disabled={isSaved || isSaving}
                                   style={{
