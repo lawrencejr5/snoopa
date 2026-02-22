@@ -32,18 +32,26 @@ export default function NotificationsScreen() {
   const router = useRouter();
 
   const notifications = useQuery(api.notifications.get_notifications);
-  const markAllRead = useMutation(api.notifications.mark_all_read);
+  const markAllSeen = useMutation(api.notifications.mark_all_seen);
+  const markRead = useMutation(api.notifications.mark_read);
 
-  // Mark all as read when the screen opens
+  // Mark all as SEEN when the screen opens — clears the bell dot
   useEffect(() => {
-    markAllRead();
+    markAllSeen();
   }, []);
 
   const isLoading = notifications === undefined;
 
   const handleNotificationPress = (item: {
+    _id: Id<"notifications">;
     watchlist_id?: Id<"watchlist">;
+    read: boolean;
   }) => {
+    // Mark this individual notification as read
+    if (!item.read) {
+      markRead({ notification_id: item._id });
+    }
+    // Navigate to the snoop detail if it has a watchlist_id
     if (item.watchlist_id) {
       router.push({
         pathname: "/snoop/[id]",
@@ -92,6 +100,7 @@ export default function NotificationsScreen() {
               style={({ pressed }) => [
                 styles.notificationItem,
                 {
+                  // Unread = hasn't been tapped yet → highlighted
                   backgroundColor: item.read
                     ? "transparent"
                     : Colors[theme].surface,
@@ -104,17 +113,6 @@ export default function NotificationsScreen() {
                 <View
                   style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
                 >
-                  {/* Unread dot */}
-                  {!item.read && (
-                    <View
-                      style={{
-                        width: 6,
-                        height: 6,
-                        borderRadius: 3,
-                        backgroundColor: "#FF3B30",
-                      }}
-                    />
-                  )}
                   <View
                     style={[
                       styles.typeIndicator,
@@ -134,7 +132,7 @@ export default function NotificationsScreen() {
                       { color: Colors[theme].text_secondary },
                     ]}
                   >
-                    {item.type.toUpperCase()}
+                    {item.type === "alert" ? "SNOOPA" : item.type.toUpperCase()}
                   </Text>
                 </View>
                 <Text
@@ -153,19 +151,6 @@ export default function NotificationsScreen() {
               <Text style={[styles.message, { color: Colors[theme].text }]}>
                 {item.message}
               </Text>
-
-              {item.watchlist_id && (
-                <Text
-                  style={{
-                    marginTop: 10,
-                    fontSize: 12,
-                    fontFamily: "FontMedium",
-                    color: Colors[theme].primary,
-                  }}
-                >
-                  Tap to view snoop →
-                </Text>
-              )}
             </Pressable>
           ))}
 

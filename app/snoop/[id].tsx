@@ -5,9 +5,9 @@ import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { useQuery } from "convex/react";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import * as WebBrowser from "expo-web-browser";
 import {
   Image,
-  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -188,8 +188,8 @@ export default function SnoopDetailsScreen() {
               logs.map((log, index) => (
                 <Pressable
                   key={log._id}
-                  onPress={() => {
-                    if (log.url) Linking.openURL(log.url);
+                  onPress={async () => {
+                    if (log.url) await WebBrowser.openAuthSessionAsync(log.url);
                   }}
                   style={({ pressed }) => [
                     styles.logItem,
@@ -252,7 +252,7 @@ export default function SnoopDetailsScreen() {
                             { color: Colors[theme].primary },
                           ]}
                         >
-                          · Open article
+                          · Click to open article
                         </Text>
                       )}
                     </View>

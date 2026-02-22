@@ -24,7 +24,8 @@ export const get_notifications = query({
 });
 
 /**
- * Count of unread notifications for the current user.
+ * Count of unseen notifications — drives the bell red dot.
+ * Clears once the user opens the notifications screen (mark_all_seen).
  */
 export const unread_count = query({
   args: {},
@@ -32,13 +33,13 @@ export const unread_count = query({
     const user_id = await getAuthUserId(ctx);
     if (!user_id) return 0;
 
-    const unread = await ctx.db
+    const unseen = await ctx.db
       .query("notifications")
       .withIndex("by_user", (q) => q.eq("user_id", user_id))
-      .filter((q) => q.eq(q.field("read"), false))
+      .filter((q) => q.eq(q.field("seen"), false))
       .collect();
 
-    return unread.length;
+    return unseen.length;
   },
 });
 
@@ -47,7 +48,27 @@ export const unread_count = query({
 // ---------------------------------------------------------------------------
 
 /**
- * Mark all notifications as seen + read for the current user.
+ * Mark all notifications as SEEN (not read) — called when the screen opens.
+ * Clears the bell red dot without marking individual cards as read.
+ */
+export const mark_all_seen = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const user_id = await getAuthUserId(ctx);
+    if (!user_id) return;
+
+    const unseen = await ctx.db
+      .query("notifications")
+      .withIndex("by_user", (q) => q.eq("user_id", user_id))
+      .filter((q) => q.eq(q.field("seen"), false))
+      .collect();
+
+    await Promise.all(unseen.map((n) => ctx.db.patch(n._id, { seen: true })));
+  },
+});
+
+/**
+ * Mark all notifications as seen + read — full clear.
  */
 export const mark_all_read = mutation({
   args: {},
@@ -64,6 +85,22 @@ export const mark_all_read = mutation({
     await Promise.all(
       unread.map((n) => ctx.db.patch(n._id, { seen: true, read: true })),
     );
+  },
+});
+
+/**
+ * Mark a single notification as read — called when the user taps it.
+ */
+export const mark_read = mutation({
+  args: { notification_id: v.id("notifications") },
+  handler: async (ctx, args) => {
+    const user_id = await getAuthUserId(ctx);
+    if (!user_id) return;
+
+    const notification = await ctx.db.get(args.notification_id);
+    if (!notification || notification.user_id !== user_id) return;
+
+    await ctx.db.patch(args.notification_id, { seen: true, read: true });
   },
 });
 
