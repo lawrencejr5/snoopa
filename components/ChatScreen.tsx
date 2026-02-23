@@ -51,6 +51,7 @@ export default function ChatScreen() {
   const [typingMessageId, setTypingMessageId] = useState<Id<"chats"> | null>(
     null,
   );
+  const [snoopingText, setSnoopingText] = useState("Snooping...");
   const lastProcessedMessageIdRef = useRef<string | null>(null);
   const [isHere, setIsHere] = useState(false);
 
@@ -150,6 +151,19 @@ export default function ChatScreen() {
       }
     }
   }, [displayMessages, isHere]); // Added isHere to dependencies
+
+  useEffect(() => {
+    let timer: any;
+    if (sending) {
+      setSnoopingText("Snooping...");
+      timer = setTimeout(() => {
+        setSnoopingText("Snooping the web...");
+      }, 2000);
+    }
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }, [sending]);
 
   const handleSend = async () => {
     if (!input.trim() || sending || typingMessageId) return;
@@ -641,7 +655,7 @@ export default function ChatScreen() {
                         color: Colors[theme].text_secondary,
                       }}
                     >
-                      Snooping...
+                      {snoopingText}
                     </Text>
                   </View>
                 </View>
