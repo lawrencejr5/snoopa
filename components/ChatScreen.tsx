@@ -525,52 +525,6 @@ export default function ChatScreen() {
                                         {watchlistData.condition}
                                       </Text>
                                     </View>
-                                    <View>
-                                      <Text
-                                        style={{
-                                          color: Colors[theme].text_secondary,
-                                          fontFamily: "FontBold",
-                                          fontSize: 11,
-                                          textTransform: "uppercase",
-                                          letterSpacing: 0.5,
-                                          marginBottom: 6,
-                                        }}
-                                      >
-                                        Keywords
-                                      </Text>
-                                      <View
-                                        style={{
-                                          flexDirection: "row",
-                                          flexWrap: "wrap",
-                                          gap: 6,
-                                        }}
-                                      >
-                                        {watchlistData.keywords.map(
-                                          (kw: string, i: number) => (
-                                            <View
-                                              key={i}
-                                              style={{
-                                                backgroundColor:
-                                                  Colors[theme].primary + "20",
-                                                borderRadius: 6,
-                                                paddingHorizontal: 8,
-                                                paddingVertical: 3,
-                                              }}
-                                            >
-                                              <Text
-                                                style={{
-                                                  color: Colors[theme].primary,
-                                                  fontFamily: "FontMedium",
-                                                  fontSize: 12,
-                                                }}
-                                              >
-                                                {kw}
-                                              </Text>
-                                            </View>
-                                          ),
-                                        )}
-                                      </View>
-                                    </View>
                                   </View>
                                 )}
 

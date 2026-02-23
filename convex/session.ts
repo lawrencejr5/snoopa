@@ -15,7 +15,7 @@ export const list_sessions = query({
 
     const sessions = await ctx.db
       .query("sessions")
-      .withIndex("by_user", (q) => q.eq("user_id", user_id))
+      .withIndex("by_user_updated", (q) => q.eq("user_id", user_id))
       .order("desc")
       .collect();
 

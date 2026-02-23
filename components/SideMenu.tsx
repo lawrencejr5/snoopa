@@ -8,6 +8,7 @@ import { useMutation, useQuery } from "convex/react";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
+  ActivityIndicator,
   Image,
   Modal,
   Pressable,
@@ -38,6 +39,7 @@ export const SideMenu = (props: DrawerContentComponentProps) => {
     title: string;
   } | null>(null);
   const [renameText, setRenameText] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
   // Get current session ID from navigation state if possible
   const currentRoute = props.state.routes.find((r) => r.name === "Chat");
@@ -56,23 +58,37 @@ export const SideMenu = (props: DrawerContentComponentProps) => {
 
   const handleRename = async () => {
     if (selectedSession && renameText.trim()) {
-      await updateSession({
-        session_id: selectedSession.id,
-        title: renameText.trim(),
-      });
-      setModalVisible(false);
-      setRenameText("");
+      setIsLoading(true);
+      try {
+        await updateSession({
+          session_id: selectedSession.id,
+          title: renameText.trim(),
+        });
+        setModalVisible(false);
+        setRenameText("");
+      } catch (error) {
+        console.error("Failed to rename session:", error);
+      } finally {
+        setIsLoading(false);
+      }
     }
   };
 
   const handleDelete = async () => {
     if (selectedSession) {
-      // If we are deleting the current session, navigate to new chat
-      if (currentSessionId === selectedSession.id) {
-        handleSessionPress(null);
+      setIsLoading(true);
+      try {
+        // If we are deleting the current session, navigate to new chat
+        if (currentSessionId === selectedSession.id) {
+          handleSessionPress(null);
+        }
+        await deleteSession({ session_id: selectedSession.id });
+        setModalVisible(false);
+      } catch (error) {
+        console.error("Failed to delete session:", error);
+      } finally {
+        setIsLoading(false);
       }
-      await deleteSession({ session_id: selectedSession.id });
-      setModalVisible(false);
     }
   };
 
@@ -300,6 +316,7 @@ export const SideMenu = (props: DrawerContentComponentProps) => {
                     setRenameText(selectedSession?.title || "");
                     setModalMode("rename");
                   }}
+                  disabled={isLoading}
                 >
                   <Text
                     style={[
@@ -313,6 +330,7 @@ export const SideMenu = (props: DrawerContentComponentProps) => {
                 <TouchableOpacity
                   style={[styles.modalOption, { borderBottomWidth: 0 }]}
                   onPress={() => setModalMode("delete")}
+                  disabled={isLoading}
                 >
                   <Text
                     style={[
@@ -352,6 +370,7 @@ export const SideMenu = (props: DrawerContentComponentProps) => {
                   <TouchableOpacity
                     onPress={() => setModalVisible(false)}
                     style={styles.modalButton}
+                    disabled={isLoading}
                   >
                     <Text
                       style={{
@@ -368,15 +387,23 @@ export const SideMenu = (props: DrawerContentComponentProps) => {
                       styles.modalButton,
                       { backgroundColor: Colors[theme].primary },
                     ]}
+                    disabled={isLoading || !renameText.trim()}
                   >
-                    <Text
-                      style={{
-                        color: Colors[theme].background,
-                        fontFamily: "FontBold",
-                      }}
-                    >
-                      Save
-                    </Text>
+                    {isLoading ? (
+                      <ActivityIndicator
+                        size="small"
+                        color={Colors[theme].background}
+                      />
+                    ) : (
+                      <Text
+                        style={{
+                          color: Colors[theme].background,
+                          fontFamily: "FontBold",
+                        }}
+                      >
+                        Save
+                      </Text>
+                    )}
                   </TouchableOpacity>
                 </View>
               </>
@@ -402,6 +429,7 @@ export const SideMenu = (props: DrawerContentComponentProps) => {
                   <TouchableOpacity
                     onPress={() => setModalVisible(false)}
                     style={styles.modalButton}
+                    disabled={isLoading}
                   >
                     <Text
                       style={{
@@ -418,10 +446,15 @@ export const SideMenu = (props: DrawerContentComponentProps) => {
                       styles.modalButton,
                       { backgroundColor: Colors[theme].danger },
                     ]}
+                    disabled={isLoading}
                   >
-                    <Text style={{ color: "white", fontFamily: "FontBold" }}>
-                      Delete
-                    </Text>
+                    {isLoading ? (
+                      <ActivityIndicator size="small" color="white" />
+                    ) : (
+                      <Text style={{ color: "white", fontFamily: "FontBold" }}>
+                        Delete
+                      </Text>
+                    )}
                   </TouchableOpacity>
                 </View>
               </>
