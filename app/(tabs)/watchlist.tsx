@@ -282,7 +282,7 @@ export default function WatchlistScreen() {
               style={[
                 styles.emptyCard,
                 {
-                  backgroundColor: Colors[theme].surface,
+                  backgroundColor: "transparent",
                   borderColor: Colors[theme].border,
                 },
               ]}
@@ -290,10 +290,9 @@ export default function WatchlistScreen() {
               <Image
                 source={require("@/assets/images/splash-icon.png")}
                 style={{
-                  width: 80,
-                  height: 80,
+                  width: 100,
+                  height: 100,
                   marginBottom: 20,
-                  opacity: 0.5,
                 }}
               />
               <Text
@@ -540,9 +539,7 @@ const styles = StyleSheet.create({
   emptyCard: {
     width: "100%",
     maxWidth: 400,
-    borderRadius: 24,
-    padding: 40,
-    borderWidth: 1,
+    padding: 0,
     alignItems: "center",
   },
   section: {

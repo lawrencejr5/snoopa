@@ -14,7 +14,7 @@ const Container = ({ children }: { children: ReactNode }) => {
         backgroundColor: Colors[theme].background,
         paddingTop: insets.top,
         paddingBottom: insets.bottom,
-        paddingHorizontal: 15,
+        paddingHorizontal: 20,
       }}
     >
       {children}

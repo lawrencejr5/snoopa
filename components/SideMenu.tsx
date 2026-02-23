@@ -184,58 +184,71 @@ export const SideMenu = (props: DrawerContentComponentProps) => {
           >
             RECENT SESSIONS
           </Text>
-          {sessions.map((session) => {
-            const isActive = currentSessionId === session._id;
-            return (
-              <Pressable
-                key={session._id}
-                onPress={() => handleSessionPress(session._id)}
-                onLongPress={() => handleLongPress(session)}
-                style={[
-                  styles.menuItem,
-                  {
-                    backgroundColor: isActive
-                      ? Colors[theme].surface
-                      : "transparent",
-                  },
-                ]}
-              >
-                <Image
-                  source={require("@/assets/icons/clock-thick.png")}
-                  style={{
-                    width: 16,
-                    height: 16,
-                    tintColor: isActive
-                      ? Colors[theme].primary
-                      : Colors[theme].text_secondary,
-                    marginRight: 10,
-                  }}
-                />
-                <View style={{ flex: 1 }}>
-                  <Text
-                    numberOfLines={1}
+          {sessions.length === 0 ? (
+            <Text
+              style={{
+                fontFamily: "FontRegular",
+                fontSize: 14,
+                color: Colors[theme].text_secondary,
+                marginTop: 10,
+              }}
+            >
+              You haven't started any chat sessions
+            </Text>
+          ) : (
+            sessions.map((session) => {
+              const isActive = currentSessionId === session._id;
+              return (
+                <Pressable
+                  key={session._id}
+                  onPress={() => handleSessionPress(session._id)}
+                  onLongPress={() => handleLongPress(session)}
+                  style={[
+                    styles.menuItem,
+                    {
+                      backgroundColor: isActive
+                        ? Colors[theme].surface
+                        : "transparent",
+                    },
+                  ]}
+                >
+                  <Image
+                    source={require("@/assets/icons/clock-thick.png")}
                     style={{
-                      fontFamily: isActive ? "FontBold" : "FontMedium",
-                      fontSize: 14,
-                      color: Colors[theme].text,
+                      width: 16,
+                      height: 16,
+                      tintColor: isActive
+                        ? Colors[theme].primary
+                        : Colors[theme].text_secondary,
+                      marginRight: 10,
                     }}
-                  >
-                    {session.title}
-                  </Text>
-                  <Text
-                    numberOfLines={1}
-                    style={{
-                      fontFamily: "FontRegular",
-                      fontSize: 12,
-                      color: Colors[theme].text_secondary,
-                    }}
-                  >
-                    {session.excerpt?.replace(/\*/g, "")}
-                  </Text>
-                </View>
-              </Pressable>
-            );
-          })}
+                  />
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      numberOfLines={1}
+                      style={{
+                        fontFamily: isActive ? "FontBold" : "FontMedium",
+                        fontSize: 14,
+                        color: Colors[theme].text,
+                      }}
+                    >
+                      {session.title}
+                    </Text>
+                    <Text
+                      numberOfLines={1}
+                      style={{
+                        fontFamily: "FontRegular",
+                        fontSize: 12,
+                        color: Colors[theme].text_secondary,
+                      }}
+                    >
+                      {session.excerpt?.replace(/\*/g, "")}
+                    </Text>
+                  </View>
+                </Pressable>
+              );
+            })
+          )}
         </View>
       </ScrollView>
       {/* Footer */}

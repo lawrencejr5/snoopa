@@ -385,9 +385,17 @@ export default function ChatScreen() {
                       >
                         <SnoopaHead />
 
-                        <FormatText>
-                          {extractConfirmationMessage(msg.content)}
-                        </FormatText>
+                        {typingMessageId === msg._id ? (
+                          <TypeWriter
+                            content={msg.content}
+                            onComplete={() => setTypingMessageId(null)}
+                            speed={10}
+                          />
+                        ) : (
+                          <FormatText>
+                            {extractConfirmationMessage(msg.content)}
+                          </FormatText>
+                        )}
                       </View>
 
                       {/* Watchlist Card */}
