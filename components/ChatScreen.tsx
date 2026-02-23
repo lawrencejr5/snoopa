@@ -707,8 +707,8 @@ export default function ChatScreen() {
                 <Image
                   source={require("@/assets/icons/sliders.png")}
                   style={{
-                    width: 20,
-                    height: 20,
+                    width: 22,
+                    height: 22,
                     tintColor: Colors[theme].text_secondary,
                   }}
                 />
@@ -719,16 +719,18 @@ export default function ChatScreen() {
               onPress={handleSend}
               disabled={isBusy || !input.trim()}
               style={{
-                padding: 6,
+                padding: 3,
+                backgroundColor: Colors[theme].text,
+                opacity: input && !isBusy ? 1 : 0.5,
+                borderRadius: 20,
               }}
             >
               <Image
                 source={require("@/assets/icons/arrow-up.png")}
                 style={{
-                  width: 22,
-                  height: 22,
-                  tintColor: Colors[theme].text,
-                  opacity: input && !isBusy ? 1 : 0.5,
+                  width: 20,
+                  height: 20,
+                  tintColor: Colors[theme].background,
                 }}
               />
             </Pressable>
