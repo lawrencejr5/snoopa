@@ -131,7 +131,7 @@ export default function BillingScreen() {
             Upgrade to Pro
           </Text>
           <Text style={[styles.price, { color: Colors[theme].primary }]}>
-            $29
+            $30M😎
             <Text style={{ fontSize: 16, color: Colors[theme].text_secondary }}>
               /mo
             </Text>

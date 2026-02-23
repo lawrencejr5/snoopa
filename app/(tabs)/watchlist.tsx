@@ -79,7 +79,7 @@ type WatchlistItem = {
   _id: import("@/convex/_generated/dataModel").Id<"watchlist">;
   title: string;
   condition: string;
-  status: "active" | "completed";
+  status: "active" | "completed" | "inactive";
   last_checked: number;
   [key: string]: unknown;
 };
@@ -226,7 +226,9 @@ export default function WatchlistScreen() {
   const watchlistData = useQuery(api.watchlist.get_watchlists) || [];
 
   const activeSnoops = watchlistData.filter((i) => i.status === "active");
-  const closedSnoops = watchlistData.filter((i) => i.status === "completed");
+  const closedSnoops = watchlistData.filter(
+    (i) => i.status === "completed" || i.status === "inactive",
+  );
 
   if (isLoading || !signedIn || appLoading || !watchlistData)
     return <Loading />;
@@ -457,7 +459,12 @@ export default function WatchlistScreen() {
                       <View
                         style={[
                           styles.statusBadge,
-                          { backgroundColor: Colors[theme].border },
+                          {
+                            backgroundColor:
+                              item.status === "inactive"
+                                ? Colors[theme].border
+                                : Colors[theme].border,
+                          },
                         ]}
                       >
                         <Text
@@ -467,7 +474,7 @@ export default function WatchlistScreen() {
                             fontFamily: "FontBold",
                           }}
                         >
-                          CONFIRMED
+                          {item.status === "inactive" ? "STOPPED" : "CONFIRMED"}
                         </Text>
                       </View>
                     </View>

@@ -3,10 +3,12 @@ import Colors from "@/constants/Colors";
 import { useTheme } from "@/context/ThemeContext";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
+import { useState } from "react";
 import {
+  ActivityIndicator,
   Image,
   Pressable,
   ScrollView,
@@ -30,6 +32,21 @@ export default function SnoopDetailsScreen() {
     api.watchlist.get_watchlist_logs,
     id ? { watchlist_id: id as Id<"watchlist"> } : "skip",
   );
+  const deactivateWatchlist = useMutation(api.watchlist.deactivate_watchlist);
+
+  const [isDeactivating, setIsDeactivating] = useState(false);
+
+  const handleStopTracking = async () => {
+    if (!id || isDeactivating) return;
+    setIsDeactivating(true);
+    try {
+      await deactivateWatchlist({ watchlist_id: id as Id<"watchlist"> });
+    } catch (error) {
+      console.error("Failed to stop tracking:", error);
+    } finally {
+      setIsDeactivating(false);
+    }
+  };
 
   if (!snoop) {
     return (
@@ -75,17 +92,39 @@ export default function SnoopDetailsScreen() {
           <View
             style={[
               styles.statusBadge,
-              { backgroundColor: Colors[theme].primary + "20" },
+              {
+                backgroundColor:
+                  snoop.status === "inactive"
+                    ? Colors[theme].text_secondary + "20"
+                    : Colors[theme].primary + "20",
+              },
             ]}
           >
             <View
               style={[
                 styles.pulsingDot,
-                { backgroundColor: Colors[theme].primary },
+                {
+                  backgroundColor:
+                    snoop.status === "inactive"
+                      ? Colors[theme].text_secondary
+                      : Colors[theme].primary,
+                },
               ]}
             />
-            <Text style={[styles.statusText, { color: Colors[theme].primary }]}>
-              CURRENTLY TRACKING
+            <Text
+              style={[
+                styles.statusText,
+                {
+                  color:
+                    snoop.status === "inactive"
+                      ? Colors[theme].text_secondary
+                      : Colors[theme].primary,
+                },
+              ]}
+            >
+              {snoop.status === "inactive"
+                ? "TRACKING STOPPED"
+                : "CURRENTLY TRACKING"}
             </Text>
           </View>
 
@@ -287,19 +326,39 @@ export default function SnoopDetailsScreen() {
         ]}
       >
         <Pressable
+          onPress={handleStopTracking}
+          disabled={isDeactivating || snoop.status === "inactive"}
           style={[
             styles.stopButton,
             {
               backgroundColor: Colors[theme].surface,
-              borderColor: Colors[theme].danger,
+              borderColor:
+                snoop.status === "inactive"
+                  ? Colors[theme].border
+                  : Colors[theme].danger,
+              opacity: snoop.status === "inactive" ? 0.6 : 1,
             },
           ]}
         >
-          <Text
-            style={[styles.stopButtonText, { color: Colors[theme].danger }]}
-          >
-            Stop Tracking
-          </Text>
+          {isDeactivating ? (
+            <ActivityIndicator size="small" color={Colors[theme].danger} />
+          ) : (
+            <Text
+              style={[
+                styles.stopButtonText,
+                {
+                  color:
+                    snoop.status === "inactive"
+                      ? Colors[theme].text_secondary
+                      : Colors[theme].danger,
+                },
+              ]}
+            >
+              {snoop.status === "inactive"
+                ? "Tracking Stopped"
+                : "Stop Tracking"}
+            </Text>
+          )}
         </Pressable>
       </View>
     </Container>

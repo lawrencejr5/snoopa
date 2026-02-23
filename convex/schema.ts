@@ -38,7 +38,11 @@ const schema = defineSchema({
     keywords: v.array(v.string()),
     condition: v.string(),
     canonical_topic: v.optional(v.string()),
-    status: v.union(v.literal("active"), v.literal("completed")),
+    status: v.union(
+      v.literal("active"),
+      v.literal("completed"),
+      v.literal("inactive"),
+    ),
     last_checked: v.number(),
     sources: v.array(v.string()),
     message_id: v.optional(v.id("chats")),
