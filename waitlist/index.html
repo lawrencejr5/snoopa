@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Snoopa — Join the Waitlist</title>
+    <meta
+      name="description"
+      content="Snoopa is your proactive AI private investigator. Don't snoop, just search. Join the waitlist and be first to know when we launch."
+    />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="noise-overlay"></div>
+
+    <main class="layout">
+      <!-- LEFT: App screen recording placeholder -->
+      <section class="left-panel" id="app-preview" aria-label="App Preview">
+        <div class="phone-frame">
+          <div class="phone-notch"></div>
+          <div class="phone-screen">
+            <div class="video-placeholder">
+              <div class="placeholder-icon">
+                <svg
+                  width="48"
+                  height="48"
+                  viewBox="0 0 48 48"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <circle
+                    cx="24"
+                    cy="24"
+                    r="22"
+                    stroke="#EBEBDF"
+                    stroke-opacity="0.2"
+                    stroke-width="1.5"
+                  />
+                  <path
+                    d="M19 16.5L34 24L19 31.5V16.5Z"
+                    fill="#EBEBDF"
+                    fill-opacity="0.4"
+                  />
+                </svg>
+              </div>
+              <p class="placeholder-label">App preview coming soon</p>
+            </div>
+          </div>
+          <div class="phone-home-indicator"></div>
+        </div>
+
+        <!-- Floating glow blobs -->
+        <div class="glow glow--amber"></div>
+        <div class="glow glow--bone"></div>
+      </section>
+
+      <!-- RIGHT: Copy + waitlist form -->
+      <section class="right-panel" aria-label="Waitlist">
+        <header class="brand">
+          <img
+            src="./images/favicon.png"
+            alt="Snoopa logo"
+            class="brand__logo-img"
+          />
+          <span class="brand__name">snoopa</span>
+        </header>
+
+        <div class="content">
+          <div class="badge">Private Beta</div>
+
+          <h1 class="headline">
+            Don't snoop,<br />
+            <span class="headline--accent">just search.</span>
+          </h1>
+
+          <p class="subtext">
+            Snoopa is your proactive AI private investigator. Ask it what's
+            happening right now — sports, tech, finance — and set it to watch
+            for things that matter to you. When something changes, Snoopa finds
+            you first.
+          </p>
+
+          <ul class="features">
+            <li class="feature-item">
+              <span class="feature-dot"></span>
+              Real-time intel sourced straight from the web
+            </li>
+            <li class="feature-item">
+              <span class="feature-dot"></span>
+              Set watchlists &amp; get push alerts when things change
+            </li>
+            <li class="feature-item">
+              <span class="feature-dot"></span>
+              Built for speed. Powered by a Greyhound spirit.
+            </li>
+          </ul>
+
+          <!-- Watch Video — mobile only, sits at the bottom of right panel content -->
+          <button
+            class="watch-video-btn"
+            id="watch-video-btn"
+            aria-label="Scroll to app preview"
+          >
+            <span class="watch-video-btn__icon" aria-hidden="true">
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 16 16"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <circle
+                  cx="8"
+                  cy="8"
+                  r="7"
+                  stroke="currentColor"
+                  stroke-width="1.2"
+                  stroke-opacity="0.6"
+                />
+                <path d="M6.5 5.5L11 8L6.5 10.5V5.5Z" fill="currentColor" />
+              </svg>
+            </span>
+            Watch Video
+          </button>
+
+          <form class="waitlist-form" id="waitlist-form" novalidate>
+            <div class="input-group">
+              <input
+                type="email"
+                id="email-input"
+                name="email"
+                class="email-input"
+                placeholder="your@email.com"
+                autocomplete="email"
+                required
+                aria-label="Email address"
+              />
+              <button
+                type="submit"
+                class="submit-btn"
+                id="submit-btn"
+                aria-label="Join Waitlist"
+              >
+                <span class="btn-text">Join Waitlist</span>
+                <span class="btn-icon" aria-hidden="true">
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 16 16"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M3 8H13M13 8L9 4M13 8L9 12"
+                      stroke="currentColor"
+                      stroke-width="1.5"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                </span>
+                <span class="btn-loader" aria-hidden="true">
+                  <svg
+                    class="spinner"
+                    width="18"
+                    height="18"
+                    viewBox="0 0 18 18"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <circle
+                      cx="9"
+                      cy="9"
+                      r="7"
+                      stroke="currentColor"
+                      stroke-opacity="0.3"
+                      stroke-width="2"
+                    />
+                    <path
+                      d="M9 2a7 7 0 0 1 7 7"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                    />
+                  </svg>
+                </span>
+              </button>
+            </div>
+            <p
+              class="form-error"
+              id="form-error"
+              role="alert"
+              aria-live="polite"
+            ></p>
+          </form>
+
+          <div
+            class="success-state"
+            id="success-state"
+            aria-live="polite"
+            hidden
+          >
+            <div class="success-icon">
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M5 12L10 17L19 7"
+                  stroke="#4BB543"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            </div>
+            <div>
+              <p class="success-title">You're on the list.</p>
+              <p class="success-sub">
+                We'll reach out when it's your turn. Stay sharp.
+              </p>
+            </div>
+          </div>
+
+          <p class="privacy-note">No spam. Unsubscribe anytime.</p>
+        </div>
+
+        <div class="counter" id="counter">
+          <span class="counter__pulse"></span>
+          <span class="counter__text" id="counter-text"
+            >Be among the first to get access</span
+          >
+        </div>
+      </section>
+    </main>
+
+    <script src="main.js"></script>
+  </body>
+</html>

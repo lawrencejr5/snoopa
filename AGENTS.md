@@ -2,9 +2,12 @@
 
 ## Project Mission
 
-Snoopa is a proactive AI agent that hunts for verified facts (sports, tech, finance) and "snitches" them to users via a Greyhound mascot interface.
-For now, what we're trying to achieve is getting the UI ready for the different features we're going to have for the mvp.
-We'll take it little by little, feature by feature, frontend first before backend, please take note.
+Snoopa is a proactive AI agent that hunts for verified facts (sports, tech, finance) and "snoops" them to users via a Greyhound mascot interface.
+Now Snoopa is like a private investigator agent. This is just an app that you can converse with on what is currently happening and also tell it to track things that'll happen in the future and let you know.
+
+So for example, I want to know how real madrid's injury list looks like, I ask snoopa and snoopa says that bellingham just went into injury, eder militao is recorvering faster, and then I'll be like, alright then, when eder militao is back in training, please let me know and then it saves a watchlist and when he returns, snoopa sends you a push notification.
+
+Now where does snoopa get it's intel from? I actually use serper.dev to query and scrape the front page of google, so my intel is actually from google at the moment.
 
 ## Tech Stack
 
