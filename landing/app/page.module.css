@@ -326,14 +326,21 @@
 }
 
 @media (max-width: 640px) {
+  .heroVisual {
+    position: absolute;
+    top: 72px;
+    right: 24px;
+    margin: 0;
+  }
+
   .heroMascot {
-    width: 120px;
-    height: 120px;
+    width: 80px;
+    height: 80px;
   }
 
   .heroGlow {
-    width: 200px;
-    height: 200px;
+    width: 120px;
+    height: 120px;
   }
 }
 
@@ -364,32 +371,48 @@
 }
 
 .demoPhoneFrame {
-  width: 220px;
-  height: 450px;
-  background: var(--surface);
-  border-radius: 36px;
-  border: 1.5px solid rgba(235, 235, 223, 0.1);
+  position: relative;
+  width: 260px;
+  height: 530px;
+  background: var(--card);
+  border-radius: 44px;
+  border: 1.5px solid rgba(235, 235, 223, 0.12);
   box-shadow:
-    0 0 0 1px rgba(235, 235, 223, 0.04),
-    0 32px 64px rgba(0, 0, 0, 0.5);
+    0 0 0 1px rgba(235, 235, 223, 0.05),
+    0 40px 80px rgba(10, 10, 10, 0.8),
+    inset 0 1px 0 rgba(235, 235, 223, 0.06);
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  animation: float 5s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
 }
 
 @media (max-width: 640px) {
   .demoPhoneFrame {
-    width: 180px;
-    height: 370px;
-    border-radius: 30px;
+    width: 200px;
+    height: 410px;
+    border-radius: 36px;
   }
 }
 
 .demoScreen {
   flex: 1;
-  overflow: hidden;
-  border-radius: 34px 34px 0 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface);
   margin: 6px 6px 0;
+  border-radius: 30px 30px 0 0;
 }
 
 .demoVideo {
@@ -399,20 +422,21 @@
 }
 
 .demoHomeBar {
-  height: 20px;
+  flex-shrink: 0;
+  height: 24px;
+  background: var(--surface);
+  margin: 0 6px;
+  border-radius: 0 0 38px 38px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--surface);
-  margin: 0 6px;
-  border-radius: 0 0 30px 30px;
 }
 
 .demoHomeBar::after {
   content: "";
-  width: 50px;
-  height: 3.5px;
-  background: rgba(235, 235, 223, 0.18);
+  width: 60px;
+  height: 4px;
+  background: rgba(235, 235, 223, 0.2);
   border-radius: 2px;
 }
 
@@ -496,29 +520,37 @@
   display: none;
 }
 
-.screenshotImg {
+.screenshotPhoneFrame {
   flex-shrink: 0;
-  width: 180px;
-  height: 360px;
-  object-fit: cover;
-  border-radius: 20px;
-  border: 1px solid var(--border);
+  position: relative;
+  width: 220px;
+  height: 450px;
+  background: var(--card);
+  border-radius: 36px;
+  border: 1.5px solid rgba(235, 235, 223, 0.12);
+  box-shadow:
+    0 0 0 1px rgba(235, 235, 223, 0.05),
+    0 20px 40px rgba(10, 10, 10, 0.5),
+    inset 0 1px 0 rgba(235, 235, 223, 0.06);
+  display: flex;
+  flex-direction: column;
   scroll-snap-align: start;
   transition:
     transform 0.25s ease,
     border-color 0.25s ease;
 }
 
-.screenshotImg:hover {
-  transform: translateY(-4px);
+.screenshotPhoneFrame:hover {
+  transform: translateY(-6px);
   border-color: rgba(235, 235, 223, 0.2);
 }
 
 @media (max-width: 640px) {
-  .screenshotImg {
-    width: 140px;
-    height: 280px;
-    border-radius: 16px;
+  .screenshotPhoneFrame {
+    width: 180px;
+    height: 370px;
+    border-radius: 30px;
+    overflow: hidden;
   }
 }
 

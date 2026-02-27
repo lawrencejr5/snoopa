@@ -177,31 +177,38 @@ export default function Home() {
         {/* ─ SCREENSHOTS CARD ─ */}
         <section className={styles.cardScreenshots}>
           <div className={styles.screenshotStrip}>
-            <img
-              src="/images/screenshots/Screenshot_20260227-040025_Snoopa.jpg"
-              alt="Snoopa home screen"
-              className={styles.screenshotImg}
-            />
-            <img
-              src="/images/screenshots/Screenshot_20260227-040041_Snoopa.jpg"
-              alt="Snoopa conversation"
-              className={styles.screenshotImg}
-            />
-            <img
-              src="/images/screenshots/Screenshot_20260227-040050_Snoopa.jpg"
-              alt="Snoopa watchlist"
-              className={styles.screenshotImg}
-            />
-            <img
-              src="/images/screenshots/Screenshot_20260227-040104_Snoopa.jpg"
-              alt="Snoopa tracking"
-              className={styles.screenshotImg}
-            />
-            <img
-              src="/images/screenshots/Screenshot_20260227-040134_Snoopa.jpg"
-              alt="Snoopa notifications"
-              className={styles.screenshotImg}
-            />
+            {[
+              {
+                src: "/images/screenshots/Screenshot_20260227-040025_Snoopa.jpg",
+                alt: "Snoopa home screen",
+              },
+              {
+                src: "/images/screenshots/Screenshot_20260227-040050_Snoopa.jpg",
+                alt: "Snoopa watchlist",
+              },
+              {
+                src: "/images/screenshots/Screenshot_20260227-040041_Snoopa.jpg",
+                alt: "Snoopa conversation",
+              },
+              {
+                src: "/images/screenshots/Screenshot_20260227-040134_Snoopa.jpg",
+                alt: "Snoopa notifications",
+              },
+              {
+                src: "/images/screenshots/Screenshot_20260227-040104_Snoopa.jpg",
+                alt: "Snoopa tracking",
+              },
+            ].map((shot, idx) => (
+              <div key={idx} className={styles.screenshotPhoneFrame}>
+                <div className={styles.demoScreen}>
+                  <img
+                    src={shot.src}
+                    alt={shot.alt}
+                    className={styles.demoVideo}
+                  />
+                </div>
+              </div>
+            ))}
           </div>
         </section>
 
