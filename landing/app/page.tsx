@@ -290,7 +290,7 @@ export default function Home() {
 function WaitlistScript() {
   const script = `
     (function() {
-      const CONVEX_URL = "https://sensible-sandpiper-436.convex.site";
+      const CONVEX_URL = "https://sensible-sandpiper-436.convex.cloud";
 
       const form        = document.getElementById("waitlist-form");
       const emailInput  = document.getElementById("email-input");
