@@ -80,6 +80,12 @@ const schema = defineSchema({
     read: v.boolean(),
     watchlist_id: v.optional(v.id("watchlist")),
   }).index("by_user", ["user_id"]),
+
+  waitlist_signups: defineTable({
+    email: v.string(),
+    signed_up_at: v.number(),
+    notified: v.boolean(),
+  }).index("by_email", ["email"]),
 });
 
 export default schema;

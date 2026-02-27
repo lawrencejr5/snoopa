@@ -1,11 +1,15 @@
 // ─────────────────────────────────────────────
 // Snoopa Waitlist — main.js
-// Handles form submission, validation & UI states.
-// Backend (Convex + Resend) will be wired here later.
+// Convex + Resend backend integration
 // ─────────────────────────────────────────────
 
 (function () {
   "use strict";
+
+  // ── Config ────────────────────────────────
+  // Your Convex deployment URL — find this in your Convex dashboard
+  // or in the EXPO_PUBLIC_CONVEX_URL env var from your app project.
+  const CONVEX_URL = "https://cheerful-bear-807.convex.cloud";
 
   // ── DOM refs ──────────────────────────────
   const form = document.getElementById("waitlist-form");
@@ -44,6 +48,39 @@
     successState.hidden = false;
   }
 
+  // ── Convex HTTP API call ──────────────────
+  // The waitlist page is plain HTML so we use Convex's HTTP mutation API
+  // instead of the JS SDK (no bundler available here).
+  async function callConvexMutation(fn_path, args) {
+    const res = await fetch(`${CONVEX_URL}/api/mutation`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path: fn_path, args }),
+    });
+
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.message || `Server error (${res.status})`);
+    }
+
+    return res.json();
+  }
+
+  async function callConvexQuery(fn_path, args) {
+    const res = await fetch(`${CONVEX_URL}/api/query`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path: fn_path, args }),
+    });
+
+    if (!res.ok) {
+      throw new Error(`Query failed (${res.status})`);
+    }
+
+    const data = await res.json();
+    return data.value;
+  }
+
   // ── Real-time validation ──────────────────
   emailInput.addEventListener("input", function () {
     if (formError.classList.contains("is-visible")) clearError();
@@ -71,30 +108,28 @@
     setLoading(true);
 
     try {
-      // ── TODO: Replace with your Convex mutation call ──
-      // const client = new ConvexClient(CONVEX_URL);
-      // await client.mutation(api.waitlist.join, { email });
-      await simulateRequest(email);
-      showSuccess();
+      const result = await callConvexMutation("waitlist_signups:join", {
+        email,
+      });
+
+      if (result.value?.already_signed_up) {
+        // Still show success — no need to tell them they already signed up
+        showSuccess();
+      } else {
+        showSuccess();
+      }
+
+      // Refresh the counter
+      loadCounter();
     } catch (err) {
-      setError(err.message || "Something went wrong. Please try again.");
+      console.error("[Waitlist]", err);
+      setError("Something went wrong. Please try again.");
     } finally {
       setLoading(false);
     }
   });
 
-  // ── Simulated request (remove when backend is ready) ──
-  function simulateRequest(email) {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        console.log("[Snoopa Waitlist] Email captured:", email);
-        resolve({ success: true });
-      }, 1400);
-    });
-  }
-
   // ── Watch Video: scroll to phone preview (mobile only) ──
-  // The button is CSS-hidden on desktop so this only fires on mobile.
   if (watchVideoBtn) {
     watchVideoBtn.addEventListener("click", function () {
       const target = document.getElementById("app-preview");
@@ -104,21 +139,20 @@
     });
   }
 
-  // ── Animate counter number ────────────────
-  function animateCounter() {
+  // ── Load live signup count ────────────────
+  async function loadCounter() {
     if (!counterText) return;
-    const target = 17; // placeholder — update with real Convex query
-    let current = 0;
-    const step = Math.ceil(target / 40);
-    const timer = setInterval(() => {
-      current += step;
-      if (current >= target) {
-        current = target;
-        clearInterval(timer);
+
+    try {
+      const count = await callConvexQuery("waitlist_signups:get_count", {});
+      if (typeof count === "number" && count > 0) {
+        counterText.textContent = `${count.toLocaleString()} ${count === 1 ? "person" : "people"} already waiting`;
       }
-      counterText.textContent = `${current.toLocaleString()} people already waiting`;
-    }, 30);
+    } catch {
+      // Silently fail — counter isn't critical
+    }
   }
 
-  setTimeout(animateCounter, 800);
+  // Load the real count on page load
+  loadCounter();
 })();
