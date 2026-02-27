@@ -716,6 +716,15 @@
   margin-top: 4px;
 }
 
+.counterText {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  letter-spacing: 0.01em;
+  margin-top: 2px;
+  min-height: 1em;
+}
+
 /* ── Footer ─────────────────────────────────── */
 .footer {
   position: relative;

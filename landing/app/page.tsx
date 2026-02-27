@@ -236,7 +236,9 @@ export default function Home() {
                 className={styles.submitBtn}
                 id="submit-btn"
               >
-                <span className={styles.btnText}>Join</span>
+                <span className={styles.btnText} id="btn-text">
+                  Join
+                </span>
                 <span className={styles.btnLoader} id="btn-loader">
                   <svg
                     className={styles.spinner}
@@ -267,13 +269,14 @@ export default function Home() {
             <p className={styles.formSuccess} id="form-success"></p>
           </form>
           <p className={styles.privacyNote}>No spam. Unsubscribe anytime.</p>
+          <p className={styles.counterText} id="counter-text"></p>
         </section>
       </main>
 
       {/* ── Footer ──────────────────────────── */}
       <footer className={styles.footer}>
         <p className={styles.footerText}>
-          © {new Date().getFullYear()} Snoopa. Built with the Greyhound spirit.
+          © {new Date().getFullYear()} Snoopa. By Lawjun Technologies.
         </p>
       </footer>
 
@@ -287,54 +290,98 @@ export default function Home() {
 function WaitlistScript() {
   const script = `
     (function() {
-      const CONVEX_URL = "https://cheerful-bear-807.convex.cloud";
+      const CONVEX_URL = "https://sensible-sandpiper-436.convex.site";
 
-      const form = document.getElementById("waitlist-form");
-      const emailInput = document.getElementById("email-input");
-      const submitBtn = document.getElementById("submit-btn");
-      const formError = document.getElementById("form-error");
+      const form        = document.getElementById("waitlist-form");
+      const emailInput  = document.getElementById("email-input");
+      const submitBtn   = document.getElementById("submit-btn");
+      const formError   = document.getElementById("form-error");
       const formSuccess = document.getElementById("form-success");
-      const btnLoader = document.getElementById("btn-loader");
+      const btnLoader   = document.getElementById("btn-loader");
+      const btnText     = document.getElementById("btn-text");
+      const counterText = document.getElementById("counter-text");
 
-      function isValidEmail(e) { return /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(e.trim()); }
+      function isValidEmail(e) {
+        return /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(e.trim());
+      }
 
-      function setError(msg) { formError.textContent = msg; formError.style.display = "block"; formSuccess.style.display = "none"; }
-      function clearError() { formError.textContent = ""; formError.style.display = "none"; }
-      function showSuccess() {
-        formSuccess.textContent = "You're on the list! We'll be in touch.";
+      function setError(msg) {
+        formError.textContent = msg;
+        formError.style.display = "block";
+        formSuccess.style.display = "none";
+      }
+
+      function clearError() {
+        formError.textContent = "";
+        formError.style.display = "none";
+      }
+
+      function showSuccess(position, alreadySignedUp) {
+        var msg = alreadySignedUp
+          ? "You\\'re already on the list! Check your email for your position."
+          : "You\\'re #" + position + " on the waitlist! Check your email.";
+        formSuccess.textContent = msg;
         formSuccess.style.display = "block";
         formError.style.display = "none";
         emailInput.value = "";
-      }
-      function setLoading(v) {
-        submitBtn.disabled = v;
-        btnLoader.style.display = v ? "flex" : "none";
-        submitBtn.querySelector("." + "${styles.btnText}").style.display = v ? "none" : "inline";
+        // Update counter in place
+        if (counterText && !alreadySignedUp) {
+          counterText.textContent = position + " " + (position === 1 ? "person" : "people") + " already waiting";
+        }
       }
 
-      emailInput.addEventListener("input", function() { if(formError.style.display==="block") clearError(); });
+      function setLoading(v) {
+        submitBtn.disabled = v;
+        if (btnLoader) btnLoader.style.display = v ? "flex" : "none";
+        if (btnText)   btnText.style.display   = v ? "none" : "inline";
+      }
+
+      emailInput.addEventListener("input", function() {
+        if (formError.style.display === "block") clearError();
+      });
 
       form.addEventListener("submit", async function(e) {
         e.preventDefault();
         clearError();
         var email = emailInput.value.trim();
-        if (!email) { setError("Please enter your email."); return; }
-        if (!isValidEmail(email)) { setError("That doesn't look like a valid email."); return; }
+        if (!email)              { setError("Please enter your email."); return; }
+        if (!isValidEmail(email)){ setError("That doesn\\'t look like a valid email."); return; }
         setLoading(true);
         try {
           var res = await fetch(CONVEX_URL + "/api/mutation", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ path: "waitlist_signups:join", args: { email: email } }),
+            body: JSON.stringify({ path: "waitlist:join", args: { email: email } }),
           });
           if (!res.ok) throw new Error("Server error");
-          showSuccess();
+          var data = await res.json();
+          var value = data.value || data;
+          showSuccess(value.position, value.already_signed_up);
         } catch(err) {
           setError("Something went wrong. Please try again.");
         } finally {
           setLoading(false);
         }
       });
+
+      // Load live count on mount
+      async function loadCounter() {
+        if (!counterText) return;
+        try {
+          var res = await fetch(CONVEX_URL + "/api/query", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ path: "waitlist:get_count", args: {} }),
+          });
+          if (!res.ok) return;
+          var data = await res.json();
+          var count = data.value;
+          if (typeof count === "number" && count > 0) {
+            counterText.textContent = count.toLocaleString() + " " + (count === 1 ? "person" : "people") + " already waiting";
+          }
+        } catch(_) {}
+      }
+      loadCounter();
 
       // Mobile menu toggle
       var menuBtn = document.getElementById("mobile-menu-btn");
