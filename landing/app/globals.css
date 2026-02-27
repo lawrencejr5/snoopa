@@ -1,33 +1,55 @@
+/* ─────────────────────────────────────────────
+   Snoopa Landing — globals.css
+   Design: Dark, Bento, Tactical Luxury
+   Font: Space Grotesk (local)
+   ───────────────────────────────────────────── */
+
+/* ── Reset ──────────────────────────────────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* ── Tokens ─────────────────────────────────── */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg: #141414;
+  --surface: #0a0a0a;
+  --primary: #ebebdf;
+  --primary-variant: #d1d1cb;
+  --text: #ebebdf;
+  --text-secondary: #a3a398;
+  --border: #2a2a2a;
+  --card: #1c1c1c;
+  --success: #4bb543;
+  --danger: #ff4d4d;
+  --accent1: #333333;
+  --accent2: #555555;
+  --amber: #c68e17;
+
+  --radius-sm: 12px;
+  --radius-md: 20px;
+  --radius-lg: 28px;
+  --radius-xl: 32px;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
-html,
-body {
-  max-width: 100vw;
-  overflow-x: hidden;
-}
-
-body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+/* ── Base ───────────────────────────────────── */
+html {
+  font-size: 16px;
+  scroll-behavior: smooth;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-* {
-  box-sizing: border-box;
-  padding: 0;
-  margin: 0;
+body {
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: var(--font-space-grotesk), system-ui, sans-serif;
+  font-weight: 400;
+  min-height: 100vh;
+  overflow-x: hidden;
 }
 
 a {
@@ -35,8 +57,13 @@ a {
   text-decoration: none;
 }
 
-@media (prefers-color-scheme: dark) {
-  html {
-    color-scheme: dark;
-  }
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+img,
+video {
+  display: block;
+  max-width: 100%;
 }
