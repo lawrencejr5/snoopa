@@ -85,6 +85,7 @@ export const search = internalAction({
       topic: "general",
       searchDepth: "advanced",
       includeAnswer: false,
+      timeRange: "day",
       maxResults: 5,
     });
 
