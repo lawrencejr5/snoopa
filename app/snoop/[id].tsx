@@ -33,6 +33,13 @@ export default function SnoopDetailsScreen() {
     id ? { watchlist_id: id as Id<"watchlist"> } : "skip",
   );
   const deactivateWatchlist = useMutation(api.watchlist.deactivate_watchlist);
+  const markSessionRead = useMutation(api.session.mark_session_read);
+
+  // Check for unread Snoopa messages in the linked chat session
+  const hasUnread = useQuery(
+    api.session.has_unread_from_snoopa,
+    snoop?.session_id ? { session_id: snoop.session_id } : "skip",
+  );
 
   const [isDeactivating, setIsDeactivating] = useState(false);
 
@@ -79,8 +86,46 @@ export default function SnoopDetailsScreen() {
             }}
           />
         </Pressable>
-        {/* <Text style={[styles.headerTitle, { color: Colors[theme].text }]}>Details</Text> */}
-        <View style={{ width: 40 }} />
+
+        {/* Chat icon — navigate to the watchlist's linked session */}
+        {snoop.session_id ? (
+          <Pressable
+            onPress={async () => {
+              if (snoop.session_id) {
+                await markSessionRead({ session_id: snoop.session_id });
+                router.push({
+                  pathname: "/(tabs)",
+                  params: { sessionId: snoop.session_id },
+                });
+              }
+            }}
+            style={{ position: "relative", padding: 5 }}
+          >
+            <Image
+              source={require("@/assets/icons/send.png")}
+              style={{
+                width: 22,
+                height: 22,
+                tintColor: Colors[theme].text,
+              }}
+            />
+            {hasUnread && (
+              <View
+                style={{
+                  position: "absolute",
+                  top: 3,
+                  right: 3,
+                  width: 8,
+                  height: 8,
+                  borderRadius: 4,
+                  backgroundColor: "#FF3B30",
+                }}
+              />
+            )}
+          </Pressable>
+        ) : (
+          <View style={{ width: 40 }} />
+        )}
       </View>
 
       <ScrollView

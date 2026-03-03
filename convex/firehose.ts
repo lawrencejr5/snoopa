@@ -98,6 +98,54 @@ async function verifyHeadlineWithGemini(
 }
 
 // ---------------------------------------------------------------------------
+// Gemini brief generation
+// ---------------------------------------------------------------------------
+
+interface VerifiedHeadline {
+  title: string;
+  snippet: string;
+  url: string;
+  source?: string;
+  hash: string;
+}
+
+async function generateBrief(
+  watchlistTitle: string,
+  condition: string,
+  headlines: VerifiedHeadline[],
+  geminiKey: string,
+): Promise<string> {
+  const genAI = new GoogleGenerativeAI(geminiKey);
+  const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-lite" });
+
+  const headlineList = headlines
+    .map(
+      (h, i) => `${i + 1}. "${h.title}"${h.snippet ? ` — ${h.snippet}` : ""}`,
+    )
+    .join("\n");
+
+  const prompt = `You are Snoopa, a sharp AI intelligence agent. Given these verified news headlines about "${watchlistTitle}" (tracking condition: "${condition}"), write a 1-2 sentence casual briefing that captures the key takeaway.
+    Sound natural, like you're briefing a friend. Examples:
+    - "Heads up — Dangote's refinery just cracked 650k barrels/day. IPO chatter is heating up."
+    - "Militão is finally back in training, touched the ball today for the first time since November."
+    - "Bitcoin slipped below $82k overnight. Might want to keep an eye on it."
+
+    Headlines:
+    ${headlineList}
+
+    Return ONLY the brief, no quotes, no markdown.`;
+
+  try {
+    const result = await model.generateContent(prompt);
+    return result.response.text().trim();
+  } catch (err) {
+    console.error("Gemini brief generation error:", err);
+    // Fallback: use the first headline title
+    return headlines[0].title;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Internal queries
 // ---------------------------------------------------------------------------
 
@@ -228,19 +276,13 @@ export const run_firehose = internalAction({
       urlHash: string;
       watchlist_id: (typeof activeItems)[0]["_id"];
     }> = [];
-    const toInsertLogs: Array<{
-      watchlist_id: (typeof activeItems)[0]["_id"];
-      action: string;
-      url: string;
-    }> = [];
-    // One notification per watchlist item per run — keyed by watchlist _id
-    const toSendNotifications = new Map<
+
+    // Collect verified headlines per watchlist item for brief generation
+    const verifiedByItem = new Map<
       string,
       {
-        user_id: (typeof activeItems)[0]["user_id"];
-        watchlist_id: (typeof activeItems)[0]["_id"];
-        title: string;
-        message: string;
+        item: (typeof activeItems)[0];
+        headlines: VerifiedHeadline[];
       }
     >();
 
@@ -276,21 +318,19 @@ export const run_firehose = internalAction({
 
         if (satisfied) {
           verified++;
-          const logAction = `${headline.title}${headline.source ? ` — ${headline.source}` : ""}`;
-          toInsertLogs.push({
-            watchlist_id: item._id,
-            action: logAction,
-            url: headline.link,
-          });
-          // Only queue one notification per watchlist item per run
-          if (!toSendNotifications.has(item._id)) {
-            toSendNotifications.set(item._id, {
-              user_id: item.user_id,
-              watchlist_id: item._id,
-              title: item.title,
-              message: headline.title,
-            });
+
+          // Accumulate verified headlines for this watchlist item
+          if (!verifiedByItem.has(item._id)) {
+            verifiedByItem.set(item._id, { item, headlines: [] });
           }
+          verifiedByItem.get(item._id)!.headlines.push({
+            title: headline.title,
+            snippet: headline.snippet ?? "",
+            url: headline.link,
+            source: headline.source,
+            hash: headline.hash,
+          });
+
           console.log(`Firehose: ✓ "${item.title}" → "${headline.title}"`);
         }
       }
@@ -300,35 +340,82 @@ export const run_firehose = internalAction({
       );
     }
 
-    // 6. Flush all writes — 2 batch mutations
+    // 6. Flush processed entries
     if (toMarkProcessed.length > 0) {
       await ctx.runMutation(internal.log.batch_mark_processed, {
         entries: toMarkProcessed,
       });
     }
 
-    if (toInsertLogs.length > 0) {
-      await ctx.runMutation(internal.log.batch_insert_logs, {
-        entries: toInsertLogs,
-      });
-    }
+    // 7. Generate briefs, save logs + notifications + chat messages
+    let totalAlerts = 0;
 
-    // 7. Save notifications to DB + fire push — one per watchlist item
-    const notifications = [...toSendNotifications.values()];
-    if (notifications.length > 0) {
-      for (const n of notifications) {
-        await ctx.runMutation(internal.notifications.save_notification, {
-          user_id: n.user_id,
-          title: n.title,
-          message: n.message,
-          type: "alert",
-          watchlist_id: n.watchlist_id,
-        });
-        const pushTokens = await ctx.runQuery(internal.users.get_push_tokens, {
-          user_id: n.user_id,
-        });
-        await sendExpoPush(pushTokens, n.title, n.message);
+    for (const [, { item, headlines }] of verifiedByItem) {
+      // Generate a contextual brief from all verified headlines
+      const brief = await generateBrief(
+        item.title,
+        item.condition,
+        headlines,
+        geminiKey,
+      );
+
+      console.log(`Firehose: brief for "${item.title}" → "${brief}"`);
+
+      // Build log entries: one brief log + individual headline logs with URLs
+      const logEntries: Array<{
+        watchlist_id: (typeof activeItems)[0]["_id"];
+        action: string;
+        url?: string;
+      }> = [];
+
+      // The brief as the primary log entry (with first headline URL)
+      logEntries.push({
+        watchlist_id: item._id,
+        action: brief,
+        url: headlines[0]?.url,
+      });
+
+      // Individual headline logs for link preservation (if more than 1)
+      if (headlines.length > 1) {
+        for (const h of headlines.slice(1)) {
+          logEntries.push({
+            watchlist_id: item._id,
+            action: `${h.title}${h.source ? ` — ${h.source}` : ""}`,
+            url: h.url,
+          });
+        }
       }
+
+      // Batch insert logs
+      await ctx.runMutation(internal.log.batch_insert_logs, {
+        entries: logEntries,
+      });
+      totalAlerts += logEntries.length;
+
+      // Save notification with the brief
+      await ctx.runMutation(internal.notifications.save_notification, {
+        user_id: item.user_id,
+        title: item.title,
+        message: brief,
+        type: "alert",
+        watchlist_id: item._id,
+      });
+
+      // Send the brief as a chat message if the watchlist has a linked session
+      if (item.session_id) {
+        await ctx.runMutation(internal.chat.save_message, {
+          session_id: item.session_id,
+          role: "snoopa",
+          content: brief,
+          type: "snitch",
+        });
+      }
+
+      // Push notification
+      const pushTokens = await ctx.runQuery(internal.users.get_push_tokens, {
+        user_id: item.user_id,
+      });
+      await sendExpoPush(pushTokens, item.title, brief);
     }
 
     // 8. Update last_checked for all active items — 1 mutation
@@ -337,7 +424,7 @@ export const run_firehose = internalAction({
     });
 
     console.log(
-      `Firehose: complete. ${toInsertLogs.length} alerts sent, ${toMarkProcessed.length} headlines marked processed.`,
+      `Firehose: complete. ${totalAlerts} alerts sent, ${toMarkProcessed.length} headlines marked processed.`,
     );
   },
 });
