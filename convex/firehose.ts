@@ -401,11 +401,23 @@ export const run_firehose = internalAction({
         });
       }
 
-      // Push notification
+      // Push notification with randomized prefix
+      const prefixes = [
+        "New intel on",
+        "Found something new regarding",
+        "Just spotted a change in",
+        "Sharing some new findings on",
+        "Fresh scent on",
+        "Intel drop:",
+        "Something's moving on",
+      ];
+      const prefix = prefixes[Math.floor(Math.random() * prefixes.length)];
+      const pushTitle = `${prefix} ${item.title}`;
+
       const pushTokens = await ctx.runQuery(internal.users.get_push_tokens, {
         user_id: item.user_id,
       });
-      await sendExpoPush(pushTokens, item.title, brief);
+      await sendExpoPush(pushTokens, pushTitle, brief);
     }
 
     // 8. Update last_checked for all active items — 1 mutation
