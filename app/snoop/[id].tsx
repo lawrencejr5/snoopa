@@ -6,7 +6,7 @@ import { Id } from "@/convex/_generated/dataModel";
 import { useMutation, useQuery } from "convex/react";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -42,6 +42,56 @@ export default function SnoopDetailsScreen() {
   );
 
   const [isDeactivating, setIsDeactivating] = useState(false);
+
+  // Group logs by date
+  const groupedLogs = useMemo(() => {
+    if (!logs || logs.length === 0) return [];
+
+    const ordinal = (d: number) => {
+      const s = ["th", "st", "nd", "rd"];
+      const v = d % 100;
+      return d + (s[(v - 20) % 10] || s[v] || s[0]);
+    };
+
+    const months = [
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec",
+    ];
+
+    const groups: { label: string; logs: typeof logs }[] = [];
+    let currentLabel = "";
+    let currentGroup: typeof logs = [];
+
+    for (const log of logs) {
+      const date = new Date(log.timestamp);
+      const label = `${ordinal(date.getDate())} ${months[date.getMonth()]}, ${date.getFullYear()}`;
+
+      if (label !== currentLabel) {
+        if (currentGroup.length > 0) {
+          groups.push({ label: currentLabel, logs: currentGroup });
+        }
+        currentLabel = label;
+        currentGroup = [log];
+      } else {
+        currentGroup.push(log);
+      }
+    }
+    if (currentGroup.length > 0) {
+      groups.push({ label: currentLabel, logs: currentGroup });
+    }
+
+    return groups;
+  }, [logs]);
 
   const handleStopTracking = async () => {
     if (!id || isDeactivating) return;
@@ -101,8 +151,8 @@ export default function SnoopDetailsScreen() {
             }}
             style={{
               position: "relative",
-              paddingHorizontal: 10,
-              paddingVertical: 5,
+              paddingHorizontal: 12,
+              paddingVertical: 8,
               backgroundColor: Colors[theme].surface,
               borderColor: Colors[theme].border,
               borderWidth: 1,
@@ -112,7 +162,13 @@ export default function SnoopDetailsScreen() {
               gap: 10,
             }}
           >
-            <Text style={{ color: Colors[theme].text, fontFamily: "FontBold" }}>
+            <Text
+              style={{
+                color: Colors[theme].text,
+                fontFamily: "FontBold",
+                fontSize: 14,
+              }}
+            >
               Go to chat
             </Text>
             <Image
@@ -282,80 +338,114 @@ export default function SnoopDetailsScreen() {
               },
             ]}
           >
-            {logs && logs.length > 0 ? (
-              logs.map((log, index) => (
-                <Pressable
-                  key={log._id}
-                  onPress={async () => {
-                    if (log.url) await WebBrowser.openAuthSessionAsync(log.url);
-                  }}
-                  style={({ pressed }) => [
-                    styles.logItem,
-                    index !== logs.length - 1 && {
-                      borderBottomWidth: 1,
-                      borderBottomColor: Colors[theme].border + "50",
-                    },
-                    pressed && log.url ? { opacity: 0.7 } : {},
-                  ]}
-                >
-                  <View style={{ width: 50 }}>
+            {groupedLogs.length > 0 ? (
+              groupedLogs.map((group, groupIndex) => (
+                <View key={group.label}>
+                  {/* Date Header */}
+                  <View
+                    style={{
+                      paddingHorizontal: 15,
+                      paddingTop: groupIndex === 0 ? 12 : 16,
+                      paddingBottom: 8,
+                      ...(groupIndex > 0 && {
+                        borderTopWidth: 1,
+                        borderTopColor: Colors[theme].border + "80",
+                      }),
+                    }}
+                  >
                     <Text
-                      style={[
-                        styles.logTime,
-                        { color: Colors[theme].text_secondary },
-                      ]}
-                    >
-                      {new Date(log.timestamp).toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </Text>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text
-                      style={[styles.logAction, { color: Colors[theme].text }]}
-                    >
-                      {log.action}
-                    </Text>
-                    <View
                       style={{
-                        flexDirection: "row",
-                        alignItems: "center",
-                        gap: 6,
-                        marginTop: 4,
+                        fontFamily: "FontBold",
+                        fontSize: 12,
+                        color: Colors[theme].text_secondary,
+                        letterSpacing: 0.5,
+                        textTransform: "uppercase",
                       }}
                     >
-                      <View
-                        style={[
-                          styles.verificationDot,
-                          {
-                            backgroundColor: log.verified
-                              ? Colors[theme].success
-                              : Colors[theme].warning,
-                          },
-                        ]}
-                      />
-                      <Text
-                        style={[
-                          styles.verificationText,
-                          { color: Colors[theme].text_secondary },
-                        ]}
-                      >
-                        {log.verified ? "Verified" : "Unverified"}
-                      </Text>
-                      {log.url && (
+                      {group.label}
+                    </Text>
+                  </View>
+
+                  {/* Logs for this date */}
+                  {group.logs.map((log, index) => (
+                    <Pressable
+                      key={log._id}
+                      onPress={async () => {
+                        if (log.url)
+                          await WebBrowser.openAuthSessionAsync(log.url);
+                      }}
+                      style={({ pressed }) => [
+                        styles.logItem,
+                        index !== group.logs.length - 1 && {
+                          borderBottomWidth: 1,
+                          borderBottomColor: Colors[theme].border + "50",
+                        },
+                        pressed && log.url ? { opacity: 0.7 } : {},
+                      ]}
+                    >
+                      <View style={{ width: 50 }}>
                         <Text
                           style={[
-                            styles.verificationText,
-                            { color: Colors[theme].primary },
+                            styles.logTime,
+                            { color: Colors[theme].text_secondary },
                           ]}
                         >
-                          · Click to open article
+                          {new Date(log.timestamp).toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
                         </Text>
-                      )}
-                    </View>
-                  </View>
-                </Pressable>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text
+                          style={[
+                            styles.logAction,
+                            { color: Colors[theme].text },
+                          ]}
+                        >
+                          {log.action}
+                        </Text>
+                        <View
+                          style={{
+                            flexDirection: "row",
+                            alignItems: "center",
+                            gap: 6,
+                            marginTop: 4,
+                          }}
+                        >
+                          <View
+                            style={[
+                              styles.verificationDot,
+                              {
+                                backgroundColor: log.verified
+                                  ? Colors[theme].success
+                                  : Colors[theme].warning,
+                              },
+                            ]}
+                          />
+                          <Text
+                            style={[
+                              styles.verificationText,
+                              { color: Colors[theme].text_secondary },
+                            ]}
+                          >
+                            {log.verified ? "Verified" : "Unverified"}
+                          </Text>
+                          {log.url && (
+                            <Text
+                              style={[
+                                styles.verificationText,
+                                { color: Colors[theme].primary },
+                              ]}
+                            >
+                              · Click to open article
+                            </Text>
+                          )}
+                        </View>
+                      </View>
+                    </Pressable>
+                  ))}
+                </View>
               ))
             ) : (
               <View style={{ padding: 20, alignItems: "center" }}>
