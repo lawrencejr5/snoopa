@@ -8,6 +8,7 @@ import { useUser } from "@/context/UserContext";
 import { api } from "@/convex/_generated/api";
 import { createDrawerNavigator } from "@react-navigation/drawer";
 import { useConvexAuth, useQuery } from "convex/react";
+import { useLocalSearchParams } from "expo-router";
 
 const Drawer = createDrawerNavigator();
 
@@ -18,6 +19,11 @@ const IndexPage = () => {
 
   const { signedIn } = useUser();
   const watchlists = useQuery(api.watchlist.get_watchlists) || [];
+
+  // Read sessionId from Expo Router search params (e.g. from snoop detail page)
+  const { sessionId: routerSessionId } = useLocalSearchParams<{
+    sessionId?: string;
+  }>();
 
   if (isLoading || !signedIn || appLoading || !watchlists) return <Loading />;
 
@@ -35,7 +41,13 @@ const IndexPage = () => {
         },
       }}
     >
-      <Drawer.Screen name="Chat" component={ChatScreen} />
+      <Drawer.Screen
+        name="Chat"
+        component={ChatScreen}
+        initialParams={
+          routerSessionId ? { sessionId: routerSessionId } : undefined
+        }
+      />
     </Drawer.Navigator>
   );
 };

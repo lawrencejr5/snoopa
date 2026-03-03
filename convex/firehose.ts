@@ -361,29 +361,19 @@ export const run_firehose = internalAction({
 
       console.log(`Firehose: brief for "${item.title}" → "${brief}"`);
 
-      // Build log entries: one brief log + individual headline logs with URLs
+      // Build log entries: individual headlines only (brief goes to notifications + chat)
       const logEntries: Array<{
         watchlist_id: (typeof activeItems)[0]["_id"];
         action: string;
         url?: string;
       }> = [];
 
-      // The brief as the primary log entry (with first headline URL)
-      logEntries.push({
-        watchlist_id: item._id,
-        action: brief,
-        url: headlines[0]?.url,
-      });
-
-      // Individual headline logs for link preservation (if more than 1)
-      if (headlines.length > 1) {
-        for (const h of headlines.slice(1)) {
-          logEntries.push({
-            watchlist_id: item._id,
-            action: `${h.title}${h.source ? ` — ${h.source}` : ""}`,
-            url: h.url,
-          });
-        }
+      for (const h of headlines) {
+        logEntries.push({
+          watchlist_id: item._id,
+          action: `${h.title}${h.source ? ` — ${h.source}` : ""}`,
+          url: h.url,
+        });
       }
 
       // Batch insert logs

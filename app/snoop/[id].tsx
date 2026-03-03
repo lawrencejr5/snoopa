@@ -99,13 +99,27 @@ export default function SnoopDetailsScreen() {
                 });
               }
             }}
-            style={{ position: "relative", padding: 5 }}
+            style={{
+              position: "relative",
+              paddingHorizontal: 10,
+              paddingVertical: 5,
+              backgroundColor: Colors[theme].surface,
+              borderColor: Colors[theme].border,
+              borderWidth: 1,
+              borderRadius: 10,
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 10,
+            }}
           >
+            <Text style={{ color: Colors[theme].text, fontFamily: "FontBold" }}>
+              Go to chat
+            </Text>
             <Image
-              source={require("@/assets/icons/send.png")}
+              source={require("@/assets/icons/comment.png")}
               style={{
-                width: 22,
-                height: 22,
+                width: 15,
+                height: 15,
                 tintColor: Colors[theme].text,
               }}
             />
