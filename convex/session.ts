@@ -139,3 +139,52 @@ export const update_session = mutation({
     await ctx.db.patch(args.session_id, updates);
   },
 });
+
+/**
+ * Check if a session has unread messages from Snoopa.
+ * Compares message creation time against session.last_read_at.
+ */
+export const has_unread_from_snoopa = query({
+  args: { session_id: v.id("sessions") },
+  handler: async (ctx, args) => {
+    const user_id = await getAuthUserId(ctx);
+    if (!user_id) return false;
+
+    const session = await ctx.db.get(args.session_id);
+    if (!session || session.user_id !== user_id) return false;
+
+    const lastRead = session.last_read_at ?? 0;
+
+    const unread = await ctx.db
+      .query("chats")
+      .withIndex("by_session", (q) => q.eq("session_id", args.session_id))
+      .filter((q) =>
+        q.and(
+          q.eq(q.field("role"), "snoopa"),
+          q.gt(q.field("_creationTime"), lastRead),
+        ),
+      )
+      .first();
+
+    return unread !== null;
+  },
+});
+
+/**
+ * Mark a session as read — sets last_read_at to now.
+ * Called when the user opens the chat from the snoop detail page.
+ */
+export const mark_session_read = mutation({
+  args: { session_id: v.id("sessions") },
+  handler: async (ctx, args) => {
+    const user_id = await getAuthUserId(ctx);
+    if (!user_id) throw new Error("Not authenticated");
+
+    const session = await ctx.db.get(args.session_id);
+    if (!session || session.user_id !== user_id) {
+      throw new Error("Session not found or unauthorized");
+    }
+
+    await ctx.db.patch(args.session_id, { last_read_at: Date.now() });
+  },
+});

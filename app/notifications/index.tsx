@@ -148,7 +148,10 @@ export default function NotificationsScreen() {
               <Text style={[styles.title, { color: Colors[theme].text }]}>
                 {item.title}
               </Text>
-              <Text style={[styles.message, { color: Colors[theme].text }]}>
+              <Text
+                style={[styles.message, { color: Colors[theme].text }]}
+                numberOfLines={2}
+              >
                 {item.message}
               </Text>
             </Pressable>

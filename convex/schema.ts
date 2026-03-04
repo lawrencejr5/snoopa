@@ -20,6 +20,7 @@ const schema = defineSchema({
     title: v.string(),
     active: v.boolean(),
     last_updated: v.number(),
+    last_read_at: v.optional(v.number()),
   })
     .index("by_user", ["user_id"])
     .index("by_user_updated", ["user_id", "last_updated"]),
