@@ -20,6 +20,13 @@ import {
 } from "react-native";
 import { TextInput } from "react-native-gesture-handler";
 import { KeyboardStickyView } from "react-native-keyboard-controller";
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withSequence,
+  withTiming,
+} from "react-native-reanimated";
 import FormatText from "./FormatText";
 
 export default function ChatScreen() {
@@ -43,6 +50,7 @@ export default function ChatScreen() {
   );
 
   const sendMessage = useAction(api.chat.send_message);
+  const detectIntent = useAction(api.chat.detect_intent);
   const addWatchlist = useMutation(api.watchlist.add_watchlist_item);
   const unreadCount = useQuery(api.notifications.unread_count) ?? 0;
   const { signedIn } = useUser();
@@ -152,18 +160,7 @@ export default function ChatScreen() {
     }
   }, [displayMessages, isHere]); // Added isHere to dependencies
 
-  useEffect(() => {
-    let timer: any;
-    if (sending) {
-      setSnoopingText("Snooping...");
-      timer = setTimeout(() => {
-        setSnoopingText("Snooping the web...");
-      }, 2000);
-    }
-    return () => {
-      if (timer) clearTimeout(timer);
-    };
-  }, [sending]);
+  // Remove old timer effect — snoopingText is now set based on detected intent
 
   const handleSend = async () => {
     if (!input.trim() || sending || typingMessageId) return;
@@ -172,11 +169,25 @@ export default function ChatScreen() {
     setInput("");
     setPendingContent(content); // Optimistic: show message immediately
     setSending(true);
+    setSnoopingText("Snooping"); // Default while we detect intent
 
     try {
+      // Detect intent first so we can show a contextual loading message
+      const intent = await detectIntent({ content });
+
+      // Update loading text based on detected intent
+      if (intent === "SEARCH") {
+        setSnoopingText("Snooping the web");
+      } else if (intent === "WATCHLIST") {
+        setSnoopingText("Setting up watchlist");
+      } else {
+        setSnoopingText("Snooping");
+      }
+
       const result = (await sendMessage({
         session_id: sessionId ?? undefined,
         content,
+        intent,
       })) as { response: string; session_id: string };
 
       // If this was a new session, navigate to it
@@ -633,31 +644,7 @@ export default function ChatScreen() {
                     { backgroundColor: "transparent" },
                   ]}
                 >
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      marginBottom: 4,
-                      gap: 8,
-                    }}
-                  >
-                    <Image
-                      source={require("@/assets/images/splash-icon.png")}
-                      style={[
-                        styles.snoopa_logo,
-                        { borderColor: Colors[theme].border },
-                      ]}
-                    />
-                    <Text
-                      style={{
-                        fontFamily: "FontBold",
-                        fontSize: 13,
-                        color: Colors[theme].text_secondary,
-                      }}
-                    >
-                      {snoopingText}
-                    </Text>
-                  </View>
+                  <SnoopingIndicator text={snoopingText} />
                 </View>
               </View>
             )}
@@ -740,6 +727,113 @@ export default function ChatScreen() {
     </Container>
   );
 }
+
+const SnoopingIndicator = ({ text }: { text: string }) => {
+  const { theme } = useTheme();
+
+  // Animated dots: . → .. → ...
+  const dot2Opacity = useSharedValue(0);
+  const dot3Opacity = useSharedValue(0);
+
+  useEffect(() => {
+    dot2Opacity.value = withRepeat(
+      withSequence(
+        withTiming(1, { duration: 400 }),
+        withTiming(1, { duration: 400 }),
+        withTiming(1, { duration: 400 }),
+        withTiming(0, { duration: 400 }),
+      ),
+      -1,
+    );
+    dot3Opacity.value = withRepeat(
+      withSequence(
+        withTiming(0, { duration: 400 }),
+        withTiming(1, { duration: 400 }),
+        withTiming(0, { duration: 400 }),
+        withTiming(0, { duration: 400 }),
+      ),
+      -1,
+    );
+  }, []);
+
+  const dot2Style = useAnimatedStyle(() => ({ opacity: dot2Opacity.value }));
+  const dot3Style = useAnimatedStyle(() => ({ opacity: dot3Opacity.value }));
+
+  return (
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        marginBottom: 4,
+        gap: 8,
+      }}
+    >
+      {/* Logo */}
+      <View
+        style={{
+          width: 28,
+          height: 28,
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <Image
+          source={require("@/assets/images/splash-icon.png")}
+          style={[styles.snoopa_logo, { borderColor: Colors[theme].border }]}
+        />
+      </View>
+
+      {/* "Snooping" + animated dots */}
+      <View style={{ flexDirection: "row", alignItems: "flex-end" }}>
+        <Text
+          style={{
+            fontFamily: "FontBold",
+            fontSize: 13,
+            color: Colors[theme].text_secondary,
+          }}
+        >
+          {text}
+        </Text>
+        <Text
+          style={{
+            fontFamily: "FontBold",
+            fontSize: 16,
+            lineHeight: 18,
+            color: Colors[theme].text_secondary,
+          }}
+        >
+          .
+        </Text>
+        <Animated.Text
+          style={[
+            {
+              fontFamily: "FontBold",
+              fontSize: 16,
+              lineHeight: 18,
+              color: Colors[theme].text_secondary,
+            },
+            dot2Style,
+          ]}
+        >
+          .
+        </Animated.Text>
+        <Animated.Text
+          style={[
+            {
+              fontFamily: "FontBold",
+              fontSize: 16,
+              lineHeight: 18,
+              color: Colors[theme].text_secondary,
+            },
+            dot3Style,
+          ]}
+        >
+          .
+        </Animated.Text>
+      </View>
+    </View>
+  );
+};
 
 const SnoopaHead = () => {
   const { theme } = useTheme();
