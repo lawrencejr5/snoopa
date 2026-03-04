@@ -169,7 +169,7 @@ export default function ChatScreen() {
     setInput("");
     setPendingContent(content); // Optimistic: show message immediately
     setSending(true);
-    setSnoopingText("Thinking"); // Default while we detect intent
+    setSnoopingText("Snooping"); // Default while we detect intent
 
     try {
       // Detect intent first so we can show a contextual loading message
@@ -179,9 +179,9 @@ export default function ChatScreen() {
       if (intent === "SEARCH") {
         setSnoopingText("Snooping the web");
       } else if (intent === "WATCHLIST") {
-        setSnoopingText("Setting up your watchlist");
+        setSnoopingText("Setting up watchlist");
       } else {
-        setSnoopingText("Thinking");
+        setSnoopingText("Snooping");
       }
 
       const result = (await sendMessage({

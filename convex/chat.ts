@@ -60,46 +60,56 @@ export const save_message = internalMutation({
   },
 });
 
+// ---------------------------------------------------------------------------
+// Shared intent detection helper
+// ---------------------------------------------------------------------------
+
+type Intent = "SEARCH" | "WATCHLIST" | "CHAT";
+
+async function _detectIntent(
+  content: string,
+  history?: string,
+): Promise<Intent> {
+  const api_key = process.env.GOOGLE_GEMINI_API_KEY;
+  if (!api_key) return "CHAT";
+
+  try {
+    const gen_ai = new GoogleGenerativeAI(api_key);
+    const model = gen_ai.getGenerativeModel({ model: "gemini-2.0-flash-lite" });
+
+    const prompt = `Analyze this user message and classify the intent.
+      ${history ? `RECENT HISTORY:\n${history}\n` : ""}
+      USER MESSAGE: "${content}"
+
+      Classify as ONE of:
+      - SEARCH: current/live web information, news, prices, scores, recent events, anything requiring data from the last 24 hours. Includes 'is X happening', 'did Y happen', 'I heard Z is happening'.
+      - WATCHLIST: user wants to track, monitor, save, or be notified about something. E.g. 'track Bitcoin', 'watch for iPhone deals', 'notify me when Z happens', 'snoop on X'.
+      - CHAT: conversational, general knowledge, opinions, or greetings.
+
+      Reply with ONLY one word: SEARCH, WATCHLIST, or CHAT.`;
+
+    const result = await model.generateContent(prompt);
+    const text = result.response.text().trim().toUpperCase();
+    console.log(`🔍 Intent: "${content.substring(0, 50)}" → ${text}`);
+
+    if (text.includes("WATCHLIST")) return "WATCHLIST";
+    if (text.includes("SEARCH")) return "SEARCH";
+    return "CHAT";
+  } catch (err) {
+    console.warn("Intent detection failed, defaulting to CHAT:", err);
+    return "CHAT";
+  }
+}
+
 // --- Actions ---
 
 /**
  * Lightweight action to detect the intent of a user message.
- * Returns "SEARCH", "WATCHLIST", or "CHAT".
  * Call this before send_message to show context-aware loading text on the frontend.
  */
 export const detect_intent = action({
   args: { content: v.string(), history: v.optional(v.string()) },
-  handler: async (_ctx, args) => {
-    const api_key = process.env.GOOGLE_GEMINI_API_KEY;
-    if (!api_key) return "CHAT" as const;
-
-    try {
-      const gen_ai = new GoogleGenerativeAI(api_key);
-      const model = gen_ai.getGenerativeModel({
-        model: "gemini-2.0-flash-lite",
-      });
-
-      const prompt = `Analyze this user message and classify the intent.
-        ${args.history ? `RECENT HISTORY:\n${args.history}\n` : ""}
-        USER MESSAGE: "${args.content}"
-
-        Classify as ONE of:
-        - SEARCH: current/live web information, news, prices, scores, recent events, anything needing data from the last 24 hours.
-        - WATCHLIST: user wants to track, monitor, save, or be notified about something.
-        - CHAT: conversational, general knowledge, opinions, greetings.
-
-        Reply with ONLY one word: SEARCH, WATCHLIST, or CHAT.`;
-
-      const result = await model.generateContent(prompt);
-      const text = result.response.text().trim().toUpperCase();
-
-      if (text.includes("WATCHLIST")) return "WATCHLIST" as const;
-      if (text.includes("SEARCH")) return "SEARCH" as const;
-      return "CHAT" as const;
-    } catch {
-      return "CHAT" as const;
-    }
-  },
+  handler: async (_ctx, args) => _detectIntent(args.content, args.history),
 });
 
 /**
@@ -168,54 +178,17 @@ export const send_message = action({
     }));
 
     // 5. Detect intent: SEARCH, WATCHLIST, or CHAT
-    // If pre-detected by the frontend (via detect_intent), skip the Gemini call
-    let intent: "SEARCH" | "WATCHLIST" | "CHAT" = args.intent ?? "CHAT";
+    // If pre-detected by the frontend (via detect_intent), use it; otherwise run detection now.
+    const intent: Intent =
+      args.intent ??
+      (await _detectIntent(
+        args.content,
+        mappedHistory
+          .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
+          .join("\n"),
+      ));
 
-    if (!args.intent) {
-      try {
-        const intentModel = gen_ai.getGenerativeModel({
-          model: "gemini-2.0-flash-lite",
-        });
-
-        const intentPrompt = `Analyze this user message and determine the intent. Consider the conversation history for context.
-
-        CONVERSATION HISTORY:
-        ${mappedHistory.map((m) => `${m.role.toUpperCase()}: ${m.content}`).join("\n")}
-
-        USER MESSAGE: "${args.content}"
-
-        Classify the intent as ONE of:
-        - SEARCH: The user wants current/live information from the web (news, current events, recent facts, statistics, live data, specific products/services, prices, scores, weather). Classify as SEARCH if the user mentions current events, 'is X happening', 'did Y happen', 'I heard Z is happening' or anything that requires knowledge from the last 24 hours.
-        - WATCHLIST: The user wants to save, track, monitor, or add something to their watchlist. Examples: "track Bitcoin price", "watch for iPhone deals", "monitor this stock", "add X to my watchlist", "keep an eye on Y", "notify me when Z happens", "snoop on X for me".
-        - CHAT: The message is conversational, general knowledge, greetings, opinions, or can be answered without web data and is NOT a watchlist request.
-
-        Reply with ONLY one word: SEARCH, WATCHLIST, or CHAT.`;
-
-        const intentResult = await intentModel.generateContent(intentPrompt);
-        const intentResponse = intentResult.response
-          .text()
-          .trim()
-          .toUpperCase();
-        console.log("Intent raw:", intentResponse);
-
-        if (intentResponse.includes("WATCHLIST")) {
-          intent = "WATCHLIST";
-        } else if (intentResponse.includes("SEARCH")) {
-          intent = "SEARCH";
-        } else {
-          intent = "CHAT";
-        }
-
-        console.log(
-          `🔍 Intent Detection: Query "${args.content.substring(0, 50)}..." → ${intent}`,
-        );
-      } catch (err) {
-        console.warn("Intent detection failed, defaulting to CHAT:", err);
-        intent = "CHAT";
-      }
-    } else {
-      console.log(`🔍 Intent (pre-detected): ${intent}`);
-    }
+    console.log(`🔍 Intent${args.intent ? " (pre-detected)" : ""}: ${intent}`);
 
     // 6. Conditionally fetch search results from Tavily (only for SEARCH intent)
     const needsSearch = intent === "SEARCH";
@@ -243,6 +216,7 @@ export const send_message = action({
     // Build adaptive system instructions based on intent
     let instructions = `You are Snoopa, a proactive AI agent that hunts for verified facts and 'snoops' them to users developed by Lawjun Technologies.
       Your mascot is a Greyhound - fast, lean, and sharp. You provide accurate, verified information in a modern, clean, and elegant tone.
+      You can also save watchlists for information users want to track, so when the user is talking about something that might need you to track keep the user updated, you can ask a follow up question like, "do u want me to save this as a watchlist for u and track it for u?" something like that.
       Determine from the user's prompt if you need to be descriptive or very direct. Don't be verbose; be speed-optimized.`;
 
     if (intent === "SEARCH") {
