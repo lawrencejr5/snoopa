@@ -139,7 +139,7 @@ export const send_message = action({
         USER MESSAGE: "${args.content}"
 
         Classify the intent as ONE of:
-        - SEARCH: The user wants current/live information from the web (news, current events, recent facts, statistics, live data, specific products/services, prices, scores, weather).
+        - SEARCH: The user wants current/live information from the web (news, current events, recent facts, statistics, live data, specific products/services, prices, scores, weather). Classify as SEARCH if the user mentions current events, 'is X happening', 'did Y happen', 'I heard Z is happening' or anything that requires knowledge from the last 24 hours.
         - WATCHLIST: The user wants to save, track, monitor, or add something to their watchlist. Examples: "track Bitcoin price", "watch for iPhone deals", "monitor this stock", "add X to my watchlist", "keep an eye on Y", "notify me when Z happens", "snoop on X for me".
         - CHAT: The message is conversational, general knowledge, greetings, opinions, or can be answered without web data and is NOT a watchlist request.
 
