@@ -441,3 +441,108 @@ export const trigger_firehose = action({
     await ctx.runAction(internal.firehose.run_firehose);
   },
 });
+
+// ---------------------------------------------------------------------------
+// Simulated Firehose (for Testing/Screen Recording)
+// ---------------------------------------------------------------------------
+
+export const get_watchlist_by_id = internalQuery({
+  args: { watchlist_id: v.id("watchlist") },
+  handler: async (ctx, args) => {
+    return await ctx.db.get(args.watchlist_id);
+  },
+});
+
+export const run_simulated_firehose = internalAction({
+  args: {
+    watchlist_id: v.id("watchlist"),
+    fake_headline: v.object({
+      title: v.string(),
+      url: v.optional(v.string()),
+      source: v.optional(v.string()),
+    }),
+    briefing: v.string(),
+    push_tokens: v.array(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const item = await ctx.runQuery(internal.firehose.get_watchlist_by_id, {
+      watchlist_id: args.watchlist_id,
+    });
+
+    if (!item) {
+      console.log("Simulated Firehose: watchlist item not found.");
+      return;
+    }
+
+    console.log(`Simulated Firehose: triggering for "${item.title}"`);
+
+    // Build log entries
+    const logEntries = [
+      {
+        watchlist_id: item._id,
+        action: `${args.fake_headline.title}${args.fake_headline.source ? ` — ${args.fake_headline.source}` : ""}`,
+        url: args.fake_headline.url,
+      },
+    ];
+
+    // Batch insert logs
+    await ctx.runMutation(internal.log.batch_insert_logs, {
+      entries: logEntries,
+    });
+
+    // Save notification with the brief
+    await ctx.runMutation(internal.notifications.save_notification, {
+      user_id: item.user_id,
+      title: item.title,
+      message: args.briefing,
+      type: "alert",
+      watchlist_id: item._id,
+    });
+
+    // Send the brief as a chat message if the watchlist has a linked session
+    if (item.session_id) {
+      await ctx.runMutation(internal.chat.save_message, {
+        session_id: item.session_id,
+        role: "snoopa",
+        content: args.briefing,
+        type: "snitch",
+      });
+    }
+
+    // Push notification with a prefix
+    const pushTitle = `New intel on ${item.title}`;
+
+    if (args.push_tokens.length > 0) {
+      await sendExpoPush(args.push_tokens, pushTitle, args.briefing);
+    } else {
+      // Fallback: look up user's push tokens if none provided
+      const pushTokens = await ctx.runQuery(internal.users.get_push_tokens, {
+        user_id: item.user_id,
+      });
+      await sendExpoPush(pushTokens, pushTitle, args.briefing);
+    }
+
+    // Update last_checked for this item
+    await ctx.runMutation(internal.log.batch_update_last_checked, {
+      watchlist_ids: [item._id],
+    });
+
+    console.log(`Simulated Firehose: complete.`);
+  },
+});
+
+export const trigger_simulated_firehose = action({
+  args: {
+    watchlist_id: v.id("watchlist"),
+    fake_headline: v.object({
+      title: v.string(),
+      url: v.optional(v.string()),
+      source: v.optional(v.string()),
+    }),
+    briefing: v.string(),
+    push_tokens: v.array(v.string()),
+  },
+  handler: async (ctx, args) => {
+    await ctx.runAction(internal.firehose.run_simulated_firehose, args);
+  },
+});
