@@ -43,6 +43,11 @@ export default function ChatScreen() {
     sessionId ? { session_id: sessionId } : "skip",
   );
 
+  const session = useQuery(
+    api.session.get_session,
+    sessionId ? { session_id: sessionId } : "skip",
+  );
+
   // Get saved message IDs to restore saved state
   const savedMessageIds = useQuery(
     api.watchlist.get_saved_message_ids,
@@ -275,16 +280,21 @@ export default function ChatScreen() {
             style={{ width: 22, height: 22, tintColor: Colors[theme].text }}
           />
         </Pressable>
-        <Text
-          style={{
-            color: Colors[theme].text,
-            fontFamily: "FontBold",
-            fontSize: 18,
-            letterSpacing: -0.5,
-          }}
-        >
-          Snoopa
-        </Text>
+        <View style={{ flex: 1, paddingHorizontal: 15, alignItems: "center" }}>
+          <Text
+            numberOfLines={1}
+            style={{
+              color: Colors[theme].text,
+              fontFamily: "FontBold",
+              fontSize: 18,
+              letterSpacing: -0.5,
+              width: 220,
+              textAlign: "center",
+            }}
+          >
+            {session?.title || "Snoopa"}
+          </Text>
+        </View>
         <Pressable
           onPress={() => navigation.push("notifications/index")}
           style={{ position: "relative" }}

@@ -36,6 +36,24 @@ export const list_sessions = query({
   },
 });
 
+/**
+ * Get a specific session by ID.
+ */
+export const get_session = query({
+  args: { session_id: v.id("sessions") },
+  handler: async (ctx, args) => {
+    const user_id = await getAuthUserId(ctx);
+    if (!user_id) return null;
+
+    const session = await ctx.db.get(args.session_id);
+    if (!session || session.user_id !== user_id) {
+      return null;
+    }
+
+    return session;
+  },
+});
+
 // --- Mutations ---
 
 /**
