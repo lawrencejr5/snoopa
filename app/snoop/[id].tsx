@@ -33,6 +33,7 @@ export default function SnoopDetailsScreen() {
     id ? { watchlist_id: id as Id<"watchlist"> } : "skip",
   );
   const deactivateWatchlist = useMutation(api.watchlist.deactivate_watchlist);
+  const reactivateWatchlist = useMutation(api.watchlist.reactivate_watchlist);
   const markSessionRead = useMutation(api.session.mark_session_read);
 
   // Check for unread Snoopa messages in the linked chat session
@@ -100,6 +101,18 @@ export default function SnoopDetailsScreen() {
       await deactivateWatchlist({ watchlist_id: id as Id<"watchlist"> });
     } catch (error) {
       console.error("Failed to stop tracking:", error);
+    } finally {
+      setIsDeactivating(false);
+    }
+  };
+
+  const handleResumeTracking = async () => {
+    if (!id || isDeactivating) return;
+    setIsDeactivating(true);
+    try {
+      await reactivateWatchlist({ watchlist_id: id as Id<"watchlist"> });
+    } catch (error) {
+      console.error("Failed to resume tracking:", error);
     } finally {
       setIsDeactivating(false);
     }
@@ -475,8 +488,12 @@ export default function SnoopDetailsScreen() {
         ]}
       >
         <Pressable
-          onPress={handleStopTracking}
-          disabled={isDeactivating || snoop.status === "inactive"}
+          onPress={
+            snoop.status === "inactive"
+              ? handleResumeTracking
+              : handleStopTracking
+          }
+          disabled={isDeactivating}
           style={[
             styles.stopButton,
             {
@@ -485,12 +502,18 @@ export default function SnoopDetailsScreen() {
                 snoop.status === "inactive"
                   ? Colors[theme].border
                   : Colors[theme].danger,
-              opacity: snoop.status === "inactive" ? 0.6 : 1,
             },
           ]}
         >
           {isDeactivating ? (
-            <ActivityIndicator size="small" color={Colors[theme].danger} />
+            <ActivityIndicator
+              size="small"
+              color={
+                snoop.status === "inactive"
+                  ? Colors[theme].border
+                  : Colors[theme].danger
+              }
+            />
           ) : (
             <Text
               style={[
@@ -504,7 +527,7 @@ export default function SnoopDetailsScreen() {
               ]}
             >
               {snoop.status === "inactive"
-                ? "Tracking Stopped"
+                ? "Resume Tracking"
                 : "Stop Tracking"}
             </Text>
           )}
@@ -610,14 +633,18 @@ const styles = StyleSheet.create({
     bottom: 15,
     left: 0,
     right: 0,
-    padding: 30,
+    padding: 20,
+    paddingBottom: 30,
     borderTopWidth: 1,
   },
   stopButton: {
     width: "100%",
     paddingVertical: 10,
     borderRadius: 15,
+    flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
     borderWidth: 1,
   },
   stopButtonText: {

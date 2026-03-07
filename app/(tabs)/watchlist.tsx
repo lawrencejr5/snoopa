@@ -432,11 +432,17 @@ export default function WatchlistScreen() {
                 <Text
                   style={[styles.sectionTitle, { color: Colors[theme].text }]}
                 >
-                  Past Snoops
+                  Inactive Snoops
                 </Text>
                 {closedSnoops.map((item) => (
-                  <View
+                  <Pressable
                     key={item._id}
+                    onPress={() =>
+                      router.push({
+                        pathname: "/snoop/[id]",
+                        params: { id: item._id },
+                      })
+                    }
                     style={[
                       styles.card,
                       {
@@ -487,7 +493,7 @@ export default function WatchlistScreen() {
                     >
                       {item.condition}
                     </Text>
-                  </View>
+                  </Pressable>
                 ))}
               </View>
             )}

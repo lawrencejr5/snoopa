@@ -249,6 +249,37 @@ export const deactivate_watchlist = mutation({
 });
 
 /**
+ * Reactivate a watchlist item (resume tracking).
+ */
+export const reactivate_watchlist = mutation({
+  args: {
+    watchlist_id: v.id("watchlist"),
+  },
+  handler: async (ctx, args) => {
+    const user_id = await getAuthUserId(ctx);
+    if (!user_id) throw new Error("Not authenticated");
+
+    const item = await ctx.db.get(args.watchlist_id);
+    if (!item || item.user_id !== user_id) {
+      throw new Error("Watchlist item not found or unauthorized");
+    }
+
+    await ctx.db.patch(args.watchlist_id, {
+      status: "active",
+      last_checked: Date.now(),
+    });
+
+    // Log the status change
+    await ctx.db.insert("logs", {
+      watchlist_id: args.watchlist_id,
+      timestamp: Date.now(),
+      action: "Tracking resumed (Active)",
+      verified: true,
+    });
+  },
+});
+
+/**
  * Delete a watchlist item and its associated logs.
  */
 export const delete_watchlist_item = mutation({
