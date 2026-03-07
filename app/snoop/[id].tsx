@@ -1,4 +1,5 @@
 import Container from "@/components/Container";
+import Loading from "@/components/Loading";
 import Colors from "@/constants/Colors";
 import { useTheme } from "@/context/ThemeContext";
 import { api } from "@/convex/_generated/api";
@@ -118,7 +119,11 @@ export default function SnoopDetailsScreen() {
     }
   };
 
-  if (!snoop) {
+  if (snoop === undefined) {
+    return <Loading />;
+  }
+
+  if (snoop === null) {
     return (
       <Container>
         <Text
