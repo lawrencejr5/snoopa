@@ -153,7 +153,7 @@ export default function ChatScreen() {
       const lastMsg = displayMessages[displayMessages.length - 1];
       if (lastMsg._id !== lastProcessedMessageIdRef.current) {
         lastProcessedMessageIdRef.current = lastMsg._id;
-        if (lastMsg.role === "snoopa" && lastMsg.type !== "status") {
+        if (lastMsg.role === "snoopa" && lastMsg.type !== "watchlist") {
           setTypingMessageId(lastMsg._id);
         }
       }
@@ -399,7 +399,7 @@ export default function ChatScreen() {
               // Snoopa Messages
               return (
                 <View key={msg._id} style={styles.snoopa_container}>
-                  {msg.type === "status" ? (
+                  {msg.type === "watchlist" ? (
                     <>
                       {/* Confirmation Message (Regular Chat Style) */}
                       <View

@@ -397,7 +397,7 @@ export const run_firehose = internalAction({
           session_id: item.session_id,
           role: "snoopa",
           content: brief,
-          type: "snitch",
+          type: "snoop",
         });
       }
 
@@ -505,7 +505,7 @@ export const run_simulated_firehose = internalAction({
         session_id: item.session_id,
         role: "snoopa",
         content: args.briefing,
-        type: "snitch",
+        type: "snoop",
       });
     }
 

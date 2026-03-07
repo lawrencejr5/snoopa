@@ -3,7 +3,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { v } from "convex/values";
 import { api, internal } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
-import { action, internalMutation, query } from "./_generated/server";
+import { action, internalMutation, mutation, query } from "./_generated/server";
 
 // --- Queries ---
 
@@ -39,7 +39,14 @@ export const save_message = internalMutation({
     session_id: v.id("sessions"),
     role: v.union(v.literal("user"), v.literal("snoopa")),
     content: v.string(),
-    type: v.optional(v.union(v.literal("snitch"), v.literal("status"))),
+    type: v.optional(
+      v.union(
+        v.literal("snoop"),
+        v.literal("watchlist"),
+        v.literal("chat"),
+        v.literal("search"),
+      ),
+    ),
     sources: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
@@ -57,6 +64,31 @@ export const save_message = internalMutation({
     });
 
     return message;
+  },
+});
+
+/**
+ * Mutation to update the type of a chat message.
+ */
+export const update_chat_type = mutation({
+  args: {
+    old_type: v.any(),
+    type: v.union(
+      v.literal("snoop"),
+      v.literal("watchlist"),
+      v.literal("chat"),
+      v.literal("search"),
+    ),
+  },
+  handler: async (ctx, args) => {
+    const chats = await ctx.db
+      .query("chats")
+      .filter((q) => q.eq(q.field("type"), args.old_type))
+      .collect();
+
+    for (const chat of chats) {
+      await ctx.db.patch("chats", chat._id, { type: args.type });
+    }
   },
 });
 
@@ -300,12 +332,12 @@ export const send_message = action({
       }
     }
 
-    // 9. Save AI response (with type "status" for watchlist items)
+    // 9. Save AI response
     await ctx.runMutation(internal.chat.save_message, {
       session_id: currentSessionId,
       role: "snoopa",
       content: response_text,
-      type: intent === "WATCHLIST" ? "status" : undefined,
+      type: intent.toLowerCase() as "watchlist" | "search" | "chat",
     });
 
     // 10. Generate session title with Gemini if this is a new session

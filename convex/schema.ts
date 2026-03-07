@@ -29,7 +29,16 @@ const schema = defineSchema({
     session_id: v.id("sessions"),
     role: v.union(v.literal("user"), v.literal("snoopa")),
     content: v.string(),
-    type: v.optional(v.union(v.literal("snitch"), v.literal("status"))),
+    type: v.optional(
+      v.union(
+        v.literal("snoop"),
+        v.literal("watchlist"),
+        v.literal("chat"),
+        v.literal("search"),
+        v.literal("snitch"),
+        v.literal("status"),
+      ),
+    ),
     sources: v.optional(v.array(v.string())),
   }).index("by_session", ["session_id"]),
 
