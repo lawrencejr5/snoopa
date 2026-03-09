@@ -291,7 +291,7 @@ export const migrate_seen_field = internalMutation({
 
     // Patch all un-migrated logs
     await Promise.all(
-      toUpdate.map((log) => ctx.db.patch(log._id, { seen: false })),
+      toUpdate.map((log) => ctx.db.patch(log._id, { seen: true })),
     );
 
     return `Updated ${toUpdate.length} logs!`;

@@ -1,6 +1,7 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { v } from "convex/values";
+import OpenAI from "openai";
 import { api, internal } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
 import { action, internalMutation, mutation, query } from "./_generated/server";
@@ -274,6 +275,10 @@ export const send_message = action({
     }
 
     const gen_ai = new GoogleGenerativeAI(api_key);
+    const openai = new OpenAI({
+      baseURL: "https://api.deepseek.com", // This routes requests to DeepSeek
+      apiKey: process.env.DEEPSEEK_API_KEY,
+    });
 
     // Prepare history for context
     const mappedHistory = messages.map((msg) => ({
@@ -312,12 +317,7 @@ export const send_message = action({
       );
     }
 
-    // 8. Try models in order with automatic fallback
-    const modelsToTry = ["gemini-2.5-flash-lite", "gemini-2.0-flash"];
-    let response_text = "";
-    let lastError: any = null;
-
-    // Build adaptive system instructions based on intent
+    // 8. Build system prompt and message history (shared across model calls)
     let instructions = `You are Snoopa, a proactive AI agent that hunts for verified facts and 'snoops' them to users developed by Lawjun Technologies.
       Your mascot is a Greyhound - fast, lean, and sharp. You provide accurate, verified information in a modern, clean, and elegant tone.
       You can also save watchlists for information users want to track, so when the user is talking about something that might need you to track keep the user updated, you can ask a follow up question like, "do u want me to save this as a watchlist for u and track it for u?" something like that.
@@ -348,59 +348,79 @@ export const send_message = action({
       instructions += `\n\nBe conversational and friendly for general chat.`;
     }
 
-    for (const model_name of modelsToTry) {
+    // Build the user prompt (inject search results for SEARCH intent)
+    const userPrompt =
+      intent === "SEARCH"
+        ? `SEARCH RESULTS: ${leanNews}\n\nUSER QUESTION: ${args.content}`
+        : args.content;
+
+    // OpenAI-compatible message array (used by DeepSeek)
+    const openaiMessages: {
+      role: "system" | "user" | "assistant";
+      content: string;
+    }[] = [
+      { role: "system", content: instructions },
+      ...messages.slice(0, -1).map((msg) => ({
+        role: (msg.role === "user" ? "user" : "assistant") as
+          | "user"
+          | "assistant",
+        content: msg.content,
+      })),
+      { role: "user", content: userPrompt },
+    ];
+
+    // 9. Try DeepSeek first, fall back to Gemini 2.5 flash lite
+    let response_text = "";
+    let lastError: any = null;
+
+    // --- Primary: DeepSeek ---
+    try {
+      const result = await openai.chat.completions.create({
+        model: "deepseek-chat",
+        messages: openaiMessages,
+      });
+      response_text = result.choices[0].message.content ?? "";
+      console.log(
+        `✅ Success (deepseek-chat) - Input: ${result.usage?.prompt_tokens}, Output: ${result.usage?.completion_tokens}`,
+      );
+    } catch (error: any) {
+      lastError = error;
+      console.warn(
+        `⚠️ DeepSeek failed:`,
+        error.message?.split(":")[0] || error.message || "Unknown error",
+      );
+
+      // --- Fallback: Gemini 2.5 flash lite ---
       try {
-        const model = gen_ai.getGenerativeModel({
-          model: model_name,
+        const fallbackModel = gen_ai.getGenerativeModel({
+          model: "gemini-2.5-flash-lite",
           systemInstruction: instructions,
         });
 
-        const history = messages.map((msg) => ({
+        const geminiHistory = messages.map((msg) => ({
           role: msg.role === "user" ? "user" : "model",
           parts: [{ text: msg.content }],
         }));
 
-        const chat_session = model.startChat({
-          history: history.slice(0, -1),
+        const chat_session = fallbackModel.startChat({
+          history: geminiHistory.slice(0, -1),
         });
 
-        // Adjust prompt based on intent
-        let prompt = args.content;
-        if (intent === "SEARCH") {
-          prompt = `SEARCH RESULTS: ${leanNews}\n\nUSER QUESTION: ${args.content}`;
-        }
+        const result = await chat_session.sendMessage(userPrompt);
+        response_text = result.response.text();
+        console.log(`✅ Success (gemini-2.5-flash-lite, fallback)`);
+      } catch (fallbackError: any) {
+        console.error("All AI models failed. Last error:", fallbackError);
 
-        const result = await chat_session.sendMessage(prompt);
-        const response = result.response;
-        response_text = response.text();
+        const error_message =
+          "Sorry, I hit a snag while snooping. Try again in a bit.";
+        await ctx.runMutation(internal.chat.save_message, {
+          session_id: currentSessionId,
+          role: "snoopa",
+          content: error_message,
+        });
 
-        if (response.usageMetadata) {
-          console.log(
-            `✅ Success (${model_name}) - Input: ${response.usageMetadata.promptTokenCount}, Output: ${response.usageMetadata.candidatesTokenCount}`,
-          );
-        }
-
-        break;
-      } catch (error: any) {
-        lastError = error;
-        console.warn(
-          `⚠️ Failed with ${model_name}:`,
-          error.message?.split(":")[0] || error.message || "Unknown error",
-        );
-
-        if (model_name === modelsToTry[modelsToTry.length - 1]) {
-          console.error("All AI models failed. Last error:", lastError);
-
-          const error_message =
-            "Sorry, I hit a snag while snooping. Try again in a bit.";
-          await ctx.runMutation(internal.chat.save_message, {
-            session_id: currentSessionId,
-            role: "snoopa",
-            content: error_message,
-          });
-
-          throw new Error("All AI models failed.");
-        }
+        throw new Error("All AI models failed.");
       }
     }
 
