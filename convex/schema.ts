@@ -29,6 +29,7 @@ const schema = defineSchema({
     session_id: v.id("sessions"),
     role: v.union(v.literal("user"), v.literal("snoopa")),
     content: v.string(),
+    seen: v.optional(v.boolean()),
     type: v.optional(
       v.union(
         v.literal("snoop"),

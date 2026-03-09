@@ -35,7 +35,7 @@ export default function SnoopDetailsScreen() {
   );
   const deactivateWatchlist = useMutation(api.watchlist.deactivate_watchlist);
   const reactivateWatchlist = useMutation(api.watchlist.reactivate_watchlist);
-  const markSessionRead = useMutation(api.session.mark_session_read);
+  const markChatsSeen = useMutation(api.chat.mark_chats_seen);
   const markLogsSeen = useMutation(api.log.mark_logs_seen);
 
   // Mark all logs as seen when the details page opens
@@ -45,11 +45,12 @@ export default function SnoopDetailsScreen() {
     }
   }, [id]);
 
-  // Check for unread Snoopa messages in the linked chat session
-  const hasUnread = useQuery(
-    api.session.has_unread_from_snoopa,
-    snoop?.session_id ? { session_id: snoop.session_id } : "skip",
-  );
+  // Count unseen snoopa messages in the linked chat session
+  const unseenChatsCount =
+    useQuery(
+      api.chat.get_unseen_chats_count,
+      snoop?.session_id ? { session_id: snoop.session_id } : "skip",
+    ) ?? 0;
 
   const [isDeactivating, setIsDeactivating] = useState(false);
 
@@ -168,7 +169,7 @@ export default function SnoopDetailsScreen() {
           <Pressable
             onPress={async () => {
               if (snoop.session_id) {
-                await markSessionRead({ session_id: snoop.session_id });
+                await markChatsSeen({ session_id: snoop.session_id });
                 router.push({
                   pathname: "/(tabs)",
                   params: { sessionId: snoop.session_id },
@@ -205,7 +206,7 @@ export default function SnoopDetailsScreen() {
                 tintColor: Colors[theme].text,
               }}
             />
-            {hasUnread && (
+            {unseenChatsCount > 0 && (
               <View
                 style={{
                   position: "absolute",

@@ -29,6 +29,60 @@ export const get_messages = query({
   },
 });
 
+/**
+ * Count unseen snoopa messages in a session.
+ * Used to show the red dot on the "Go to chat" button from the snoop details page.
+ */
+export const get_unseen_chats_count = query({
+  args: { session_id: v.id("sessions") },
+  handler: async (ctx, args) => {
+    const user_id = await getAuthUserId(ctx);
+    if (!user_id) return 0;
+
+    const session = await ctx.db.get(args.session_id);
+    if (!session || session.user_id !== user_id) return 0;
+
+    const unseen = await ctx.db
+      .query("chats")
+      .withIndex("by_session", (q) => q.eq("session_id", args.session_id))
+      .filter((q) =>
+        q.and(q.eq(q.field("role"), "snoopa"), q.eq(q.field("seen"), false)),
+      )
+      .collect();
+
+    return unseen.length;
+  },
+});
+
+/**
+ * Mark all unseen snoopa messages in a session as seen.
+ * Called when the user opens the chat screen.
+ */
+export const mark_chats_seen = mutation({
+  args: { session_id: v.id("sessions") },
+  handler: async (ctx, args) => {
+    const user_id = await getAuthUserId(ctx);
+    if (!user_id) throw new Error("Not authenticated");
+
+    const session = await ctx.db.get(args.session_id);
+    if (!session || session.user_id !== user_id) {
+      throw new Error("Session not found or unauthorized");
+    }
+
+    const unseenChats = await ctx.db
+      .query("chats")
+      .withIndex("by_session", (q) => q.eq("session_id", args.session_id))
+      .filter((q) =>
+        q.and(q.eq(q.field("role"), "snoopa"), q.eq(q.field("seen"), false)),
+      )
+      .collect();
+
+    await Promise.all(
+      unseenChats.map((chat) => ctx.db.patch(chat._id, { seen: true })),
+    );
+  },
+});
+
 // --- Mutations ---
 
 /**
@@ -54,6 +108,8 @@ export const save_message = internalMutation({
       session_id: args.session_id,
       role: args.role,
       content: args.content,
+      // User messages are always "seen" by the user; snoopa messages start unseen
+      seen: args.role === "user" ? true : false,
       type: args.type,
       sources: args.sources,
     });
@@ -89,6 +145,22 @@ export const update_chat_type = mutation({
     for (const chat of chats) {
       await ctx.db.patch("chats", chat._id, { type: args.type });
     }
+  },
+});
+
+/**
+ * Migration: backfill seen=true for user messages and seen=false for snoopa messages
+ * where seen is currently undefined.
+ */
+export const migrate_seen_field = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const allChats = await ctx.db.query("chats").collect();
+    const toUpdate = allChats.filter((c) => c.seen === undefined);
+
+    await Promise.all(toUpdate.map((c) => ctx.db.patch(c._id, { seen: true })));
+
+    return `Updated ${toUpdate.length} chats!`;
   },
 });
 

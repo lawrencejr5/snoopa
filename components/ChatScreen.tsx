@@ -76,6 +76,7 @@ export default function ChatScreen() {
   const sendMessage = useAction(api.chat.send_message);
   const detectIntent = useAction(api.chat.detect_intent);
   const addWatchlist = useMutation(api.watchlist.add_watchlist_item);
+  const markChatsSeen = useMutation(api.chat.mark_chats_seen);
   const unreadCount = useQuery(api.notifications.unread_count) ?? 0;
   const { signedIn } = useUser();
 
@@ -117,6 +118,13 @@ export default function ChatScreen() {
     setTypingMessageId(null);
     lastProcessedMessageIdRef.current = null;
     userMessageYPositions.current.clear();
+  }, [sessionId]);
+
+  // Mark all snoopa messages as seen when a chat session is opened
+  useEffect(() => {
+    if (sessionId) {
+      markChatsSeen({ session_id: sessionId }).catch(() => {});
+    }
   }, [sessionId]);
 
   // Optimistic UI: track pending user message
