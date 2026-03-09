@@ -8,7 +8,7 @@ import { Id } from "@/convex/_generated/dataModel";
 import { useRoute } from "@react-navigation/native";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { useNavigation } from "expo-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -35,6 +35,25 @@ export default function ChatScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const scrollViewRef = useRef<ScrollView>(null);
+  const userMessageYPositions = useRef<Map<string, number>>(new Map());
+
+  // Scroll to the last user message's Y position with a small delay
+  // so layout has time to settle (fixes partial-scroll bug).
+  const scrollToLastUserMessage = useCallback(() => {
+    setTimeout(() => {
+      const positions = userMessageYPositions.current;
+      if (positions.size === 0) return;
+
+      let maxY = -1;
+      positions.forEach((y) => {
+        if (y > maxY) maxY = y;
+      });
+
+      if (maxY >= 0 && scrollViewRef.current) {
+        scrollViewRef.current.scrollTo({ y: maxY, animated: true });
+      }
+    }, 100);
+  }, []);
 
   const sessionId = route.params?.sessionId as Id<"sessions"> | undefined;
 
@@ -97,6 +116,7 @@ export default function ChatScreen() {
     setIsHere(false);
     setTypingMessageId(null);
     lastProcessedMessageIdRef.current = null;
+    userMessageYPositions.current.clear();
   }, [sessionId]);
 
   // Optimistic UI: track pending user message
@@ -173,6 +193,9 @@ export default function ChatScreen() {
     const content = input.trim();
     setInput("");
     setPendingContent(content); // Optimistic: show message immediately
+
+    // Scroll to the new user message after it renders
+    setTimeout(() => scrollToLastUserMessage(), 200);
     setSending(true);
     setSnoopingText("Snooping"); // Default while we detect intent
 
@@ -322,9 +345,7 @@ export default function ChatScreen() {
         ref={scrollViewRef}
         contentContainerStyle={{ flexGrow: 1, paddingBottom: 20 }}
         showsVerticalScrollIndicator={false}
-        onContentSizeChange={() =>
-          scrollViewRef.current?.scrollToEnd({ animated: true })
-        }
+        onContentSizeChange={() => scrollToLastUserMessage()}
       >
         {isLoading ? (
           <View
@@ -387,6 +408,12 @@ export default function ChatScreen() {
                 return (
                   <View
                     key={msg._id}
+                    onLayout={(e) => {
+                      userMessageYPositions.current.set(
+                        msg._id,
+                        e.nativeEvent.layout.y,
+                      );
+                    }}
                     style={[
                       styles.user_chat,
                       { backgroundColor: Colors[theme].surface },
