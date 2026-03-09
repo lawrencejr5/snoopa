@@ -74,6 +74,7 @@ const schema = defineSchema({
     timestamp: v.number(),
     action: v.string(),
     verified: v.boolean(),
+    seen: v.optional(v.boolean()),
     url: v.optional(v.string()),
     session_id: v.optional(v.id("sessions")),
   })

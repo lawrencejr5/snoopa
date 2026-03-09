@@ -7,7 +7,7 @@ import { Id } from "@/convex/_generated/dataModel";
 import { useMutation, useQuery } from "convex/react";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -36,6 +36,14 @@ export default function SnoopDetailsScreen() {
   const deactivateWatchlist = useMutation(api.watchlist.deactivate_watchlist);
   const reactivateWatchlist = useMutation(api.watchlist.reactivate_watchlist);
   const markSessionRead = useMutation(api.session.mark_session_read);
+  const markLogsSeen = useMutation(api.log.mark_logs_seen);
+
+  // Mark all logs as seen when the details page opens
+  useEffect(() => {
+    if (id) {
+      markLogsSeen({ watchlist_id: id as Id<"watchlist"> }).catch(() => {});
+    }
+  }, [id]);
 
   // Check for unread Snoopa messages in the linked chat session
   const hasUnread = useQuery(

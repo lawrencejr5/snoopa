@@ -57,6 +57,29 @@ export const get_new_logs_count = query({
   },
 });
 
+/**
+ * Count unseen log entries for a watchlist item.
+ * Used to display the red dot indicator on the "View Details" button.
+ */
+export const get_unseen_logs_count = query({
+  args: { watchlist_id: v.id("watchlist") },
+  handler: async (ctx, args) => {
+    const user_id = await getAuthUserId(ctx);
+    if (!user_id) return 0;
+
+    const item = await ctx.db.get(args.watchlist_id);
+    if (!item || item.user_id !== user_id) return 0;
+
+    const unseen = await ctx.db
+      .query("logs")
+      .withIndex("by_watchlist", (q) => q.eq("watchlist_id", args.watchlist_id))
+      .filter((q) => q.eq(q.field("seen"), false))
+      .collect();
+
+    return unseen.length;
+  },
+});
+
 // --- Mutations ---
 
 /**
@@ -76,9 +99,37 @@ export const insert_log = internalMutation({
       timestamp: Date.now(),
       action: args.action,
       verified: args.verified,
+      seen: false,
       url: args.url,
       session_id: args.session_id,
     });
+  },
+});
+
+/**
+ * Mark all logs for a watchlist item as seen.
+ * Called when the user opens the details page.
+ */
+export const mark_logs_seen = mutation({
+  args: { watchlist_id: v.id("watchlist") },
+  handler: async (ctx, args) => {
+    const user_id = await getAuthUserId(ctx);
+    if (!user_id) throw new Error("Not authenticated");
+
+    const item = await ctx.db.get(args.watchlist_id);
+    if (!item || item.user_id !== user_id) {
+      throw new Error("Watchlist item not found or unauthorized");
+    }
+
+    const unseenLogs = await ctx.db
+      .query("logs")
+      .withIndex("by_watchlist", (q) => q.eq("watchlist_id", args.watchlist_id))
+      .filter((q) => q.eq(q.field("seen"), false))
+      .collect();
+
+    await Promise.all(
+      unseenLogs.map((log) => ctx.db.patch(log._id, { seen: true })),
+    );
   },
 });
 
@@ -218,10 +269,31 @@ export const batch_insert_logs = internalMutation({
           timestamp: now,
           action: e.action,
           verified: true,
+          seen: false,
           url: e.url,
           session_id: e.session_id,
         }),
       ),
     );
+  },
+});
+
+/**
+ * Migration function to update all logs where 'seen' is undefined to false.
+ */
+export const migrate_seen_field = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const logs = await ctx.db.query("logs").collect();
+
+    // Filter for logs where seen is not set
+    const toUpdate = logs.filter((log) => log.seen === undefined);
+
+    // Patch all un-migrated logs
+    await Promise.all(
+      toUpdate.map((log) => ctx.db.patch(log._id, { seen: false })),
+    );
+
+    return `Updated ${toUpdate.length} logs!`;
   },
 });

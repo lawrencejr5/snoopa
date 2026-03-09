@@ -99,6 +99,12 @@ function ActiveSnoopCard({
       since: item.last_checked,
     }) ?? 0;
 
+  // Count logs that haven't been seen yet — drives the red dot on View Details
+  const unseenCount =
+    useQuery(api.log.get_unseen_logs_count, {
+      watchlist_id: item._id,
+    }) ?? 0;
+
   const { theme } = useTheme();
   return (
     <View
@@ -197,6 +203,7 @@ function ActiveSnoopCard({
               params: { id: item._id },
             })
           }
+          style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
         >
           <Text
             style={{
@@ -207,6 +214,17 @@ function ActiveSnoopCard({
           >
             View Details
           </Text>
+          {unseenCount > 0 && (
+            <View
+              style={{
+                width: 5,
+                height: 5,
+                borderRadius: 4,
+                backgroundColor: "#FF3B30",
+                marginBottom: 10,
+              }}
+            />
+          )}
         </Pressable>
       </View>
     </View>
