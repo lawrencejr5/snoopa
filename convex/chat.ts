@@ -166,6 +166,23 @@ export const migrate_seen_field = internalMutation({
 });
 
 // ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function getCurrentDateTime() {
+  return new Date().toLocaleString("en-US", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    hour: "numeric",
+    minute: "numeric",
+    hour12: true,
+    timeZoneName: "short",
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Shared intent detection helper
 // ---------------------------------------------------------------------------
 
@@ -317,11 +334,28 @@ export const send_message = action({
       );
     }
 
+    // 7.5 Fetch user context for personalization
+    const user = await ctx.runQuery(api.users.get_current_user);
+    const fullname = user?.fullname || "User";
+    const username = user?.username || "My friend";
+    const userMemory = user?.memory || "No personal context provided yet.";
+
     // 8. Build system prompt and message history (shared across model calls)
-    let instructions = `You are Snoopa, a proactive AI agent that hunts for verified facts and 'snoops' them to users developed by Lawjun Technologies.
-      Your mascot is a Greyhound - fast, lean, and sharp. You provide accurate, verified information in a modern, clean, and elegant tone.
-      You can also save watchlists for information users want to track, so when the user is talking about something that might need you to track keep the user updated, you can ask a follow up question like, "do u want me to save this as a watchlist for u and track it for u?" something like that.
-      Determine from the user's prompt if you need to be descriptive or very direct. Don't be verbose; be speed-optimized.`;
+    const currentDateTime = getCurrentDateTime();
+    let instructions = `You are Snoopa, a proactive AI agent that hunts for verified facts and 'snoops' them to users, developed by Lawjun Technologies.
+      Your mascot is a Greyhound - fast, lean, and sharp. You provide accurate, verified information in a modern, clean, and elegant tone and help save watchlists to track updates.
+      
+      USER CONTEXT:
+      - Name: ${fullname}
+      - Username: ${username}
+      - Memory/Preferences: ${userMemory}
+      
+      You should always refer to the user by their username (${username}) when appropriate.
+      
+      CURRENT DATE AND TIME: ${currentDateTime}
+      
+      You can also save watchlists for information users want to track. When the user mentions something that should be monitored, offer to track it: "Do you want me to save this as a watchlist for you and track it?"
+      Tailor your response length to the user's intent: be descriptive when needed, but stay direct and speed-optimized for simple queries. Always be Snoopa.`;
 
     if (intent === "SEARCH") {
       instructions += `\n\nYou are being provided with web search results. Always cite your sources when giving news or factual information.`;
@@ -354,18 +388,21 @@ export const send_message = action({
         ? `SEARCH RESULTS: ${leanNews}\n\nUSER QUESTION: ${args.content}`
         : args.content;
 
-    // OpenAI-compatible message array (used by DeepSeek)
-    const openaiMessages: {
-      role: "system" | "user" | "assistant";
-      content: string;
-    }[] = [
-      { role: "system", content: instructions },
+    const openai_history = [
       ...messages.slice(0, -1).map((msg) => ({
         role: (msg.role === "user" ? "user" : "assistant") as
           | "user"
           | "assistant",
         content: msg.content,
       })),
+    ];
+    // OpenAI-compatible message array (used by DeepSeek)
+    const openaiMessages: {
+      role: "system" | "user" | "assistant";
+      content: string;
+    }[] = [
+      { role: "system", content: instructions },
+      ...openai_history,
       { role: "user", content: userPrompt },
     ];
 
@@ -393,7 +430,7 @@ export const send_message = action({
       // --- Fallback: Gemini 2.5 flash lite ---
       try {
         const fallbackModel = gen_ai.getGenerativeModel({
-          model: "gemini-2.5-flash-lite",
+          model: "gemini-2.5-flash",
           systemInstruction: instructions,
         });
 
@@ -408,7 +445,7 @@ export const send_message = action({
 
         const result = await chat_session.sendMessage(userPrompt);
         response_text = result.response.text();
-        console.log(`✅ Success (gemini-2.5-flash-lite, fallback)`);
+        console.log(`✅ Success (gemini-2.5-flash, fallback)`);
       } catch (fallbackError: any) {
         console.error("All AI models failed. Last error:", fallbackError);
 
