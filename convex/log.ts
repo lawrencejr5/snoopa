@@ -277,23 +277,3 @@ export const batch_insert_logs = internalMutation({
     );
   },
 });
-
-/**
- * Migration function to update all logs where 'seen' is undefined to false.
- */
-export const migrate_seen_field = internalMutation({
-  args: {},
-  handler: async (ctx) => {
-    const logs = await ctx.db.query("logs").collect();
-
-    // Filter for logs where seen is not set
-    const toUpdate = logs.filter((log) => log.seen === undefined);
-
-    // Patch all un-migrated logs
-    await Promise.all(
-      toUpdate.map((log) => ctx.db.patch(log._id, { seen: true })),
-    );
-
-    return `Updated ${toUpdate.length} logs!`;
-  },
-});

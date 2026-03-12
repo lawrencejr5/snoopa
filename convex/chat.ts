@@ -340,13 +340,19 @@ export const send_message = action({
 
         <Your friendly confirmation message here, 1-2 sentences acknowledging what you're tracking for them>
         ---WATCHLIST_DATA---
-        {"title": "<concise title, max 8 words>", "keywords": ["<keyword1>", "<keyword2>", "<keyword3>"], "condition": "<clear, specific condition or rule that defines when this watchlist item should trigger an alert>", "canonical_topic": "<2-4 word topic label that best describes the watchlist for easy searching.>"}
+        {"title": "<concise title, max 8 words>", "keywords": ["<keyword1>", "<keyword2>", "<keyword3>"], "condition": "<clear, specific condition or rule that defines when this watchlist item should trigger an alert>", "canonical_topic": "<2-4 word topic label that best describes the watchlist for easy searching.>", "tier": <1|2|3|4>, "priority_reasoning": "<one sentence explaining why this priority was assigned>", "escalation_keywords": ["<keyword that if found in results should bump priority up by 1>"]}
 
         Rules:
         - The title should be clear and specific (e.g. "Bitcoin Price Movement", "iPhone 16 Pro Deals")
         - The keywords array should contain 3-6 targeted search terms relevant to tracking this item
         - The condition should be a precise, actionable rule (e.g. "Alert when Bitcoin price drops below $80,000" or "Notify when a new iPhone 16 Pro deal appears under $900")
-        - The canonical_topic must be a short 2-4 word label, most likely the first keyword. Please avoid canonical topics that are too broad, generate canonical topics that when searched would bring out results for that watchlist in the first 10 results Reuse an existing topic if it fits, otherwise create a new one.${topicsContext}
+        - The canonical_topic must be a short 2-4 word label, most likely the first keyword. Please avoid canonical topics that are too broad, generate canonical topics that when searched would bring out results for that watchlist in the first 10 results. Reuse an existing topic if it fits, otherwise create a new one.${topicsContext}
+        - The tier must be a number 1, 2, 3, or 4 based on the following:
+            1 = BREAKING: Event is imminent or already unfolding. Could happen any hour. (e.g. player expected back "this week", IPO date already announced)
+            2 = ACTIVE: Situation is developing but no exact timeframe. News is moving but not hourly. (e.g. transfer rumour gaining momentum, company confirmed exploring an IPO)
+            3 = WAITING: Event is real but likely weeks or months away with no strong signals yet. (e.g. "when Dangote lists on NGX" with no announcement yet)
+            4 = DORMANT: Speculative, long-horizon, or vague future event. (e.g. "when Nigeria joins BRICS", "when Apple makes a foldable phone")
+        - The escalation_keywords should be 3-6 terms that if found in search results suggest the story is accelerating and priority should increase (e.g. "confirmed", "announces", "approved", "this week", "imminent")
         - The confirmation message should be in Snoopa's voice — sharp, proactive, and cool
         - Do NOT include markdown formatting in the response`;
     } else {
@@ -398,7 +404,7 @@ export const send_message = action({
         error.message?.split(":")[0] || error.message || "Unknown error",
       );
 
-      // --- Fallback: Gemini 2.5 flash lite ---
+      // --- Fallback: Gemini 2.5 flash ---
       try {
         const fallbackModel = gen_ai.getGenerativeModel({
           model: "gemini-2.5-flash",

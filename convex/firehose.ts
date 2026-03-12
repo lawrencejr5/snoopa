@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
+import { Id } from "./_generated/dataModel";
 import { action, internalAction, internalQuery } from "./_generated/server";
 import { sendExpoPush } from "./notifications";
 import { hashString } from "./utils";
@@ -8,8 +9,6 @@ import { hashString } from "./utils";
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
-
-const RESULTS_PER_PAGE = 10; // 10 results per topic query
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -39,7 +38,7 @@ async function fetchHeadlines(
   query: string,
   apiKey: string,
 ): Promise<SerperNewsResult[]> {
-  const res = await fetch("https://google.serper.dev/news", {
+  const res = await fetch("https://google.serper.dev/search", {
     method: "POST",
     headers: {
       "X-API-KEY": apiKey,
@@ -47,9 +46,6 @@ async function fetchHeadlines(
     },
     body: JSON.stringify({
       q: query,
-      num: RESULTS_PER_PAGE,
-      page: 1,
-      gl: "ng",
       tbs: "qdr:d",
     }),
   });
@@ -62,7 +58,7 @@ async function fetchHeadlines(
   }
 
   const data = await res.json();
-  const results = (data.news ?? []) as SerperNewsResult[];
+  const results = (data.organic ?? []) as SerperNewsResult[];
   console.log(`Serper: "${query}" → ${results.length} results`);
   return results;
 }
@@ -78,7 +74,7 @@ async function verifyHeadlineWithGemini(
   geminiKey: string,
 ): Promise<boolean> {
   const genAI = new GoogleGenerativeAI(geminiKey);
-  const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-lite" });
+  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
 
   const prompt = `You are a strict fact-checker. Given a news headline and snippet, determine whether it satisfies the following condition.
         Condition: "${condition}"
@@ -188,14 +184,12 @@ export const get_unique_canonical_topics = internalQuery({
       .collect();
 
     const seen = new Set<string>();
-    const topics: string[] = [];
     for (const item of items) {
-      if (item.canonical_topic && !seen.has(item.canonical_topic)) {
+      if (item.canonical_topic) {
         seen.add(item.canonical_topic);
-        topics.push(item.canonical_topic);
       }
     }
-    return topics;
+    return [...seen];
   },
 });
 
@@ -274,7 +268,7 @@ export const run_firehose = internalAction({
     // 5. Process — all checks are in-memory, accumulate writes
     const toMarkProcessed: Array<{
       urlHash: string;
-      watchlist_id: (typeof activeItems)[0]["_id"];
+      watchlist_id: Id<"watchlist">;
     }> = [];
 
     // Collect verified headlines per watchlist item for brief generation

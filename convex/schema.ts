@@ -54,6 +54,7 @@ const schema = defineSchema({
       v.literal("completed"),
       v.literal("inactive"),
     ),
+    tier: v.optional(v.number()),
     last_checked: v.number(),
     sources: v.array(v.string()),
     message_id: v.optional(v.id("chats")),
