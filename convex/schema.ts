@@ -36,8 +36,6 @@ const schema = defineSchema({
         v.literal("watchlist"),
         v.literal("chat"),
         v.literal("search"),
-        v.literal("snitch"),
-        v.literal("status"),
       ),
     ),
     sources: v.optional(v.array(v.string())),

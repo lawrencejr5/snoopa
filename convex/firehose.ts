@@ -10,6 +10,14 @@ import { hashString } from "./utils";
 // Constants
 // ---------------------------------------------------------------------------
 
+/** Tier check intervals in milliseconds */
+const TIER_INTERVALS: Record<number, number> = {
+  1: 6 * 60 * 60 * 1000, // 6 hours
+  2: 12 * 60 * 60 * 1000, // 12 hours
+  3: 24 * 60 * 60 * 1000, // 24 hours
+  4: 72 * 60 * 60 * 1000, // 72 hours
+};
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -146,12 +154,18 @@ async function generateBrief(
 // ---------------------------------------------------------------------------
 
 export const get_active_watchlist_items = internalQuery({
-  args: {},
-  handler: async (ctx) => {
-    return await ctx.db
+  args: { tier: v.optional(v.number()) },
+  handler: async (ctx, args) => {
+    const items = await ctx.db
       .query("watchlist")
       .filter((q) => q.eq(q.field("status"), "active"))
       .collect();
+
+    if (args.tier !== undefined) {
+      // Filter by tier (items without a tier default to 3)
+      return items.filter((item) => (item.tier ?? 3) === args.tier);
+    }
+    return items;
   },
 });
 
@@ -198,8 +212,8 @@ export const get_unique_canonical_topics = internalQuery({
 // ---------------------------------------------------------------------------
 
 export const run_firehose = internalAction({
-  args: {},
-  handler: async (ctx) => {
+  args: { tier: v.number() },
+  handler: async (ctx, args) => {
     const serperKey = process.env.SERPER_API_KEY;
     const geminiKey = process.env.GOOGLE_GEMINI_API_KEY;
 
@@ -208,15 +222,30 @@ export const run_firehose = internalAction({
       return;
     }
 
-    // 1. Load all active watchlist items — 1 query
-    const activeItems = await ctx.runQuery(
+    const tierInterval = TIER_INTERVALS[args.tier] ?? TIER_INTERVALS[3];
+
+    // 1. Load active watchlist items for this tier
+    const allTierItems = await ctx.runQuery(
       internal.firehose.get_active_watchlist_items,
+      { tier: args.tier },
+    );
+
+    // Filter out items that were checked too recently (safety net against double-runs)
+    const now = Date.now();
+    const activeItems = allTierItems.filter(
+      (item) => now - item.last_checked >= tierInterval * 0.9,
     );
 
     if (activeItems.length === 0) {
-      console.log("Firehose: no active watchlist items, skipping.");
+      console.log(
+        `Firehose (tier ${args.tier}): no items due for check, skipping.`,
+      );
       return;
     }
+
+    console.log(
+      `Firehose (tier ${args.tier}): ${activeItems.length} items due for check.`,
+    );
 
     // 2. Bulk-load all processed hashes for all active items — 1 query
     //    Builds an in-memory Set of "urlHash::watchlist_id" keys
@@ -420,7 +449,7 @@ export const run_firehose = internalAction({
     });
 
     console.log(
-      `Firehose: complete. ${totalAlerts} alerts sent, ${toMarkProcessed.length} headlines marked processed.`,
+      `Firehose (tier ${args.tier}): complete. ${totalAlerts} alerts sent, ${toMarkProcessed.length} headlines marked processed.`,
     );
   },
 });
@@ -430,9 +459,9 @@ export const run_firehose = internalAction({
 // ---------------------------------------------------------------------------
 
 export const trigger_firehose = action({
-  args: {},
-  handler: async (ctx) => {
-    await ctx.runAction(internal.firehose.run_firehose);
+  args: { tier: v.number() },
+  handler: async (ctx, args) => {
+    await ctx.runAction(internal.firehose.run_firehose, { tier: args.tier });
   },
 });
 
