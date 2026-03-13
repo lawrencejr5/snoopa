@@ -36,11 +36,15 @@ export default function ChatScreen() {
   const route = useRoute<any>();
   const scrollViewRef = useRef<ScrollView>(null);
   const userMessageYPositions = useRef<Map<string, number>>(new Map());
+  const userHasScrolled = useRef(false);
 
   // Scroll to the last user message's Y position with a small delay
   // so layout has time to settle (fixes partial-scroll bug).
+  // Skips scrolling if the user has manually dragged the scroll view.
   const scrollToLastUserMessage = useCallback(() => {
+    if (userHasScrolled.current) return;
     setTimeout(() => {
+      if (userHasScrolled.current) return;
       const positions = userMessageYPositions.current;
       if (positions.size === 0) return;
 
@@ -87,6 +91,12 @@ export default function ChatScreen() {
   const [snoopingText, setSnoopingText] = useState("Snooping...");
   const lastProcessedMessageIdRef = useRef<string | null>(null);
   const [isHere, setIsHere] = useState(false);
+  const [expandedUserMessages, setExpandedUserMessages] = useState<{
+    [key: string]: boolean;
+  }>({});
+  const [truncatedUserMessages, setTruncatedUserMessages] = useState<{
+    [key: string]: boolean;
+  }>({});
 
   // Track saving and saved state for watchlist items
   const [savingWatchlist, setSavingWatchlist] = useState<{
@@ -197,6 +207,9 @@ export default function ChatScreen() {
 
   const handleSend = async () => {
     if (!input.trim() || sending || typingMessageId) return;
+
+    // Reset manual-scroll override so auto-scroll resumes for the new message
+    userHasScrolled.current = false;
 
     const content = input.trim();
     setInput("");
@@ -356,6 +369,9 @@ export default function ChatScreen() {
         contentContainerStyle={{ flexGrow: 1, paddingBottom: 20 }}
         showsVerticalScrollIndicator={false}
         onContentSizeChange={() => scrollToLastUserMessage()}
+        onScrollBeginDrag={() => {
+          userHasScrolled.current = true;
+        }}
       >
         {isLoading ? (
           <View
@@ -415,6 +431,8 @@ export default function ChatScreen() {
           <View style={{ paddingHorizontal: 10 }}>
             {displayMessages.map((msg) => {
               if (msg.role === "user") {
+                const isExpanded = expandedUserMessages[msg._id] || false;
+                const isTruncated = truncatedUserMessages[msg._id] || false;
                 return (
                   <View
                     key={msg._id}
@@ -429,16 +447,82 @@ export default function ChatScreen() {
                       { backgroundColor: Colors[theme].surface },
                     ]}
                   >
-                    <Text
-                      style={{
-                        color: Colors[theme].text,
-                        fontFamily: "FontRegular",
-                        fontSize: 15,
-                        lineHeight: 22,
-                      }}
-                    >
-                      {msg.content}
-                    </Text>
+                    <View style={{ position: "relative" }}>
+                      <Text
+                        numberOfLines={
+                          isTruncated && !isExpanded ? 5 : undefined
+                        }
+                        onTextLayout={(e) => {
+                          if (
+                            !truncatedUserMessages[msg._id] &&
+                            e.nativeEvent.lines.length > 5
+                          ) {
+                            setTruncatedUserMessages((prev) => ({
+                              ...prev,
+                              [msg._id]: true,
+                            }));
+                          }
+                        }}
+                        style={{
+                          color: Colors[theme].text,
+                          fontFamily: "FontRegular",
+                          fontSize: 15,
+                          lineHeight: 22,
+                        }}
+                      >
+                        {msg.content}
+                      </Text>
+
+                      {/* Fade overlay when collapsed and text is long */}
+                      {isTruncated && !isExpanded && (
+                        <View
+                          pointerEvents="none"
+                          style={{
+                            position: "absolute",
+                            bottom: 0,
+                            left: 0,
+                            right: 0,
+                            height: 25,
+                          }}
+                        >
+                          {/* Simulated gradient: 5 strips from transparent → surface */}
+                          {[0, 0.3, 0.5, 0.7].map((opacity, i) => (
+                            <View
+                              key={i}
+                              style={{
+                                flex: 1,
+                                backgroundColor: Colors[theme].surface,
+                                opacity,
+                              }}
+                            />
+                          ))}
+                        </View>
+                      )}
+                    </View>
+
+                    {/* View more / View less toggle */}
+                    {isTruncated && (
+                      <Pressable
+                        onPress={() =>
+                          setExpandedUserMessages((prev) => ({
+                            ...prev,
+                            [msg._id]: !prev[msg._id],
+                          }))
+                        }
+                        style={{ marginTop: 6 }}
+                      >
+                        <Text
+                          style={{
+                            color: Colors[theme].text_secondary,
+                            fontFamily: "FontMedium",
+                            fontSize: 13,
+                            textAlign: "right",
+                          }}
+                        >
+                          {isExpanded ? "View less" : "View more"}
+                        </Text>
+                      </Pressable>
+                    )}
                   </View>
                 );
               }
@@ -912,7 +996,7 @@ const SnoopaHead = () => {
 
 const styles = StyleSheet.create({
   user_chat: {
-    maxWidth: "80%",
+    maxWidth: "90%",
     borderRadius: 20,
     borderBottomRightRadius: 4,
     alignSelf: "flex-end",
