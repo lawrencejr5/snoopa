@@ -331,11 +331,11 @@ export const migrate_undefined_serper_config = internalMutation({
 
     for (const watchlist of watchlists) {
       if (
-        watchlist.serper_type === undefined ||
+        watchlist.serper_type === "search" ||
         watchlist.serper_date_range === undefined
       ) {
         await ctx.db.patch(watchlist._id, {
-          serper_type: watchlist.serper_type ?? "search",
+          serper_type: watchlist.serper_type ?? "news",
           serper_date_range: watchlist.serper_date_range ?? "day",
         });
         count++;
