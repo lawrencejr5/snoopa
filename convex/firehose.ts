@@ -45,17 +45,24 @@ interface SerperNewsResult {
 async function fetchHeadlines(
   query: string,
   apiKey: string,
+  serperType: "search" | "news" = "search",
+  dateRange: "day" | "any_time" = "day",
 ): Promise<SerperNewsResult[]> {
-  const res = await fetch("https://google.serper.dev/search", {
+  const endpoint =
+    serperType === "news"
+      ? "https://google.serper.dev/news"
+      : "https://google.serper.dev/search";
+
+  const body: Record<string, string> = { q: query };
+  if (dateRange === "day") body.tbs = "qdr:d";
+
+  const res = await fetch(endpoint, {
     method: "POST",
     headers: {
       "X-API-KEY": apiKey,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      q: query,
-      tbs: "qdr:d",
-    }),
+    body: JSON.stringify(body),
   });
 
   if (!res.ok) {
@@ -66,8 +73,13 @@ async function fetchHeadlines(
   }
 
   const data = await res.json();
-  const results = (data.organic ?? []) as SerperNewsResult[];
-  console.log(`Serper: "${query}" → ${results.length} results`);
+  // News endpoint returns results under 'news', search under 'organic'
+  const results = (
+    serperType === "news" ? (data.news ?? []) : (data.organic ?? [])
+  ) as SerperNewsResult[];
+  console.log(
+    `Serper [${serperType}/${dateRange}]: "${query}" → ${results.length} results`,
+  );
   return results;
 }
 
@@ -256,27 +268,47 @@ export const run_firehose = internalAction({
     );
     const processedSet = new Set<string>(processedKeys);
 
-    // 3. Build dynamic Serper queries from unique canonical topics — 1 query
-    const canonicalTopics = await ctx.runQuery(
-      internal.firehose.get_unique_canonical_topics,
-    );
+    // 3. Build unique Serper queries grouped by (topic, serper_type, serper_date_range)
+    interface SerperQuery {
+      topic: string;
+      serperType: "search" | "news";
+      dateRange: "day" | "any_time";
+    }
+    const queryMap = new Map<string, SerperQuery>();
+    for (const item of activeItems) {
+      if (!item.canonical_topic) continue;
+      const type = item.serper_type ?? "search";
+      const range = item.serper_date_range ?? "day";
+      const key = `${item.canonical_topic}::${type}::${range}`;
+      if (!queryMap.has(key)) {
+        queryMap.set(key, {
+          topic: item.canonical_topic,
+          serperType: type,
+          dateRange: range,
+        });
+      }
+    }
+
+    const serperQueries = [...queryMap.values()];
 
     // Fallback: if no items have canonical_topic yet, run nothing
-    if (canonicalTopics.length === 0) {
+    if (serperQueries.length === 0) {
       console.log(
         "Firehose: no canonical topics found, skipping Serper fetch.",
       );
       return;
     }
 
-    // Fetch headlines for each unique topic in parallel
+    // Fetch headlines for each unique query config in parallel
     const headlineArrays = await Promise.all(
-      canonicalTopics.map((topic) => fetchHeadlines(topic, serperKey)),
+      serperQueries.map((sq) =>
+        fetchHeadlines(sq.topic, serperKey, sq.serperType, sq.dateRange),
+      ),
     );
     const allHeadlines = headlineArrays.flat();
 
     console.log(
-      `Firehose: fetched ${allHeadlines.length} headlines across ${canonicalTopics.length} topics.`,
+      `Firehose: fetched ${allHeadlines.length} headlines across ${serperQueries.length} queries.`,
     );
 
     // 4. Within-run dedup — in-memory only, zero DB cost

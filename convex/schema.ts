@@ -53,6 +53,10 @@ const schema = defineSchema({
       v.literal("inactive"),
     ),
     tier: v.optional(v.number()),
+    serper_type: v.optional(v.union(v.literal("search"), v.literal("news"))),
+    serper_date_range: v.optional(
+      v.union(v.literal("day"), v.literal("any_time")),
+    ),
     last_checked: v.number(),
     sources: v.array(v.string()),
     message_id: v.optional(v.id("chats")),

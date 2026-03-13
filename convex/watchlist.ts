@@ -1,6 +1,6 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { internalMutation, mutation, query } from "./_generated/server";
 
 // --- Queries ---
 
@@ -124,6 +124,10 @@ export const add_watchlist_item = mutation({
     condition: v.string(),
     canonical_topic: v.optional(v.string()),
     tier: v.optional(v.number()),
+    serper_type: v.optional(v.union(v.literal("search"), v.literal("news"))),
+    serper_date_range: v.optional(
+      v.union(v.literal("day"), v.literal("any_time")),
+    ),
     sources: v.optional(v.array(v.string())),
     message_id: v.optional(v.id("chats")),
     session_id: v.optional(v.id("sessions")),
@@ -136,6 +140,8 @@ export const add_watchlist_item = mutation({
       condition: args.condition,
       canonical_topic: args.canonical_topic,
       tier: args.tier ?? 3,
+      serper_type: args.serper_type ?? "search",
+      serper_date_range: args.serper_date_range ?? "day",
       status: "active",
       last_checked: Date.now(),
       sources: args.sources ?? [],
@@ -309,5 +315,33 @@ export const delete_watchlist_item = mutation({
 
     // Delete the watchlist item
     await ctx.db.delete(args.watchlist_id);
+  },
+});
+
+/**
+ * Internal mutation to migrate watchlists with undefined serper config.
+ * Sets serper_type to "search" and serper_date_range to "day" for all
+ * watchlists missing these fields.
+ */
+export const migrate_undefined_serper_config = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const watchlists = await ctx.db.query("watchlist").collect();
+    let count = 0;
+
+    for (const watchlist of watchlists) {
+      if (
+        watchlist.serper_type === undefined ||
+        watchlist.serper_date_range === undefined
+      ) {
+        await ctx.db.patch(watchlist._id, {
+          serper_type: watchlist.serper_type ?? "search",
+          serper_date_range: watchlist.serper_date_range ?? "day",
+        });
+        count++;
+      }
+    }
+
+    return { migrated: count };
   },
 });
