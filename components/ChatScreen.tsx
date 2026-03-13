@@ -258,6 +258,7 @@ export default function ChatScreen() {
       keywords: string[];
       condition: string;
       canonical_topic?: string;
+      tier?: number;
     },
     sessionId: Id<"sessions">,
   ) => {
@@ -276,6 +277,7 @@ export default function ChatScreen() {
         keywords: watchlistData.keywords,
         condition: watchlistData.condition,
         canonical_topic: watchlistData.canonical_topic,
+        tier: watchlistData.tier,
         message_id: msgId,
         session_id: sessionId,
       });
