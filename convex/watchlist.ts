@@ -1,6 +1,6 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
-import { internalMutation, mutation, query } from "./_generated/server";
+import { mutation, query } from "./_generated/server";
 
 // --- Queries ---
 
@@ -315,53 +315,5 @@ export const delete_watchlist_item = mutation({
 
     // Delete the watchlist item
     await ctx.db.delete(args.watchlist_id);
-  },
-});
-
-/**
- * Internal mutation to migrate watchlists with undefined serper config.
- * Sets serper_type to "search" and serper_date_range to "day" for all
- * watchlists missing these fields.
- */
-export const migrate_undefined_serper_config = internalMutation({
-  args: {},
-  handler: async (ctx) => {
-    const watchlists = await ctx.db.query("watchlist").collect();
-    let count = 0;
-
-    for (const watchlist of watchlists) {
-      if (
-        watchlist.serper_type === "search" ||
-        watchlist.serper_date_range === undefined
-      ) {
-        await ctx.db.patch(watchlist._id, {
-          serper_type: watchlist.serper_type ?? "news",
-          serper_date_range: watchlist.serper_date_range ?? "day",
-        });
-        count++;
-      }
-    }
-
-    return { migrated: count };
-  },
-});
-
-/**
- * Internal mutation to migrate watchlists with undefined tiers to tier 3.
- */
-export const migrate_undefined_tiers = internalMutation({
-  args: {},
-  handler: async (ctx) => {
-    const watchlists = await ctx.db.query("watchlist").collect();
-    let count = 0;
-
-    for (const watchlist of watchlists) {
-      if (watchlist.tier === undefined) {
-        await ctx.db.patch(watchlist._id, { tier: 3 });
-        count++;
-      }
-    }
-
-    return { migrated: count };
   },
 });
