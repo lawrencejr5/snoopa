@@ -53,8 +53,8 @@ const schema = defineSchema({
       v.literal("inactive"),
     ),
     tier: v.optional(v.number()),
-    serper_type: v.optional(v.union(v.literal("search"), v.literal("news"))),
-    serper_date_range: v.optional(
+    search_type: v.optional(v.union(v.literal("general"), v.literal("news"))),
+    time_range: v.optional(
       v.union(v.literal("day"), v.literal("any_time")),
     ),
     last_checked: v.number(),

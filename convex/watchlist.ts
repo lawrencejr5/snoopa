@@ -124,8 +124,8 @@ export const add_watchlist_item = mutation({
     condition: v.string(),
     canonical_topic: v.optional(v.string()),
     tier: v.optional(v.number()),
-    serper_type: v.optional(v.union(v.literal("search"), v.literal("news"))),
-    serper_date_range: v.optional(
+    search_type: v.optional(v.union(v.literal("general"), v.literal("news"))),
+    time_range: v.optional(
       v.union(v.literal("day"), v.literal("any_time")),
     ),
     sources: v.optional(v.array(v.string())),
@@ -140,8 +140,8 @@ export const add_watchlist_item = mutation({
       condition: args.condition,
       canonical_topic: args.canonical_topic,
       tier: args.tier ?? 3,
-      serper_type: args.serper_type ?? "search",
-      serper_date_range: args.serper_date_range ?? "day",
+      search_type: args.search_type ?? "general",
+      time_range: args.time_range ?? "day",
       status: "active",
       last_checked: Date.now(),
       sources: args.sources ?? [],

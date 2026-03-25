@@ -340,7 +340,7 @@ export const send_message = action({
 
         <Your friendly confirmation message here, 1-2 sentences acknowledging what you're tracking for them>
         ---WATCHLIST_DATA---
-        {"title": "<concise title, max 8 words>", "keywords": ["<keyword1>", "<keyword2>", "<keyword3>"], "condition": "<clear, specific condition or rule that defines when this watchlist item should trigger an alert>", "canonical_topic": "<2-4 word topic label that best describes the watchlist for easy searching.>", "tier": <1-4>, "serper_type": "<search or news>", "serper_date_range": "<day or any_time>"}
+        {"title": "<concise title, max 8 words>", "keywords": ["<keyword1>", "<keyword2>", "<keyword3>"], "condition": "<clear, specific condition or rule that defines when this watchlist item should trigger an alert>", "canonical_topic": "<2-4 word topic label that best describes the watchlist for easy searching.>", "tier": <1-4>, "search_type": "<general or news>", "time_range": "<day or any_time>"}
 
         Rules:
         - The title should be clear and specific (e.g. "Bitcoin Price Movement", "iPhone 16 Pro Deals")
@@ -353,10 +353,10 @@ export const send_message = action({
           * Tier 3 (Standard): 1x/day — product deals, upcoming releases, general tracking
           * Tier 4 (Low): 1x/3 days — long-term monitoring, legislative changes, slow-moving topics
         - Assign the tier based on how time-sensitive or volatile the topic is. When in doubt, default to tier 3.
-        - serper_type determines which search endpoint Snoopa uses:
-          * "search": best for prices, product listings, deals, stats, or topics where info is updated on existing pages (e.g. iPhone price on BackMarket, stock prices)
+        - search_type determines which search endpoint Snoopa uses:
+          * "general": best for prices, product listings, deals, stats, or topics where info is updated on existing pages (e.g. iPhone price on BackMarket, stock prices)
           * "news": best for breaking events, announcements, developments, or topics that generate new articles (e.g. crypto news, political events)
-        - serper_date_range determines the time window for search results:
+        - time_range determines the time window for search results:
           * "day": last 24 hours — use for breaking/time-critical topics, news, events
           * "any_time": no time filter — use for prices, deals, or slow-moving info that lives on static/updated pages
         - The confirmation message should be in Snoopa's voice — sharp, proactive, and cool

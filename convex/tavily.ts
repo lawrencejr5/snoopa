@@ -97,3 +97,46 @@ export const search = internalAction({
       .join("\n\n");
   },
 });
+
+export const firehose_search = internalAction({
+  args: {
+    query: v.string(),
+    searchType: v.union(v.literal("general"), v.literal("news")),
+    timeRange: v.union(v.literal("day"), v.literal("any_time")),
+  },
+  handler: async (ctx, args) => {
+    const tavilyKey = process.env.TAVILY_API_KEY;
+    if (!tavilyKey) throw new Error("TAVILY_API_KEY is not set");
+
+    const tvly = tavily({ apiKey: tavilyKey });
+
+    const options: Record<string, any> = {
+      topic: args.searchType,
+      searchDepth: "advanced",
+      maxResults: 10,
+      includeAnswer: false,
+    };
+
+    if (args.timeRange === "day" && args.searchType === "news") {
+      options.days = 1;
+    }
+
+    try {
+      const res = await tvly.search(args.query, options);
+      console.log(
+        `Tavily [${args.searchType}/${args.timeRange}]: "${args.query}" → ${res.results.length} results`,
+      );
+      // Ensure we only return fields we need, but the API returns title, url, content easily
+      return res.results as Array<{
+        title: string;
+        url: string;
+        content: string;
+        score?: number;
+        publishedDate?: string;
+      }>;
+    } catch (err: any) {
+      console.error(`Tavily error for query "${args.query}":`, err);
+      return [];
+    }
+  },
+});
