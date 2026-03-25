@@ -54,9 +54,7 @@ const schema = defineSchema({
     ),
     tier: v.optional(v.number()),
     search_type: v.optional(v.union(v.literal("general"), v.literal("news"))),
-    time_range: v.optional(
-      v.union(v.literal("day"), v.literal("any_time")),
-    ),
+    time_range: v.optional(v.union(v.literal("day"), v.literal("any_time"))),
     last_checked: v.number(),
     sources: v.array(v.string()),
     message_id: v.optional(v.id("chats")),
