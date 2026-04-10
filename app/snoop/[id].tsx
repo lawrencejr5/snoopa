@@ -1,14 +1,16 @@
 import Container from "@/components/Container";
+import FormatText from "@/components/FormatText";
 import Loading from "@/components/Loading";
 import Colors from "@/constants/Colors";
 import { useTheme } from "@/context/ThemeContext";
 import { useUser } from "@/context/UserContext";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
+import { Octicons, SimpleLineIcons } from "@expo/vector-icons";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -20,8 +22,8 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { KeyboardStickyView } from "react-native-keyboard-controller";
 import Animated, {
-  Easing,
   FadeIn,
   FadeInDown,
   useAnimatedStyle,
@@ -30,7 +32,6 @@ import Animated, {
   withSequence,
   withTiming,
 } from "react-native-reanimated";
-import { KeyboardStickyView } from "react-native-keyboard-controller";
 
 // ---------------------------------------------------------------------------
 // Terminal Cursor Blink
@@ -83,32 +84,31 @@ function CommandsModal({
 }) {
   const { theme } = useTheme();
 
-  const commands = [
+  const options = [
     {
-      cmd: snoop.status === "inactive" ? "/resume" : "/pause",
-      label:
-        snoop.status === "inactive" ? "Resume tracking" : "Pause tracking",
+      id: "pause_resume",
+      label: snoop.status === "inactive" ? "Resume tracking" : "Pause tracking",
       icon: snoop.status === "inactive" ? "play" : "pause",
       action: onPauseResume,
-      color: Colors[theme].warning,
+      color: Colors[theme].text,
     },
     {
-      cmd: "/edit",
-      label: "Edit tracking condition",
+      id: "edit",
+      label: "Edit condition",
       icon: "document",
       action: onEdit,
-      color: Colors[theme].primary,
+      color: Colors[theme].text,
     },
     {
-      cmd: "/rename",
+      id: "rename",
       label: "Rename watchlist",
       icon: "document",
       action: onRename,
-      color: Colors[theme].primary,
+      color: Colors[theme].text,
     },
     {
-      cmd: "/terminate",
-      label: "Terminate watchlist",
+      id: "terminate",
+      label: "Delete watchlist",
       icon: "times",
       action: onTerminate,
       color: Colors[theme].danger,
@@ -137,13 +137,13 @@ function CommandsModal({
           <View style={cmdStyles.sheetHeader}>
             <Text
               style={{
-                color: Colors[theme].success,
+                color: Colors[theme].text_secondary,
                 fontFamily: "FontBold",
                 fontSize: 12,
                 letterSpacing: 1,
               }}
             >
-              COMMANDS
+              OPTIONS
             </Text>
             <Pressable onPress={onClose}>
               <Image
@@ -157,12 +157,12 @@ function CommandsModal({
             </Pressable>
           </View>
 
-          {/* Command List */}
-          {commands.map((c) => (
+          {/* Option List */}
+          {options.map((o) => (
             <Pressable
-              key={c.cmd}
+              key={o.id}
               onPress={() => {
-                c.action();
+                o.action();
                 onClose();
               }}
               disabled={isProcessing}
@@ -171,41 +171,38 @@ function CommandsModal({
                 { borderBottomColor: Colors[theme].border },
               ]}
             >
-              <View style={{ flexDirection: "row", alignItems: "center", flex: 1, gap: 12 }}>
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  flex: 1,
+                  gap: 12,
+                }}
+              >
                 <Text
                   style={{
-                    color: c.color,
-                    fontFamily: "FontBold",
-                    fontSize: 14,
-                    minWidth: 90,
+                    color: o.color,
+                    fontFamily: "FontMedium",
+                    fontSize: 15,
                   }}
                 >
-                  {c.cmd}
-                </Text>
-                <Text
-                  style={{
-                    color: Colors[theme].text_secondary,
-                    fontFamily: "FontRegular",
-                    fontSize: 13,
-                  }}
-                >
-                  {c.label}
+                  {o.label}
                 </Text>
               </View>
               <Image
                 source={
-                  c.icon === "play"
+                  o.icon === "play"
                     ? require("@/assets/icons/play.png")
-                    : c.icon === "pause"
+                    : o.icon === "pause"
                       ? require("@/assets/icons/pause.png")
-                      : c.icon === "document"
+                      : o.icon === "document"
                         ? require("@/assets/icons/document.png")
                         : require("@/assets/icons/times.png")
                 }
                 style={{
-                  width: 14,
-                  height: 14,
-                  tintColor: c.color,
+                  width: 16,
+                  height: 16,
+                  tintColor: o.color,
                   opacity: 0.7,
                 }}
               />
@@ -241,7 +238,12 @@ function RenameModal({
   }, [visible, currentTitle]);
 
   return (
-    <Modal animationType="fade" transparent visible={visible} onRequestClose={onClose}>
+    <Modal
+      animationType="fade"
+      transparent
+      visible={visible}
+      onRequestClose={onClose}
+    >
       <Pressable style={cmdStyles.overlay} onPress={onClose}>
         <Pressable
           style={[
@@ -253,7 +255,14 @@ function RenameModal({
           ]}
           onPress={(e) => e.stopPropagation()}
         >
-          <Text style={{ color: Colors[theme].text, fontFamily: "FontBold", fontSize: 18, marginBottom: 16 }}>
+          <Text
+            style={{
+              color: Colors[theme].text,
+              fontFamily: "FontBold",
+              fontSize: 18,
+              marginBottom: 16,
+            }}
+          >
             Rename Watchlist
           </Text>
           <TextInput
@@ -284,7 +293,14 @@ function RenameModal({
                 alignItems: "center",
               }}
             >
-              <Text style={{ color: Colors[theme].text_secondary, fontFamily: "FontMedium" }}>Cancel</Text>
+              <Text
+                style={{
+                  color: Colors[theme].text_secondary,
+                  fontFamily: "FontMedium",
+                }}
+              >
+                Cancel
+              </Text>
             </Pressable>
             <Pressable
               onPress={() => onSave(title.trim())}
@@ -299,9 +315,19 @@ function RenameModal({
               }}
             >
               {isProcessing ? (
-                <ActivityIndicator size="small" color={Colors[theme].background} />
+                <ActivityIndicator
+                  size="small"
+                  color={Colors[theme].background}
+                />
               ) : (
-                <Text style={{ color: Colors[theme].background, fontFamily: "FontBold" }}>Save</Text>
+                <Text
+                  style={{
+                    color: Colors[theme].background,
+                    fontFamily: "FontBold",
+                  }}
+                >
+                  Save
+                </Text>
               )}
             </Pressable>
           </View>
@@ -335,11 +361,16 @@ function EditModal({
   }, [visible, currentCondition]);
 
   return (
-    <Modal animationType="fade" transparent visible={visible} onRequestClose={onClose}>
+    <Modal
+      animationType="fade"
+      transparent
+      visible={visible}
+      onRequestClose={onClose}
+    >
       <Pressable style={cmdStyles.overlay} onPress={onClose}>
         <Pressable
           style={[
-             cmdStyles.renameCard,
+            cmdStyles.renameCard,
             {
               backgroundColor: Colors[theme].card,
               borderColor: Colors[theme].border,
@@ -347,7 +378,14 @@ function EditModal({
           ]}
           onPress={(e) => e.stopPropagation()}
         >
-          <Text style={{ color: Colors[theme].text, fontFamily: "FontBold", fontSize: 18, marginBottom: 16 }}>
+          <Text
+            style={{
+              color: Colors[theme].text,
+              fontFamily: "FontBold",
+              fontSize: 18,
+              marginBottom: 16,
+            }}
+          >
             Edit Condition
           </Text>
           <TextInput
@@ -381,7 +419,14 @@ function EditModal({
                 alignItems: "center",
               }}
             >
-              <Text style={{ color: Colors[theme].text_secondary, fontFamily: "FontMedium" }}>Cancel</Text>
+              <Text
+                style={{
+                  color: Colors[theme].text_secondary,
+                  fontFamily: "FontMedium",
+                }}
+              >
+                Cancel
+              </Text>
             </Pressable>
             <Pressable
               onPress={() => onSave(condition.trim())}
@@ -396,9 +441,19 @@ function EditModal({
               }}
             >
               {isProcessing ? (
-                <ActivityIndicator size="small" color={Colors[theme].background} />
+                <ActivityIndicator
+                  size="small"
+                  color={Colors[theme].background}
+                />
               ) : (
-                <Text style={{ color: Colors[theme].background, fontFamily: "FontBold" }}>Save</Text>
+                <Text
+                  style={{
+                    color: Colors[theme].background,
+                    fontFamily: "FontBold",
+                  }}
+                >
+                  Save
+                </Text>
               )}
             </Pressable>
           </View>
@@ -424,6 +479,7 @@ export default function SnoopDetailsScreen() {
   const [showEdit, setShowEdit] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [sending, setSending] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
 
   // Data
   const snoop = useQuery(
@@ -493,7 +549,9 @@ export default function SnoopDetailsScreen() {
       for (const msg of chatMessages) {
         // Skip watchlist confirmation messages (contains delimiter)
         const cleanContent = msg.content.includes("---WATCHLIST_DATA---")
-          ? msg.content.substring(0, msg.content.indexOf("---WATCHLIST_DATA---")).trim()
+          ? msg.content
+              .substring(0, msg.content.indexOf("---WATCHLIST_DATA---"))
+              .trim()
           : msg.content;
 
         entries.push({
@@ -602,7 +660,13 @@ export default function SnoopDetailsScreen() {
   if (snoop === null) {
     return (
       <Container>
-        <Text style={{ color: Colors[theme].text, marginTop: 50, textAlign: "center" }}>
+        <Text
+          style={{
+            color: Colors[theme].text,
+            marginTop: 50,
+            textAlign: "center",
+          }}
+        >
           Snoop not found.
         </Text>
       </Container>
@@ -610,7 +674,9 @@ export default function SnoopDetailsScreen() {
   }
 
   const isActive = snoop.status === "active";
-  const statusColor = isActive ? Colors[theme].success : Colors[theme].text_secondary;
+  const statusColor = isActive
+    ? Colors[theme].success
+    : Colors[theme].text_secondary;
 
   return (
     <Container>
@@ -660,31 +726,130 @@ export default function SnoopDetailsScreen() {
               letterSpacing: 0.5,
             }}
           >
-            {isActive ? "WATCHING" : snoop.status === "completed" ? "CONFIRMED" : "STOPPED"}
+            {isActive
+              ? "WATCHING"
+              : snoop.status === "completed"
+                ? "CONFIRMED"
+                : "STOPPED"}
           </Text>
         </View>
 
         {/* Commands button */}
         <Pressable
           onPress={() => setShowCommands(true)}
-          style={[
-            styles.cmdButton,
-            {
-              backgroundColor: Colors[theme].success + "15",
-              borderColor: Colors[theme].success + "30",
-            },
-          ]}
+          style={[styles.cmdButton]}
+        >
+          <SimpleLineIcons
+            name="options-vertical"
+            color={Colors[theme].text}
+            size={16}
+          />
+        </Pressable>
+      </Animated.View>
+
+      {/* Watchlist Details - Outside Terminal Body */}
+      <Animated.View
+        entering={FadeInDown.delay(100).duration(400)}
+        style={{ marginBottom: 12 }}
+      >
+        <Pressable
+          onPress={() => setShowDetails(!showDetails)}
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            paddingHorizontal: 16,
+            paddingVertical: 12,
+            backgroundColor: Colors[theme].surface,
+            borderColor: Colors[theme].border,
+            borderWidth: 1,
+            borderRadius: 16,
+          }}
         >
           <Text
             style={{
-              color: Colors[theme].success,
               fontFamily: "FontBold",
               fontSize: 13,
+              color: Colors[theme].text,
+              letterSpacing: 0.5,
             }}
           >
-            ⚡
+            WATCHLIST DETAILS
           </Text>
+          <Octicons
+            name={showDetails ? "chevron-up" : "chevron-down"}
+            size={16}
+            color={Colors[theme].text_secondary}
+          />
         </Pressable>
+
+        {showDetails && (
+          <View style={{ marginTop: 12, paddingHorizontal: 16 }}>
+            <Text
+              style={{
+                fontFamily: "FontMedium",
+                fontSize: 12,
+                color: Colors[theme].text_secondary,
+                marginBottom: 4,
+              }}
+            >
+              Condition
+            </Text>
+            <Text
+              style={{
+                fontFamily: "FontRegular",
+                fontSize: 13,
+                color: Colors[theme].text,
+                lineHeight: 20,
+                marginBottom: 16,
+              }}
+            >
+              {snoop.condition}
+            </Text>
+
+            {snoop.keywords && snoop.keywords.length > 0 && (
+              <>
+                <Text
+                  style={{
+                    fontFamily: "FontMedium",
+                    fontSize: 12,
+                    color: Colors[theme].text_secondary,
+                    marginBottom: 8,
+                  }}
+                >
+                  Keywords
+                </Text>
+                <View
+                  style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}
+                >
+                  {snoop.keywords.map((kw: string) => (
+                    <View
+                      key={kw}
+                      style={{
+                        paddingHorizontal: 12,
+                        paddingVertical: 6,
+                        borderRadius: 12,
+                        backgroundColor: Colors[theme].surface,
+                        borderWidth: 1,
+                        borderColor: Colors[theme].border,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontFamily: "FontMedium",
+                          fontSize: 11,
+                          color: Colors[theme].text,
+                        }}
+                      >
+                        {kw}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              </>
+            )}
+          </View>
+        )}
       </Animated.View>
 
       {/* Terminal Body */}
@@ -697,31 +862,6 @@ export default function SnoopDetailsScreen() {
           },
         ]}
       >
-        {/* Terminal top bar */}
-        <View
-          style={[
-            styles.terminalTopBar,
-            { borderBottomColor: Colors[theme].border },
-          ]}
-        >
-          <View style={{ flexDirection: "row", gap: 6 }}>
-            <View style={[styles.termDot, { backgroundColor: "#FF5F56" }]} />
-            <View style={[styles.termDot, { backgroundColor: "#FFBD2E" }]} />
-            <View style={[styles.termDot, { backgroundColor: "#27C93F" }]} />
-          </View>
-          <Text
-            style={{
-              color: Colors[theme].text_secondary,
-              fontFamily: "FontMedium",
-              fontSize: 11,
-              letterSpacing: 0.5,
-            }}
-          >
-            snoopa://{snoop.title.toLowerCase().replace(/\s+/g, "-")}
-          </Text>
-          <View style={{ width: 40 }} />
-        </View>
-
         {/* Terminal output */}
         <ScrollView
           ref={scrollRef}
@@ -729,74 +869,100 @@ export default function SnoopDetailsScreen() {
           contentContainerStyle={{ padding: 16, paddingBottom: 8 }}
           showsVerticalScrollIndicator={false}
         >
-          {/* System init message */}
-          <Animated.View entering={FadeInDown.delay(100).duration(400)}>
-            <Text style={[styles.systemText, { color: Colors[theme].success }]}>
-              [SYS] Tracking initialized for "{snoop.title}"
-            </Text>
-            <Text
-              style={[
-                styles.systemText,
-                { color: Colors[theme].text_secondary, marginBottom: 4 },
-              ]}
-            >
-              [SYS] Condition: {snoop.condition}
-            </Text>
-            {snoop.keywords && snoop.keywords.length > 0 && (
-              <Text
-                style={[
-                  styles.systemText,
-                  { color: Colors[theme].text_secondary, marginBottom: 12 },
-                ]}
-              >
-                [SYS] Keywords: {snoop.keywords.join(", ")}
-              </Text>
-            )}
-            <View
-              style={[
-                styles.divider,
-                { borderColor: Colors[theme].border },
-              ]}
-            />
-          </Animated.View>
-
           {/* Timeline entries */}
           {timeline.map((entry, index) => (
             <Animated.View
               key={entry.id}
-              entering={FadeInDown.delay(Math.min(index * 30, 300)).duration(300)}
+              entering={FadeInDown.delay(Math.min(index * 30, 300)).duration(
+                300,
+              )}
               style={styles.termEntry}
             >
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  marginBottom: 6,
+                }}
+              >
+                <Text
+                  style={{
+                    color:
+                      entry.type === "log"
+                        ? Colors[theme].success
+                        : entry.type === "user"
+                          ? Colors[theme].primary
+                          : Colors[theme].warning,
+                    fontFamily: "FontBold",
+                    fontSize: 12,
+                  }}
+                >
+                  {entry.type === "log"
+                    ? "Log"
+                    : entry.type === "user"
+                      ? "User"
+                      : "Snoopa"}
+                </Text>
+                <Text
+                  style={{
+                    color: Colors[theme].text_secondary,
+                    fontFamily: "FontMedium",
+                    fontSize: 11,
+                    marginHorizontal: 6,
+                  }}
+                >
+                  |
+                </Text>
+                <Text
+                  style={[
+                    styles.termTime,
+                    { color: Colors[theme].text_secondary },
+                  ]}
+                >
+                  {formatTerminalTime(entry.timestamp)}
+                </Text>
+                <Octicons
+                  name="chevron-right"
+                  size={10}
+                  color={Colors[theme].text_secondary}
+                  style={{ marginHorizontal: 6 }}
+                />
+              </View>
+
               {entry.type === "log" ? (
                 <Pressable
                   onPress={async () => {
-                    if (entry.url) await WebBrowser.openAuthSessionAsync(entry.url);
+                    if (entry.url)
+                      await WebBrowser.openAuthSessionAsync(entry.url);
                   }}
-                  style={{ flexDirection: "row", flexWrap: "wrap" }}
+                  style={{ width: "100%" }}
                 >
-                  <Text style={[styles.termTime, { color: Colors[theme].text_secondary }]}>
-                    [{formatTerminalTime(entry.timestamp)}]
-                  </Text>
-                  <Text style={{ color: Colors[theme].success, fontFamily: "FontBold", fontSize: 12, marginRight: 6 }}>
-                    {" "}LOG{" "}
-                  </Text>
-                  <Text style={[styles.termContent, { color: Colors[theme].text, flex: 1 }]}>
-                    {entry.content}
-                  </Text>
+                  <FormatText>{entry.content}</FormatText>
                   {entry.verified !== undefined && (
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4, width: "100%" }}>
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 4,
+                        marginTop: 4,
+                        width: "100%",
+                      }}
+                    >
                       <View
                         style={{
                           width: 4,
                           height: 4,
                           borderRadius: 2,
-                          backgroundColor: entry.verified ? Colors[theme].success : Colors[theme].warning,
-                          marginLeft: 50,
+                          backgroundColor: entry.verified
+                            ? Colors[theme].success
+                            : Colors[theme].warning,
                         }}
                       />
                       <Text
                         style={{
-                          color: entry.verified ? Colors[theme].success : Colors[theme].warning,
+                          color: entry.verified
+                            ? Colors[theme].success
+                            : Colors[theme].warning,
                           fontFamily: "FontMedium",
                           fontSize: 10,
                         }}
@@ -804,36 +970,31 @@ export default function SnoopDetailsScreen() {
                         {entry.verified ? "verified" : "unverified"}
                       </Text>
                       {entry.url && (
-                        <Text style={{ color: Colors[theme].primary, fontFamily: "FontMedium", fontSize: 10 }}>
-                          {" "}· tap to open
+                        <Text
+                          style={{
+                            color: Colors[theme].primary,
+                            fontFamily: "FontMedium",
+                            fontSize: 10,
+                          }}
+                        >
+                          {" "}
+                          · tap to open
                         </Text>
                       )}
                     </View>
                   )}
                 </Pressable>
               ) : entry.type === "user" ? (
-                <View style={{ flexDirection: "row", flexWrap: "wrap" }}>
-                  <Text style={[styles.termTime, { color: Colors[theme].text_secondary }]}>
-                    [{formatTerminalTime(entry.timestamp)}]
-                  </Text>
-                  <Text style={{ color: Colors[theme].primary, fontFamily: "FontBold", fontSize: 12 }}>
-                    {" "}{">"}{" "}
-                  </Text>
-                  <Text style={[styles.termContent, { color: Colors[theme].text, flex: 1 }]}>
+                <View style={{ width: "100%" }}>
+                  <Text
+                    style={[styles.termContent, { color: Colors[theme].text }]}
+                  >
                     {entry.content}
                   </Text>
                 </View>
               ) : (
-                <View style={{ flexDirection: "row", flexWrap: "wrap" }}>
-                  <Text style={[styles.termTime, { color: Colors[theme].text_secondary }]}>
-                    [{formatTerminalTime(entry.timestamp)}]
-                  </Text>
-                  <Text style={{ color: Colors[theme].warning, fontFamily: "FontBold", fontSize: 12 }}>
-                    {" "}SNOOPA{" "}
-                  </Text>
-                  <Text style={[styles.termContent, { color: Colors[theme].text_secondary, flex: 1 }]}>
-                    {entry.content}
-                  </Text>
+                <View style={{ width: "100%" }}>
+                  <FormatText>{entry.content}</FormatText>
                 </View>
               )}
             </Animated.View>
@@ -842,13 +1003,48 @@ export default function SnoopDetailsScreen() {
           {/* Sending indicator */}
           {sending && (
             <View style={styles.termEntry}>
-              <Text style={[styles.termTime, { color: Colors[theme].text_secondary }]}>
-                [...]
-              </Text>
-              <Text style={{ color: Colors[theme].warning, fontFamily: "FontBold", fontSize: 12 }}>
-                {" "}SNOOPA{" "}
-              </Text>
-              <BlinkingCursor color={Colors[theme].warning} />
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  marginBottom: 6,
+                }}
+              >
+                <Text
+                  style={{
+                    color: Colors[theme].warning,
+                    fontFamily: "FontBold",
+                    fontSize: 12,
+                  }}
+                >
+                  Snoopa
+                </Text>
+                <Text
+                  style={{
+                    color: Colors[theme].text_secondary,
+                    fontFamily: "FontMedium",
+                    fontSize: 11,
+                    marginHorizontal: 6,
+                  }}
+                >
+                  |
+                </Text>
+                <Text
+                  style={[
+                    styles.termTime,
+                    { color: Colors[theme].text_secondary },
+                  ]}
+                >
+                  [...]
+                </Text>
+                <Octicons
+                  name="chevron-right"
+                  size={10}
+                  color={Colors[theme].text_secondary}
+                  style={{ marginHorizontal: 6 }}
+                />
+              </View>
+              <BlinkingCursor color={Colors[theme].text} />
             </View>
           )}
 
@@ -872,7 +1068,7 @@ export default function SnoopDetailsScreen() {
 
       {/* Terminal Input */}
       {snoop.session_id && (
-        <KeyboardStickyView offset={{ opened: 70, closed: 0 }}>
+        <KeyboardStickyView offset={{ opened: 0, closed: 0 }}>
           <View
             style={[
               styles.inputBar,
@@ -882,16 +1078,11 @@ export default function SnoopDetailsScreen() {
               },
             ]}
           >
-            <Text
-              style={{
-                color: Colors[theme].success,
-                fontFamily: "FontBold",
-                fontSize: 16,
-                marginRight: 8,
-              }}
-            >
-              {">"}
-            </Text>
+            <Octicons
+              name="command-palette"
+              size={18}
+              color={Colors[theme].text_secondary}
+            />
             <TextInput
               value={input}
               onChangeText={setInput}
@@ -904,6 +1095,7 @@ export default function SnoopDetailsScreen() {
                 fontFamily: "FontMedium",
                 fontSize: 14,
                 paddingVertical: 0,
+                paddingLeft: 10,
               }}
               onSubmitEditing={handleSend}
               returnKeyType="send"
@@ -1025,7 +1217,7 @@ const styles = StyleSheet.create({
   },
   termContent: {
     fontFamily: "FontRegular",
-    fontSize: 13,
+    fontSize: 15,
     lineHeight: 19,
   },
   systemText: {

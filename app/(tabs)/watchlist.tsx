@@ -177,7 +177,7 @@ function ActiveSnoopCard({
               fontSize: 12,
             }}
           >
-            {formatTimeAgo(item.last_checked)}
+            Last checked {formatTimeAgo(item.last_checked)}
           </Text>
         </View>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
