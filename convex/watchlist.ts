@@ -292,6 +292,41 @@ export const reactivate_watchlist = mutation({
 });
 
 /**
+ * Get trending topics across all users with tracker counts.
+ * Returns the top 15 canonical topics sorted by number of active trackers.
+ */
+export const get_trending_topics = query({
+  args: {},
+  handler: async (ctx) => {
+    const active_items = await ctx.db
+      .query("watchlist")
+      .filter((q) => q.eq(q.field("status"), "active"))
+      .collect();
+
+    // Count unique users per canonical_topic
+    const topic_map = new Map<string, Set<string>>();
+    for (const item of active_items) {
+      if (!item.canonical_topic) continue;
+      if (!topic_map.has(item.canonical_topic)) {
+        topic_map.set(item.canonical_topic, new Set());
+      }
+      topic_map.get(item.canonical_topic)!.add(item.user_id);
+    }
+
+    // Convert to array, sort by count, take top 15
+    const trending = [...topic_map.entries()]
+      .map(([topic, users]) => ({
+        topic,
+        tracker_count: users.size,
+      }))
+      .sort((a, b) => b.tracker_count - a.tracker_count)
+      .slice(0, 15);
+
+    return trending;
+  },
+});
+
+/**
  * Delete a watchlist item and its associated logs.
  */
 export const delete_watchlist_item = mutation({

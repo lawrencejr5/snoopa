@@ -11,25 +11,32 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[theme].text_secondary,
+        tabBarActiveTintColor: Colors[theme].text,
+        tabBarInactiveTintColor: Colors[theme].text_secondary,
         headerShown: false,
         tabBarStyle: {
           elevation: 0,
           borderTopWidth: 0,
           backgroundColor: Colors[theme].background,
+          paddingTop: 4,
+        },
+        tabBarLabelStyle: {
+          fontFamily: "FontMedium",
+          fontSize: 11,
+          letterSpacing: 0.3,
         },
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
-          title: "Agent",
+          title: "Home",
           tabBarIcon: ({ focused }) => (
             <Image
               source={require("../../assets/icons/ai-assistant.png")}
               style={{
-                height: 27,
-                width: 27,
+                height: 24,
+                width: 24,
                 tintColor: focused
                   ? Colors[theme].primary
                   : Colors[theme].text_secondary,
@@ -47,8 +54,8 @@ export default function TabLayout() {
             <Image
               source={require("../../assets/icons/eyes.png")}
               style={{
-                height: 24,
-                width: 24,
+                height: 22,
+                width: 22,
                 tintColor: focused
                   ? Colors[theme].primary
                   : Colors[theme].text_secondary,

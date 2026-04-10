@@ -18,6 +18,7 @@ import {
 } from "react-native";
 import Animated, {
   Easing,
+  FadeInDown,
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
@@ -73,7 +74,7 @@ const PulsingDot = ({ color }: { color: string }) => {
 };
 
 // ---------------------------------------------------------------------------
-// ActiveSnoopCard — has its own hook so we can conditionally query per item
+// Simplified Snoop Card — title only, no condition
 // ---------------------------------------------------------------------------
 type WatchlistItem = {
   _id: import("@/convex/_generated/dataModel").Id<"watchlist">;
@@ -92,14 +93,12 @@ function ActiveSnoopCard({
   theme: string;
   router: ReturnType<typeof useRouter>;
 }) {
-  // Count verified logs since last_checked — the "new" updates
   const newCount =
     useQuery(api.log.get_new_logs_count, {
       watchlist_id: item._id,
       since: item.last_checked,
     }) ?? 0;
 
-  // Count logs that haven't been seen yet — drives the red dot on View Details
   const unseenCount =
     useQuery(api.log.get_unseen_logs_count, {
       watchlist_id: item._id,
@@ -107,7 +106,13 @@ function ActiveSnoopCard({
 
   const { theme } = useTheme();
   return (
-    <View
+    <Pressable
+      onPress={() =>
+        router.push({
+          pathname: "/snoop/[id]",
+          params: { id: item._id },
+        })
+      }
       style={[
         styles.card,
         {
@@ -117,61 +122,40 @@ function ActiveSnoopCard({
       ]}
     >
       <View style={styles.cardHeader}>
-        <Text style={[styles.cardTitle, { color: Colors[theme].text }]}>
-          {item.title}
-        </Text>
-        <View style={styles.statusBadge}>
-          <PulsingDot color={Colors[theme].success} />
-          <Text
-            style={{
-              color: Colors[theme].success,
-              fontSize: 11,
-              fontFamily: "FontBold",
-            }}
-          >
-            WATCHING
-          </Text>
-        </View>
-      </View>
-
-      <Text
-        style={[
-          styles.cardDescription,
-          { color: Colors[theme].text_secondary },
-        ]}
-        numberOfLines={2}
-      >
-        {item.condition}
-      </Text>
-
-      {newCount > 0 && (
         <View
           style={{
+            flex: 1,
             flexDirection: "row",
             alignItems: "center",
-            gap: 6,
-            marginBottom: 12,
+            gap: 10,
           }}
         >
-          <View
-            style={{
-              width: 6,
-              height: 6,
-              borderRadius: 3,
-              backgroundColor: Colors[theme].success,
-            }}
-          />
-          <Text
-            style={{
-              fontSize: 12,
-              fontFamily: "FontBold",
-              color: Colors[theme].success,
-            }}
-          >
-            {newCount} new {newCount === 1 ? "update" : "updates"}
+          <PulsingDot color={Colors[theme].success} />
+          <Text style={[styles.cardTitle, { color: Colors[theme].text }]}>
+            {item.title}
           </Text>
         </View>
-      )}
+        {newCount > 0 && (
+          <View
+            style={{
+              backgroundColor: Colors[theme].success + "20",
+              paddingHorizontal: 8,
+              paddingVertical: 3,
+              borderRadius: 10,
+            }}
+          >
+            <Text
+              style={{
+                color: Colors[theme].success,
+                fontSize: 11,
+                fontFamily: "FontBold",
+              }}
+            >
+              {newCount} new
+            </Text>
+          </View>
+        )}
+      </View>
 
       <View
         style={[styles.cardFooter, { borderTopColor: Colors[theme].border }]}
@@ -180,36 +164,28 @@ function ActiveSnoopCard({
           <Image
             source={require("@/assets/icons/clock.png")}
             style={{
-              width: 14,
-              height: 14,
+              width: 13,
+              height: 13,
               tintColor: Colors[theme].text_secondary,
-              marginRight: 6,
+              marginRight: 5,
             }}
           />
           <Text
             style={{
               color: Colors[theme].text_secondary,
               fontFamily: "FontMedium",
-              fontSize: 13,
+              fontSize: 12,
             }}
           >
-            Checked {formatTimeAgo(item.last_checked)}
+            {formatTimeAgo(item.last_checked)}
           </Text>
         </View>
-        <Pressable
-          onPress={() =>
-            router.push({
-              pathname: "/snoop/[id]",
-              params: { id: item._id },
-            })
-          }
-          style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
-        >
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
           <Text
             style={{
               color: Colors[theme].primary,
               fontFamily: "FontBold",
-              fontSize: 13,
+              fontSize: 12,
             }}
           >
             View Details
@@ -221,13 +197,13 @@ function ActiveSnoopCard({
                 height: 5,
                 borderRadius: 4,
                 backgroundColor: "#FF3B30",
-                marginBottom: 10,
+                marginBottom: 8,
               }}
             />
           )}
-        </Pressable>
+        </View>
       </View>
-    </View>
+    </Pressable>
   );
 }
 
@@ -237,10 +213,8 @@ export default function WatchlistScreen() {
 
   const { isLoading } = useConvexAuth();
   const { appLoading } = useLoadingContext();
-
   const { signedIn } = useUser();
 
-  // Fetch watchlist data from backend
   const watchlistData = useQuery(api.watchlist.get_watchlists) || [];
 
   const activeSnoops = watchlistData.filter((i) => i.status === "active");
@@ -361,7 +335,10 @@ export default function WatchlistScreen() {
         ) : (
           <>
             {/* Stats Section */}
-            <View style={styles.statsContainer}>
+            <Animated.View
+              entering={FadeInDown.delay(100).duration(400)}
+              style={styles.statsContainer}
+            >
               <View
                 style={[
                   styles.statCard,
@@ -425,28 +402,36 @@ export default function WatchlistScreen() {
                   Total Tracked
                 </Text>
               </View>
-            </View>
+            </Animated.View>
 
             {/* Active Snoops */}
-            <View style={styles.section}>
-              <Text
-                style={[styles.sectionTitle, { color: Colors[theme].text }]}
+            {activeSnoops.length > 0 && (
+              <Animated.View
+                entering={FadeInDown.delay(200).duration(400)}
+                style={styles.section}
               >
-                Active Snoops
-              </Text>
-              {activeSnoops.map((item) => (
-                <ActiveSnoopCard
-                  key={item._id}
-                  item={item as WatchlistItem}
-                  theme={theme}
-                  router={router}
-                />
-              ))}
-            </View>
+                <Text
+                  style={[styles.sectionTitle, { color: Colors[theme].text }]}
+                >
+                  Active Snoops
+                </Text>
+                {activeSnoops.map((item) => (
+                  <ActiveSnoopCard
+                    key={item._id}
+                    item={item as WatchlistItem}
+                    theme={theme}
+                    router={router}
+                  />
+                ))}
+              </Animated.View>
+            )}
 
             {/* Closed/Confirmed Snoops */}
             {closedSnoops.length > 0 && (
-              <View style={styles.section}>
+              <Animated.View
+                entering={FadeInDown.delay(300).duration(400)}
+                style={styles.section}
+              >
                 <Text
                   style={[styles.sectionTitle, { color: Colors[theme].text }]}
                 >
@@ -476,6 +461,7 @@ export default function WatchlistScreen() {
                           styles.cardTitle,
                           { color: Colors[theme].text },
                         ]}
+                        numberOfLines={1}
                       >
                         {item.title}
                       </Text>
@@ -483,10 +469,7 @@ export default function WatchlistScreen() {
                         style={[
                           styles.statusBadge,
                           {
-                            backgroundColor:
-                              item.status === "inactive"
-                                ? Colors[theme].border
-                                : Colors[theme].border,
+                            backgroundColor: Colors[theme].border,
                           },
                         ]}
                       >
@@ -501,19 +484,9 @@ export default function WatchlistScreen() {
                         </Text>
                       </View>
                     </View>
-
-                    <Text
-                      style={[
-                        styles.cardDescription,
-                        { color: Colors[theme].text_secondary },
-                      ]}
-                      numberOfLines={1}
-                    >
-                      {item.condition}
-                    </Text>
                   </Pressable>
                 ))}
-              </View>
+              </Animated.View>
             )}
           </>
         )}
@@ -578,44 +551,36 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   card: {
-    borderRadius: 20,
-    padding: 20,
+    borderRadius: 16,
+    padding: 16,
     borderWidth: 1,
-    marginBottom: 16,
+    marginBottom: 10,
   },
   cardHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 12,
+    alignItems: "center",
   },
   cardTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontFamily: "FontBold",
     flex: 1,
     marginRight: 10,
-    letterSpacing: -0.5,
+    letterSpacing: -0.3,
   },
   statusBadge: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(0,0,0,0.05)",
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
-  },
-  cardDescription: {
-    fontSize: 15,
-    fontFamily: "FontRegular",
-    marginBottom: 16,
-    lineHeight: 22,
   },
   cardFooter: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginTop: 5,
-    paddingTop: 15,
+    marginTop: 12,
+    paddingTop: 12,
     borderTopWidth: 1,
   },
 });
