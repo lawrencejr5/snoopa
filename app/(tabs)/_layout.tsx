@@ -18,7 +18,6 @@ export default function TabLayout() {
           elevation: 0,
           borderTopWidth: 0,
           backgroundColor: Colors[theme].background,
-          paddingTop: 4,
         },
         tabBarLabelStyle: {
           fontFamily: "FontMedium",
@@ -33,7 +32,7 @@ export default function TabLayout() {
           title: "Home",
           tabBarIcon: ({ focused }) => (
             <Image
-              source={require("../../assets/icons/ai-assistant.png")}
+              source={require("../../assets/icons/home.png")}
               style={{
                 height: 24,
                 width: 24,
@@ -52,7 +51,26 @@ export default function TabLayout() {
           title: "Watchlist",
           tabBarIcon: ({ focused }) => (
             <Image
-              source={require("../../assets/icons/eyes.png")}
+              source={require("../../assets/icons/watchlist.png")}
+              style={{
+                height: 22,
+                width: 22,
+                tintColor: focused
+                  ? Colors[theme].primary
+                  : Colors[theme].text_secondary,
+              }}
+              resizeMode="contain"
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: "Profile",
+          tabBarIcon: ({ focused }) => (
+            <Image
+              source={require("../../assets/icons/user.png")}
               style={{
                 height: 22,
                 width: 22,

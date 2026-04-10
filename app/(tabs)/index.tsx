@@ -7,6 +7,7 @@ import { useTheme } from "@/context/ThemeContext";
 import { useUser } from "@/context/UserContext";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
+import { Octicons } from "@expo/vector-icons";
 import { useConvexAuth, useQuery } from "convex/react";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
@@ -63,6 +64,18 @@ const PulsingDot = ({ color, size = 6 }: { color: string; size?: number }) => {
       ]}
     />
   );
+};
+
+const formatTimeAgo = (timestamp: number) => {
+  const now = Date.now();
+  const seconds = Math.floor((now - timestamp) / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+  if (days > 0) return `${days}d ago`;
+  if (hours > 0) return `${hours}h ago`;
+  if (minutes > 0) return `${minutes}m ago`;
+  return "Just now";
 };
 
 // ---------------------------------------------------------------------------
@@ -140,134 +153,6 @@ const TopicPill = ({
     </View>
   );
 };
-
-// ---------------------------------------------------------------------------
-// Briefing Card
-// ---------------------------------------------------------------------------
-function BriefingCard({
-  item,
-}: {
-  item: {
-    _id: Id<"watchlist">;
-    title: string;
-    condition: string;
-    status: string;
-    last_checked: number;
-  };
-}) {
-  const { theme } = useTheme();
-  const router = useRouter();
-
-  // Get the most recent log for this watchlist
-  const logs = useQuery(api.watchlist.get_watchlist_logs, {
-    watchlist_id: item._id,
-  });
-
-  const latestLog = logs && logs.length > 0 ? logs[0] : null;
-
-  const formatTime = (ts: number) => {
-    const now = Date.now();
-    const diff = Math.floor((now - ts) / 1000);
-    if (diff < 60) return "Just now";
-    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-    return `${Math.floor(diff / 86400)}d ago`;
-  };
-
-  return (
-    <Pressable
-      onPress={() =>
-        router.push({
-          pathname: "/snoop/[id]",
-          params: { id: item._id },
-        })
-      }
-      style={[
-        styles.briefingCard,
-        {
-          backgroundColor: Colors[theme].surface,
-          borderColor: Colors[theme].border,
-        },
-      ]}
-    >
-      {/* Top bar with icon and time */}
-      <View style={styles.briefingHeader}>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-          <PulsingDot color={Colors[theme].success} size={6} />
-          <Text
-            style={{
-              color: Colors[theme].text,
-              fontFamily: "FontBold",
-              fontSize: 14,
-              letterSpacing: -0.3,
-              flex: 1,
-            }}
-            numberOfLines={1}
-          >
-            {item.title}
-          </Text>
-        </View>
-        {latestLog && (
-          <Text
-            style={{
-              color: Colors[theme].text_secondary,
-              fontFamily: "FontMedium",
-              fontSize: 11,
-            }}
-          >
-            {formatTime(latestLog.timestamp)}
-          </Text>
-        )}
-      </View>
-
-      {/* Brief content */}
-      <Text
-        style={[
-          styles.briefingContent,
-          { color: Colors[theme].text_secondary },
-        ]}
-        numberOfLines={2}
-      >
-        {latestLog ? latestLog.action : "Awaiting first intel..."}
-      </Text>
-
-      {/* Verification indicator */}
-      {latestLog && (
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 5,
-            marginTop: 8,
-          }}
-        >
-          <View
-            style={{
-              width: 4,
-              height: 4,
-              borderRadius: 2,
-              backgroundColor: latestLog.verified
-                ? Colors[theme].success
-                : Colors[theme].warning,
-            }}
-          />
-          <Text
-            style={{
-              color: latestLog.verified
-                ? Colors[theme].success
-                : Colors[theme].warning,
-              fontFamily: "FontMedium",
-              fontSize: 10,
-              letterSpacing: 0.3,
-            }}
-          >
-            {latestLog.verified ? "VERIFIED" : "UNVERIFIED"}
-          </Text>
-        </View>
-      )}
-    </Pressable>
-  );
-}
 
 // ---------------------------------------------------------------------------
 // Active Snoop Card (compact version)
@@ -439,12 +324,21 @@ export default function HomeScreen() {
   const trendingTopics = useQuery(api.watchlist.get_trending_topics) || [];
   const unreadCount = useQuery(api.notifications.unread_count) ?? 0;
 
-  const activeSnoops = watchlistData.filter((i) => i.status === "active");
+  const activeSnoops = watchlistData
+    .filter((i) => i.status === "active")
+    .sort((a, b) => b.last_checked - a.last_checked); // Latest first
   const allSnoops = watchlistData;
+
+  const notifications = useQuery(api.notifications.get_notifications) || [];
+  const latestBriefings = notifications.slice(0, 3);
 
   if (isLoading || !signedIn || appLoading) return <Loading />;
 
-  const firstName = signedIn?.fullname?.split(" ")[0] || "Agent";
+  const currentDate = new Date().toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  });
 
   return (
     <Container>
@@ -456,44 +350,24 @@ export default function HomeScreen() {
               color: Colors[theme].text_secondary,
               fontFamily: "FontMedium",
               fontSize: 13,
-              marginBottom: 2,
+              marginBottom: 4,
             }}
           >
-            Welcome back,
+            {currentDate}
           </Text>
-          <Text style={[styles.headerTitle, { color: Colors[theme].text }]}>
-            {firstName}
+          <Text
+            style={[
+              styles.headerTitle,
+              { color: Colors[theme].text, fontSize: 32 },
+            ]}
+          >
+            SNOOPA
           </Text>
         </View>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 16 }}>
-          {activeSnoops.length > 0 && (
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                backgroundColor: Colors[theme].success + "15",
-                paddingHorizontal: 10,
-                paddingVertical: 5,
-                borderRadius: 20,
-                gap: 5,
-              }}
-            >
-              <PulsingDot color={Colors[theme].success} size={5} />
-              <Text
-                style={{
-                  color: Colors[theme].success,
-                  fontFamily: "FontBold",
-                  fontSize: 10,
-                  letterSpacing: 0.5,
-                }}
-              >
-                {activeSnoops.length} LIVE
-              </Text>
-            </View>
-          )}
           <Pressable
             onPress={() => router.push("/notifications" as any)}
-            style={{ position: "relative" }}
+            style={{ position: "relative", marginTop: 10 }}
           >
             <Image
               source={require("@/assets/icons/bells.png")}
@@ -526,10 +400,7 @@ export default function HomeScreen() {
       >
         {/* Trending Topics */}
         {trendingTopics.length > 0 && (
-          <Animated.View
-            entering={FadeInDown.delay(100).duration(500)}
-            style={styles.section}
-          >
+          <Animated.View entering={FadeInDown.delay(100).duration(500)}>
             <View style={styles.sectionHeader}>
               <Text
                 style={[
@@ -588,49 +459,122 @@ export default function HomeScreen() {
         )}
 
         {/* Briefing Section */}
-        {activeSnoops.length > 0 && (
+        {latestBriefings.length > 0 && (
           <Animated.View
             entering={FadeInDown.delay(200).duration(500)}
             style={styles.section}
           >
-            <View style={styles.sectionHeader}>
-              <Text
-                style={[
-                  styles.sectionLabel,
-                  { color: Colors[theme].text_secondary },
-                ]}
-              >
-                BRIEFING
-              </Text>
+            <View
+              style={[
+                styles.singleBriefingCard,
+                {
+                  backgroundColor: Colors[theme].surface,
+                  borderColor: Colors[theme].border,
+                },
+              ]}
+            >
               <View
                 style={{
                   flexDirection: "row",
                   alignItems: "center",
-                  gap: 4,
+                  gap: 8,
+                  marginBottom: 16,
                 }}
               >
-                <PulsingDot color={Colors[theme].success} size={4} />
+                <Octicons
+                  name="sparkle-fill"
+                  size={16}
+                  color={Colors[theme].text}
+                />
                 <Text
-                  style={{
-                    color: Colors[theme].success,
-                    fontFamily: "FontBold",
-                    fontSize: 10,
-                    letterSpacing: 0.5,
-                  }}
+                  style={[
+                    styles.sectionLabel,
+                    { color: Colors[theme].text, marginBottom: 0 },
+                  ]}
                 >
-                  LIVE
+                  Briefings
                 </Text>
               </View>
+
+              <View style={{ gap: 16 }}>
+                {latestBriefings.map((item) => (
+                  <Pressable
+                    key={item._id}
+                    onPress={() => {
+                      if (item.watchlist_id) {
+                        router.push({
+                          pathname: "/snoop/[id]",
+                          params: { id: item.watchlist_id },
+                        });
+                      }
+                    }}
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "flex-start",
+                      gap: 10,
+                    }}
+                  >
+                    <View
+                      style={{
+                        width: 4,
+                        height: 4,
+                        borderRadius: 2,
+                        backgroundColor: Colors[theme].text_secondary,
+                        marginTop: 8,
+                      }}
+                    />
+                    <View style={{ flex: 1 }}>
+                      <Text
+                        style={{
+                          color: Colors[theme].text,
+                          fontFamily: "FontBold",
+                          fontSize: 13,
+                          marginBottom: 4,
+                        }}
+                        numberOfLines={1}
+                      >
+                        {item.title}
+                      </Text>
+                      <Text
+                        style={{
+                          color: Colors[theme].text_secondary,
+                          fontFamily: "FontRegular",
+                          fontSize: 13,
+                          lineHeight: 18,
+                        }}
+                        numberOfLines={2}
+                      >
+                        {item.message}
+                      </Text>
+                    </View>
+                    <Text
+                      style={{
+                        color: Colors[theme].text_secondary,
+                        fontFamily: "FontMedium",
+                        fontSize: 11,
+                      }}
+                    >
+                      {formatTimeAgo(item._creationTime)}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+
+              <Pressable
+                onPress={() => router.push("/notifications" as any)}
+                style={{ alignSelf: "flex-end", marginTop: 16 }}
+              >
+                <Text
+                  style={{
+                    color: Colors[theme].primary,
+                    fontFamily: "FontBold",
+                    fontSize: 12,
+                  }}
+                >
+                  See more
+                </Text>
+              </Pressable>
             </View>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ gap: 12, paddingRight: 20 }}
-            >
-              {activeSnoops.slice(0, 5).map((item) => (
-                <BriefingCard key={item._id} item={item as any} />
-              ))}
-            </ScrollView>
           </Animated.View>
         )}
 
@@ -640,24 +584,43 @@ export default function HomeScreen() {
           style={styles.section}
         >
           <View style={styles.sectionHeader}>
-            <Text
-              style={[
-                styles.sectionLabel,
-                { color: Colors[theme].text_secondary },
-              ]}
+            <View
+              style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
             >
-              SNOOPS
-            </Text>
-            <Text
-              style={{
-                color: Colors[theme].text_secondary,
-                fontFamily: "FontMedium",
-                fontSize: 11,
-                opacity: 0.6,
-              }}
-            >
-              {allSnoops.length} total
-            </Text>
+              <Text
+                style={[
+                  styles.sectionLabel,
+                  { color: Colors[theme].text_secondary },
+                ]}
+              >
+                ACTIVE SNOOPS
+              </Text>
+            </View>
+            {activeSnoops.length > 0 && (
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  backgroundColor: Colors[theme].success + "15",
+                  paddingHorizontal: 8,
+                  paddingVertical: 3,
+                  borderRadius: 20,
+                  gap: 4,
+                }}
+              >
+                <PulsingDot color={Colors[theme].success} size={5} />
+                <Text
+                  style={{
+                    color: Colors[theme].success,
+                    fontFamily: "FontBold",
+                    fontSize: 10,
+                    letterSpacing: 0.5,
+                  }}
+                >
+                  {activeSnoops.length} LIVE
+                </Text>
+              </View>
+            )}
           </View>
 
           {allSnoops.length === 0 ? (
@@ -698,9 +661,23 @@ export default function HomeScreen() {
             </View>
           ) : (
             <View style={{ gap: 8 }}>
-              {allSnoops.map((item) => (
+              {activeSnoops.slice(0, 3).map((item) => (
                 <SnoopCard key={item._id} item={item as any} />
               ))}
+              <Pressable
+                onPress={() => router.push("/(tabs)/watchlist")}
+                style={{ alignSelf: "flex-end", marginTop: 8 }}
+              >
+                <Text
+                  style={{
+                    color: Colors[theme].primary,
+                    fontFamily: "FontBold",
+                    fontSize: 12,
+                  }}
+                >
+                  See more
+                </Text>
+              </Pressable>
             </View>
           )}
         </Animated.View>
@@ -745,7 +722,7 @@ const styles = StyleSheet.create({
     paddingVertical: 20,
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
+    alignItems: "flex-start",
   },
   headerTitle: {
     fontSize: 26,
@@ -753,7 +730,7 @@ const styles = StyleSheet.create({
     letterSpacing: -1,
   },
   section: {
-    marginBottom: 28,
+    marginTop: 28,
   },
   sectionHeader: {
     flexDirection: "row",
@@ -788,27 +765,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 5,
   },
-  briefingCard: {
-    width: 260,
-    padding: 16,
+  singleBriefingCard: {
+    padding: 18,
     borderRadius: 16,
     borderWidth: 1,
-  },
-  briefingHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 10,
-  },
-  briefingContent: {
-    fontFamily: "FontRegular",
-    fontSize: 13,
-    lineHeight: 19,
   },
   snoopCard: {
     borderRadius: 14,
     padding: 14,
     borderWidth: 1,
+    marginVertical: 5,
   },
   snoopCardRow: {
     flexDirection: "row",
