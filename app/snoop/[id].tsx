@@ -10,7 +10,8 @@ import { Octicons, SimpleLineIcons } from "@expo/vector-icons";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { BottomSheetModal, BottomSheetBackdrop, BottomSheetView } from "@gorhom/bottom-sheet";
 import {
   ActivityIndicator,
   Image,
@@ -115,102 +116,124 @@ function CommandsModal({
     },
   ];
 
-  return (
-    <Modal
-      animationType="fade"
-      transparent
-      visible={visible}
-      onRequestClose={onClose}
-    >
-      <Pressable style={cmdStyles.overlay} onPress={onClose}>
-        <Pressable
-          style={[
-            cmdStyles.sheet,
-            {
-              backgroundColor: Colors[theme].card,
-              borderColor: Colors[theme].border,
-            },
-          ]}
-          onPress={(e) => e.stopPropagation()}
-        >
-          {/* Header */}
-          <View style={cmdStyles.sheetHeader}>
-            <Text
-              style={{
-                color: Colors[theme].text_secondary,
-                fontFamily: "FontBold",
-                fontSize: 12,
-                letterSpacing: 1,
-              }}
-            >
-              OPTIONS
-            </Text>
-            <Pressable onPress={onClose}>
-              <Image
-                source={require("@/assets/icons/times.png")}
-                style={{
-                  width: 16,
-                  height: 16,
-                  tintColor: Colors[theme].text_secondary,
-                }}
-              />
-            </Pressable>
-          </View>
+  const bottomSheetRef = useRef<BottomSheetModal>(null);
 
-          {/* Option List */}
-          {options.map((o) => (
-            <Pressable
-              key={o.id}
-              onPress={() => {
-                o.action();
-                onClose();
+  useEffect(() => {
+    if (visible) {
+      bottomSheetRef.current?.present();
+    } else {
+      bottomSheetRef.current?.dismiss();
+    }
+  }, [visible]);
+
+  const handleSheetChanges = useCallback(
+    (index: number) => {
+      if (index === -1) {
+        onClose();
+      }
+    },
+    [onClose],
+  );
+
+  const renderBackdrop = useCallback(
+    (props: any) => (
+      <BottomSheetBackdrop
+        {...props}
+        disappearsOnIndex={-1}
+        appearsOnIndex={0}
+      />
+    ),
+    [],
+  );
+
+  return (
+    <BottomSheetModal
+      ref={bottomSheetRef}
+      snapPoints={["45%"]}
+      index={0}
+      onChange={handleSheetChanges}
+      backdropComponent={renderBackdrop}
+      backgroundStyle={{ backgroundColor: Colors[theme].card }}
+      handleIndicatorStyle={{ backgroundColor: Colors[theme].border }}
+    >
+      <BottomSheetView style={{ flex: 1, paddingHorizontal: 24, paddingVertical: 8 }}>
+        {/* Header */}
+        <View style={cmdStyles.sheetHeader}>
+          <Text
+            style={{
+              color: Colors[theme].text_secondary,
+              fontFamily: "FontBold",
+              fontSize: 12,
+              letterSpacing: 1,
+            }}
+          >
+            OPTIONS
+          </Text>
+          <Pressable onPress={() => bottomSheetRef.current?.dismiss()}>
+            <Image
+              source={require("@/assets/icons/times.png")}
+              style={{
+                width: 16,
+                height: 16,
+                tintColor: Colors[theme].text_secondary,
               }}
-              disabled={isProcessing}
-              style={[
-                cmdStyles.commandRow,
-                { borderBottomColor: Colors[theme].border },
-              ]}
+            />
+          </Pressable>
+        </View>
+
+        {/* Option List */}
+        {options.map((o) => (
+          <Pressable
+            key={o.id}
+            onPress={() => {
+              o.action();
+              bottomSheetRef.current?.dismiss();
+            }}
+            disabled={isProcessing}
+            style={[
+              cmdStyles.commandRow,
+              { borderBottomColor: Colors[theme].border },
+            ]}
+          >
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                flex: 1,
+                gap: 12,
+              }}
             >
-              <View
+              <Text
                 style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  flex: 1,
-                  gap: 12,
+                  color: o.color,
+                  fontFamily: "FontMedium",
+                  fontSize: 15,
                 }}
               >
-                <Text
-                  style={{
-                    color: o.color,
-                    fontFamily: "FontMedium",
-                    fontSize: 15,
-                  }}
-                >
-                  {o.label}
-                </Text>
-              </View>
-              <Image
-                source={
-                  o.icon === "play"
-                    ? require("@/assets/icons/play.png")
-                    : o.icon === "pause"
-                      ? require("@/assets/icons/pause.png")
-                      : o.icon === "document"
-                        ? require("@/assets/icons/document.png")
-                        : require("@/assets/icons/times.png")
-                }
-                style={{
-                  width: 16,
-                  height: 16,
-                  tintColor: o.color,
-                  opacity: 0.7,
-                }}
-              />
-            </Pressable>
-          ))}
-        </Pressable>
-      </Pressable>
-    </Modal>
+                {o.label}
+              </Text>
+            </View>
+            <Image
+              source={
+                o.icon === "play"
+                  ? require("@/assets/icons/play.png")
+                  : o.icon === "pause"
+                    ? require("@/assets/icons/pause.png")
+                    : o.icon === "document"
+                      ? require("@/assets/icons/document.png")
+                      : require("@/assets/icons/times.png")
+              }
+              style={{
+                width: 16,
+                height: 16,
+                tintColor: o.color,
+                opacity: 0.7,
+              }}
+            />
+          </Pressable>
+        ))}
+      </BottomSheetView>
+    </BottomSheetModal>
   );
 }
 
@@ -954,7 +977,7 @@ export default function SnoopDetailsScreen() {
                       {entry.type === "log"
                         ? "Log"
                         : entry.type === "user"
-                          ? "User"
+                          ? "You"
                           : "Snoopa"}
                     </Text>
                     <Text
@@ -1033,7 +1056,7 @@ export default function SnoopDetailsScreen() {
               >
                 <Text
                   style={{
-                    color: Colors[theme].warning,
+                    color: Colors[theme].text,
                     fontFamily: "FontBold",
                     fontSize: 12,
                   }}
