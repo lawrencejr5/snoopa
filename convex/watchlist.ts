@@ -157,6 +157,7 @@ export const add_watchlist_item = mutation({
       verified: true,
       seen: true,
       session_id: args.session_id,
+      type: "system",
     });
 
     return id;
@@ -223,6 +224,7 @@ export const toggle_watchlist_status = mutation({
       action: `Status changed to ${newStatus}`,
       verified: true,
       seen: true,
+      type: "system",
     });
   },
 });
@@ -255,6 +257,7 @@ export const deactivate_watchlist = mutation({
       action: "Tracking stopped (Inactive)",
       verified: true,
       seen: true,
+      type: "system",
     });
   },
 });
@@ -287,6 +290,7 @@ export const reactivate_watchlist = mutation({
       action: "Tracking resumed (Active)",
       verified: true,
       seen: true,
+      type: "system",
     });
   },
 });

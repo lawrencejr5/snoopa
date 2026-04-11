@@ -487,6 +487,137 @@ function EditModal({
 }
 
 // ---------------------------------------------------------------------------
+// Sources Sheet Modal
+// ---------------------------------------------------------------------------
+function SourcesSheet({
+  visible,
+  onClose,
+  sources,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  sources: any[];
+}) {
+  const { theme } = useTheme();
+  const bottomSheetRef = useRef<BottomSheetModal>(null);
+
+  useEffect(() => {
+    if (visible) {
+      bottomSheetRef.current?.present();
+    } else {
+      bottomSheetRef.current?.dismiss();
+    }
+  }, [visible]);
+
+  const handleSheetChanges = useCallback(
+    (index: number) => {
+      if (index === -1) {
+        onClose();
+      }
+    },
+    [onClose],
+  );
+
+  const renderBackdrop = useCallback(
+    (props: any) => (
+      <BottomSheetBackdrop {...props} disappearsOnIndex={-1} appearsOnIndex={0} />
+    ),
+    [],
+  );
+
+  return (
+    <BottomSheetModal
+      ref={bottomSheetRef}
+      snapPoints={["60%"]}
+      index={0}
+      onChange={handleSheetChanges}
+      backdropComponent={renderBackdrop}
+      backgroundStyle={{ backgroundColor: Colors[theme].card }}
+      handleIndicatorStyle={{ backgroundColor: Colors[theme].border }}
+    >
+      <BottomSheetView style={{ flex: 1, paddingHorizontal: 24, paddingVertical: 8 }}>
+        <View style={cmdStyles.sheetHeader}>
+          <Text
+            style={{
+              color: Colors[theme].text_secondary,
+              fontFamily: "FontBold",
+              fontSize: 12,
+              letterSpacing: 1,
+            }}
+          >
+            SOURCES
+          </Text>
+          <Pressable onPress={() => bottomSheetRef.current?.dismiss()}>
+            <Image
+              source={require("@/assets/icons/times.png")}
+              style={{
+                width: 16,
+                height: 16,
+                tintColor: Colors[theme].text_secondary,
+              }}
+            />
+          </Pressable>
+        </View>
+
+        <ScrollView showsVerticalScrollIndicator={false}>
+          {sources.map((s, idx) => (
+            <Pressable
+              key={idx}
+              onPress={async () => {
+                if (s.url) await WebBrowser.openAuthSessionAsync(s.url);
+              }}
+              style={{
+                paddingVertical: 14,
+                borderBottomWidth: 1,
+                borderBottomColor: Colors[theme].border,
+              }}
+            >
+              <Text
+                style={{
+                  color: Colors[theme].text,
+                  fontFamily: "FontMedium",
+                  fontSize: 14,
+                  marginBottom: 4,
+                }}
+              >
+                {s.action}
+              </Text>
+              {s.url && (
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                  <Octicons name="link" size={12} color={Colors[theme].primary} />
+                  <Text
+                    style={{
+                      color: Colors[theme].primary,
+                      fontFamily: "FontRegular",
+                      fontSize: 12,
+                    }}
+                    numberOfLines={1}
+                  >
+                    {new URL(s.url).hostname}
+                  </Text>
+                </View>
+              )}
+            </Pressable>
+          ))}
+          {sources.length === 0 && (
+            <Text
+              style={{
+                color: Colors[theme].text_secondary,
+                fontFamily: "FontMedium",
+                textAlign: "center",
+                marginTop: 20,
+              }}
+            >
+              No sources recorded.
+            </Text>
+          )}
+        </ScrollView>
+      </BottomSheetView>
+    </BottomSheetModal>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main Terminal Screen
 // ---------------------------------------------------------------------------
 export default function SnoopDetailsScreen() {
@@ -503,6 +634,8 @@ export default function SnoopDetailsScreen() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [sending, setSending] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
+  const [showSources, setShowSources] = useState(false);
+  const [selectedSources, setSelectedSources] = useState<any[]>([]);
 
   // Data
   const snoop = useQuery(
@@ -556,6 +689,7 @@ export default function SnoopDetailsScreen() {
     // Add logs
     if (logs) {
       for (const log of logs) {
+        if (log.type === "source") continue;
         entries.push({
           id: log._id,
           type: "log",
@@ -1037,6 +1171,49 @@ export default function SnoopDetailsScreen() {
                   ) : (
                     <View style={{ width: "100%" }}>
                       <FormatText>{entry.content}</FormatText>
+                      {logs &&
+                        logs.some(
+                          (l) => l.type === "source" && l.chat_id === entry.id,
+                        ) && (
+                          <Pressable
+                            onPress={() => {
+                              setSelectedSources(
+                                logs.filter(
+                                  (l) =>
+                                    l.type === "source" &&
+                                    l.chat_id === entry.id,
+                                ),
+                              );
+                              setShowSources(true);
+                            }}
+                            style={{
+                              marginTop: 12,
+                              flexDirection: "row",
+                              alignItems: "center",
+                              gap: 6,
+                              backgroundColor: Colors[theme].border,
+                              alignSelf: "flex-start",
+                              paddingHorizontal: 12,
+                              paddingVertical: 6,
+                              borderRadius: 8,
+                            }}
+                          >
+                            <Octicons
+                              name="link"
+                              size={12}
+                              color={Colors[theme].text}
+                            />
+                            <Text
+                              style={{
+                                color: Colors[theme].text,
+                                fontFamily: "FontMedium",
+                                fontSize: 13,
+                              }}
+                            >
+                              Sources
+                            </Text>
+                          </Pressable>
+                        )}
                     </View>
                   )}
                 </Animated.View>
@@ -1201,6 +1378,13 @@ export default function SnoopDetailsScreen() {
         currentCondition={snoop.condition}
         onSave={handleEdit}
         isProcessing={isProcessing}
+      />
+
+      {/* Sources Sheet */}
+      <SourcesSheet
+        visible={showSources}
+        onClose={() => setShowSources(false)}
+        sources={selectedSources}
       />
     </Container>
   );

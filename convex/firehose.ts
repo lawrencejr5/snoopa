@@ -380,11 +380,24 @@ export const run_firehose = internalAction({
 
       console.log(`Firehose: brief for "${item.title}" → "${brief}"`);
 
-      // Build log entries: individual headlines only (brief goes to notifications + chat)
+      // 1. Send the brief as a chat message if the watchlist has a linked session
+      let chatId: Id<"chats"> | undefined;
+      if (item.session_id) {
+        chatId = await ctx.runMutation(internal.chat.save_message, {
+          session_id: item.session_id,
+          role: "snoopa",
+          content: brief,
+          type: "snoop",
+        });
+      }
+
+      // 2. Build log entries: individual headlines as sources
       const logEntries: Array<{
         watchlist_id: (typeof activeItems)[0]["_id"];
         action: string;
         url?: string;
+        type: "source";
+        chat_id?: Id<"chats">;
       }> = [];
 
       for (const h of headlines) {
@@ -392,6 +405,8 @@ export const run_firehose = internalAction({
           watchlist_id: item._id,
           action: `${h.title}${h.source ? ` — ${h.source}` : ""}`,
           url: h.url,
+          type: "source",
+          chat_id: chatId,
         });
       }
 
@@ -401,7 +416,7 @@ export const run_firehose = internalAction({
       });
       totalAlerts += logEntries.length;
 
-      // Save notification with the brief
+      // 3. Save notification with the brief
       await ctx.runMutation(internal.notifications.save_notification, {
         user_id: item.user_id,
         title: item.title,
@@ -410,17 +425,7 @@ export const run_firehose = internalAction({
         watchlist_id: item._id,
       });
 
-      // Send the brief as a chat message if the watchlist has a linked session
-      if (item.session_id) {
-        await ctx.runMutation(internal.chat.save_message, {
-          session_id: item.session_id,
-          role: "snoopa",
-          content: brief,
-          type: "snoop",
-        });
-      }
-
-      // Push notification with randomized prefix
+      // 4. Push notification with randomized prefix
       const prefixes = [
         "New intel on",
         "Found something new regarding",
@@ -495,12 +500,25 @@ export const run_simulated_firehose = internalAction({
 
     console.log(`Simulated Firehose: triggering for "${item.title}"`);
 
+    // Send the brief as a chat message if the watchlist has a linked session
+    let chatId: Id<"chats"> | undefined;
+    if (item.session_id) {
+      chatId = await ctx.runMutation(internal.chat.save_message, {
+        session_id: item.session_id,
+        role: "snoopa",
+        content: args.briefing,
+        type: "snoop",
+      });
+    }
+
     // Build log entries
     const logEntries = [
       {
         watchlist_id: item._id,
         action: `${args.fake_headline.title}${args.fake_headline.source ? ` — ${args.fake_headline.source}` : ""}`,
         url: args.fake_headline.url,
+        type: "source" as const,
+        chat_id: chatId,
       },
     ];
 
@@ -517,16 +535,6 @@ export const run_simulated_firehose = internalAction({
       type: "alert",
       watchlist_id: item._id,
     });
-
-    // Send the brief as a chat message if the watchlist has a linked session
-    if (item.session_id) {
-      await ctx.runMutation(internal.chat.save_message, {
-        session_id: item.session_id,
-        role: "snoopa",
-        content: args.briefing,
-        type: "snoop",
-      });
-    }
 
     // Push notification with a prefix
     const pushTitle = `New intel on ${item.title}`;

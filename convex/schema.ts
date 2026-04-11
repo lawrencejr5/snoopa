@@ -79,6 +79,8 @@ const schema = defineSchema({
     seen: v.optional(v.boolean()),
     url: v.optional(v.string()),
     session_id: v.optional(v.id("sessions")),
+    type: v.optional(v.union(v.literal("system"), v.literal("source"))),
+    chat_id: v.optional(v.id("chats")),
   })
     .index("by_watchlist", ["watchlist_id"])
     .index("by_session", ["session_id"])

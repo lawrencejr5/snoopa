@@ -2,8 +2,7 @@ import Colors from "@/constants/Colors";
 import { useTheme } from "@/context/ThemeContext";
 import { useUser } from "@/context/UserContext";
 import { api } from "@/convex/_generated/api";
-import { Id } from "@/convex/_generated/dataModel";
-import { useAction, useMutation } from "convex/react";
+import { useAction } from "convex/react";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
@@ -107,10 +106,7 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
             New Snoop
           </Text>
           <Text
-            style={[
-              styles.subtitle,
-              { color: Colors[theme].text_secondary },
-            ]}
+            style={[styles.subtitle, { color: Colors[theme].text_secondary }]}
           >
             What do you want me to track?
           </Text>
@@ -138,10 +134,7 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
             <Pressable
               onPress={handleClose}
               disabled={isProcessing}
-              style={[
-                styles.cancelBtn,
-                { borderColor: Colors[theme].border },
-              ]}
+              style={[styles.cancelBtn, { borderColor: Colors[theme].border }]}
             >
               <Text
                 style={{
@@ -179,10 +172,10 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
                       fontSize: 14,
                     }}
                   >
-                    Snoop it
+                    Start tracking
                   </Text>
                   <Image
-                    source={require("@/assets/icons/send.png")}
+                    source={require("@/assets/icons/tracked.png")}
                     style={{
                       width: 14,
                       height: 14,
