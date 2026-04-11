@@ -487,6 +487,19 @@ function EditModal({
 }
 
 // ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+const getFaviconUrl = (url?: string) => {
+  if (!url) return null;
+  try {
+    const hostname = new URL(url).hostname;
+    return `https://www.google.com/s2/favicons?domain=${hostname}&sz=32`;
+  } catch {
+    return null;
+  }
+};
+
+// ---------------------------------------------------------------------------
 // Sources Sheet Modal
 // ---------------------------------------------------------------------------
 function SourcesSheet({
@@ -583,8 +596,21 @@ function SourcesSheet({
                 {s.action}
               </Text>
               {s.url && (
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-                  <Octicons name="link" size={12} color={Colors[theme].primary} />
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                  {getFaviconUrl(s.url) ? (
+                    <Image
+                      source={{ uri: getFaviconUrl(s.url)! }}
+                      style={{
+                        width: 14,
+                        height: 14,
+                        borderRadius: 7,
+                        borderWidth: 1,
+                        borderColor: Colors[theme].text,
+                      }}
+                    />
+                  ) : (
+                    <Octicons name="link" size={12} color={Colors[theme].primary} />
+                  )}
                   <Text
                     style={{
                       color: Colors[theme].primary,
@@ -1061,6 +1087,19 @@ export default function SnoopDetailsScreen() {
                 ? formatDateHeader(timeline[index - 1].timestamp)
                 : null;
             const showDateHeader = currentDateStr !== previousDateStr;
+            
+            const lgSources =
+              logs?.filter(
+                (l) => l.type === "source" && l.chat_id === entry.id,
+              ) || [];
+            const chSources =
+              chatSources
+                ?.filter((s) => s.chat_id === entry.id)
+                .map((s) => ({
+                  action: s.title,
+                  url: s.url,
+                })) || [];
+            const entrySources = [...lgSources, ...chSources];
 
             return (
               <React.Fragment key={entry.id}>
@@ -1175,28 +1214,10 @@ export default function SnoopDetailsScreen() {
                   ) : (
                     <View style={{ width: "100%" }}>
                       <FormatText>{entry.content}</FormatText>
-                      {((logs &&
-                        logs.some(
-                          (l) => l.type === "source" && l.chat_id === entry.id,
-                        )) ||
-                        (chatSources &&
-                          chatSources.some((s) => s.chat_id === entry.id))) && (
+                      {entrySources.length > 0 && (
                         <Pressable
                           onPress={() => {
-                            const lgSources =
-                              logs?.filter(
-                                (l) =>
-                                  l.type === "source" && l.chat_id === entry.id,
-                              ) || [];
-                            const chSources =
-                              chatSources
-                                ?.filter((s) => s.chat_id === entry.id)
-                                .map((s) => ({
-                                  action: s.title,
-                                  url: s.url,
-                                })) || [];
-
-                            setSelectedSources([...lgSources, ...chSources]);
+                            setSelectedSources(entrySources);
                             setShowSources(true);
                           }}
                           style={{
@@ -1211,16 +1232,32 @@ export default function SnoopDetailsScreen() {
                             borderRadius: 8,
                           }}
                         >
-                          <Octicons
-                            name="link"
-                            size={12}
-                            color={Colors[theme].text}
-                          />
+                          <View style={{ flexDirection: "row", alignItems: "center" }}>
+                            {entrySources.slice(0, 3).map((s, i) => {
+                              const fav = getFaviconUrl(s.url);
+                              return fav ? (
+                                <Image
+                                  key={i}
+                                  source={{ uri: fav }}
+                                  style={{
+                                    width: 14,
+                                    height: 14,
+                                    borderRadius: 7,
+                                    marginLeft: i > 0 ? -4 : 0,
+                                    borderWidth: 1,
+                                    borderColor: Colors[theme].text,
+                                    backgroundColor: Colors[theme].surface,
+                                  }}
+                                />
+                              ) : null;
+                            })}
+                          </View>
                           <Text
                             style={{
                               color: Colors[theme].text,
                               fontFamily: "FontMedium",
                               fontSize: 13,
+                              marginLeft: 4,
                             }}
                           >
                             Sources
