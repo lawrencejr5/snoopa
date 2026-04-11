@@ -1,7 +1,6 @@
 import Colors from "@/constants/Colors";
 import { useTheme } from "@/context/ThemeContext";
 import React, { ReactNode } from "react";
-import { StyleSheet } from "react-native";
 import Markdown from "react-native-markdown-display";
 
 const FormatText = ({ children }: { children: ReactNode }) => {
@@ -9,6 +8,10 @@ const FormatText = ({ children }: { children: ReactNode }) => {
   return (
     <Markdown
       style={{
+        paragraph: {
+          marginTop: 0,
+          marginBottom: 0,
+        },
         body: {
           color: Colors[theme].text,
           fontFamily: "FontRegular",
@@ -58,5 +61,3 @@ const FormatText = ({ children }: { children: ReactNode }) => {
 };
 
 export default FormatText;
-
-const styles = StyleSheet.create({});

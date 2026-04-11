@@ -10,7 +10,7 @@ import { Octicons, SimpleLineIcons } from "@expo/vector-icons";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
-import { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -568,10 +568,33 @@ export default function SnoopDetailsScreen() {
     return entries;
   }, [logs, chatMessages]);
 
+  // Format Date Header
+  const getOrdinalSuffix = (i: number) => {
+    const j = i % 10,
+      k = i % 100;
+    if (j == 1 && k != 11) return i + "st";
+    if (j == 2 && k != 12) return i + "nd";
+    if (j == 3 && k != 13) return i + "rd";
+    return i + "th";
+  };
+
+  const formatDateHeader = (ts: number) => {
+    const d = new Date(ts);
+    const dayName = d.toLocaleDateString("en-US", { weekday: "short" });
+    const day = d.getDate();
+    const month = d.toLocaleDateString("en-US", { month: "short" });
+    const year = d.getFullYear();
+    return `${dayName}, ${getOrdinalSuffix(day)} ${month} ${year}`;
+  };
+
   // Format timestamp for terminal
   const formatTerminalTime = (ts: number) => {
     const d = new Date(ts);
-    return `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
+    let hours = d.getHours();
+    const ampm = hours >= 12 ? "pm" : "am";
+    hours = hours % 12;
+    hours = hours ? hours : 12; // the hour '0' should be '12'
+    return `${hours}:${d.getMinutes().toString().padStart(2, "0")}${ampm}`;
   };
 
   // Handle send
@@ -870,135 +893,133 @@ export default function SnoopDetailsScreen() {
           showsVerticalScrollIndicator={false}
         >
           {/* Timeline entries */}
-          {timeline.map((entry, index) => (
-            <Animated.View
-              key={entry.id}
-              entering={FadeInDown.delay(Math.min(index * 30, 300)).duration(
-                300,
-              )}
-              style={styles.termEntry}
-            >
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  marginBottom: 6,
-                }}
-              >
-                <Text
-                  style={{
-                    color:
-                      entry.type === "log"
-                        ? Colors[theme].success
-                        : entry.type === "user"
-                          ? Colors[theme].primary
-                          : Colors[theme].warning,
-                    fontFamily: "FontBold",
-                    fontSize: 12,
-                  }}
-                >
-                  {entry.type === "log"
-                    ? "Log"
-                    : entry.type === "user"
-                      ? "User"
-                      : "Snoopa"}
-                </Text>
-                <Text
-                  style={{
-                    color: Colors[theme].text_secondary,
-                    fontFamily: "FontMedium",
-                    fontSize: 11,
-                    marginHorizontal: 6,
-                  }}
-                >
-                  |
-                </Text>
-                <Text
-                  style={[
-                    styles.termTime,
-                    { color: Colors[theme].text_secondary },
-                  ]}
-                >
-                  {formatTerminalTime(entry.timestamp)}
-                </Text>
-                <Octicons
-                  name="chevron-right"
-                  size={10}
-                  color={Colors[theme].text_secondary}
-                  style={{ marginHorizontal: 6 }}
-                />
-              </View>
+          {timeline.map((entry, index) => {
+            const currentDateStr = formatDateHeader(entry.timestamp);
+            const previousDateStr =
+              index > 0
+                ? formatDateHeader(timeline[index - 1].timestamp)
+                : null;
+            const showDateHeader = currentDateStr !== previousDateStr;
 
-              {entry.type === "log" ? (
-                <Pressable
-                  onPress={async () => {
-                    if (entry.url)
-                      await WebBrowser.openAuthSessionAsync(entry.url);
-                  }}
-                  style={{ width: "100%" }}
-                >
-                  <FormatText>{entry.content}</FormatText>
-                  {entry.verified !== undefined && (
-                    <View
+            return (
+              <React.Fragment key={entry.id}>
+                {showDateHeader && (
+                  <View style={{ marginVertical: 16, alignItems: "center" }}>
+                    <Text
                       style={{
-                        flexDirection: "row",
-                        alignItems: "center",
-                        gap: 4,
-                        marginTop: 4,
-                        width: "100%",
+                        fontFamily: "FontMedium",
+                        fontSize: 12,
+                        color: Colors[theme].text_secondary,
                       }}
                     >
-                      <View
-                        style={{
-                          width: 4,
-                          height: 4,
-                          borderRadius: 2,
-                          backgroundColor: entry.verified
+                      {currentDateStr}
+                    </Text>
+                  </View>
+                )}
+                {index > 0 && !showDateHeader && (
+                  <View
+                    style={{
+                      height: 1,
+                      backgroundColor: Colors[theme].border,
+                      borderStyle: "dashed",
+                      marginVertical: 12,
+                    }}
+                  />
+                )}
+                <Animated.View
+                  entering={FadeInDown.delay(
+                    Math.min(index * 30, 300),
+                  ).duration(300)}
+                  style={styles.termEntry}
+                >
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      marginBottom: 6,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color:
+                          entry.type === "log"
                             ? Colors[theme].success
-                            : Colors[theme].warning,
-                        }}
-                      />
+                            : entry.type === "user"
+                              ? Colors[theme].warning
+                              : "#fff",
+                        fontFamily: "FontBold",
+                        fontSize: 15,
+                      }}
+                    >
+                      {entry.type === "log"
+                        ? "Log"
+                        : entry.type === "user"
+                          ? "User"
+                          : "Snoopa"}
+                    </Text>
+                    <Text
+                      style={{
+                        color: Colors[theme].text_secondary,
+                        fontFamily: "FontMedium",
+                        fontSize: 11,
+                        marginHorizontal: 6,
+                      }}
+                    >
+                      |
+                    </Text>
+                    <Text
+                      style={[
+                        styles.termTime,
+                        { color: Colors[theme].text_secondary },
+                      ]}
+                    >
+                      {formatTerminalTime(entry.timestamp)}
+                    </Text>
+                    <Octicons
+                      name="chevron-right"
+                      size={10}
+                      color={Colors[theme].text_secondary}
+                      style={{ marginHorizontal: 6 }}
+                    />
+                  </View>
+
+                  {entry.type === "log" ? (
+                    <Pressable
+                      onPress={async () => {
+                        if (entry.url)
+                          await WebBrowser.openAuthSessionAsync(entry.url);
+                      }}
+                      style={{ width: "100%" }}
+                    >
                       <Text
-                        style={{
-                          color: entry.verified
-                            ? Colors[theme].success
-                            : Colors[theme].warning,
-                          fontFamily: "FontMedium",
-                          fontSize: 10,
-                        }}
+                        style={[
+                          styles.termContent,
+                          { color: Colors[theme].lightgreen },
+                        ]}
                       >
-                        {entry.verified ? "verified" : "unverified"}
+                        {entry.content}
                       </Text>
-                      {entry.url && (
-                        <Text
-                          style={{
-                            color: Colors[theme].primary,
-                            fontFamily: "FontMedium",
-                            fontSize: 10,
-                          }}
-                        >
-                          {" "}
-                          · tap to open
-                        </Text>
-                      )}
+                    </Pressable>
+                  ) : entry.type === "user" ? (
+                    <View style={{ width: "100%" }}>
+                      <Text
+                        style={[
+                          styles.termContent,
+                          { color: Colors[theme].milk },
+                        ]}
+                      >
+                        {entry.content}
+                      </Text>
+                    </View>
+                  ) : (
+                    <View style={{ width: "100%" }}>
+                      <FormatText>{entry.content}</FormatText>
                     </View>
                   )}
-                </Pressable>
-              ) : entry.type === "user" ? (
-                <View style={{ width: "100%" }}>
-                  <Text
-                    style={[styles.termContent, { color: Colors[theme].text }]}
-                  >
-                    {entry.content}
-                  </Text>
-                </View>
-              ) : (
-                <View style={{ width: "100%" }}>
-                  <FormatText>{entry.content}</FormatText>
-                </View>
-              )}
-            </Animated.View>
-          ))}
+                </Animated.View>
+              </React.Fragment>
+            );
+          })}
 
           {/* Sending indicator */}
           {sending && (
@@ -1068,7 +1089,7 @@ export default function SnoopDetailsScreen() {
 
       {/* Terminal Input */}
       {snoop.session_id && (
-        <KeyboardStickyView offset={{ opened: 0, closed: 0 }}>
+        <KeyboardStickyView offset={{ opened: 10, closed: 0 }}>
           <View
             style={[
               styles.inputBar,
