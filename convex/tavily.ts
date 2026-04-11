@@ -89,12 +89,19 @@ export const search = internalAction({
     });
 
     // Reducing search result tokens
-    return searchResult.results
+    const leanNews = searchResult.results
       .map(
         (r: any, i: number) =>
           `SOURCE [${i + 1}]: ${r.title}\nContent: ${r.content}\nURL: ${r.url}`,
       )
       .join("\n\n");
+
+    const sources = searchResult.results.map((r: any) => ({
+      title: r.title,
+      url: r.url,
+    }));
+
+    return { leanNews, sources };
   },
 });
 

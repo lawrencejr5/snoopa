@@ -120,6 +120,64 @@ export const save_message = internalMutation({
   },
 });
 
+/**
+ * Get sources for all chats in a session
+ */
+export const get_session_sources = query({
+  args: { session_id: v.id("sessions") },
+  handler: async (ctx, args) => {
+    const user_id = await getAuthUserId(ctx);
+    if (!user_id) return [];
+
+    const session = await ctx.db.get(args.session_id);
+    if (!session || session.user_id !== user_id) {
+      throw new Error("Session not found or unauthorized");
+    }
+
+    const chats = await ctx.db
+      .query("chats")
+      .withIndex("by_session", (q) => q.eq("session_id", args.session_id))
+      .collect();
+
+    const sources = [];
+    for (const chat of chats) {
+      const chatSources = await ctx.db
+        .query("sources")
+        .withIndex("by_chat", (q) => q.eq("chat_id", chat._id))
+        .collect();
+      sources.push(...chatSources);
+    }
+
+    return sources;
+  },
+});
+
+/**
+ * Batch insert sources map to a single chat identity.
+ */
+export const batch_insert_sources = internalMutation({
+  args: {
+    entries: v.array(
+      v.object({
+        chat_id: v.id("chats"),
+        title: v.string(),
+        url: v.optional(v.string()),
+      }),
+    ),
+  },
+  handler: async (ctx, args) => {
+    await Promise.all(
+      args.entries.map((e) =>
+        ctx.db.insert("sources", {
+          chat_id: e.chat_id,
+          title: e.title,
+          url: e.url,
+        }),
+      ),
+    );
+  },
+});
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -275,11 +333,15 @@ export const send_message = action({
     // 6. Conditionally fetch search results from Tavily (only for SEARCH intent)
     const needsSearch = intent === "SEARCH";
     let leanNews = "";
+    let capturedSources: Array<{ title: string; url: string }> = [];
+
     if (needsSearch) {
-      leanNews = await ctx.runAction(internal.tavily.search, {
+      const searchResult = await ctx.runAction(internal.tavily.search, {
         query: args.content,
         history: mappedHistory,
       });
+      leanNews = searchResult.leanNews;
+      capturedSources = searchResult.sources;
     }
 
     // 7. For WATCHLIST intent, fetch recent canonical topics for context
@@ -445,12 +507,23 @@ export const send_message = action({
     }
 
     // 9. Save AI response
-    await ctx.runMutation(internal.chat.save_message, {
+    const chatMsgId = await ctx.runMutation(internal.chat.save_message, {
       session_id: currentSessionId,
       role: "snoopa",
       content: response_text,
       type: intent.toLowerCase() as "watchlist" | "search" | "chat",
     });
+
+    if (capturedSources.length > 0) {
+      const sourceEntries = capturedSources.map((s) => ({
+        chat_id: chatMsgId,
+        title: s.title,
+        url: s.url,
+      }));
+      await ctx.runMutation(internal.chat.batch_insert_sources, {
+        entries: sourceEntries,
+      });
+    }
 
     // 10. Generate session title with Gemini if this is a new session
     if (isNewSession) {

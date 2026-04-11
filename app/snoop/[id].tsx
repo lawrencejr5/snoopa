@@ -650,6 +650,10 @@ export default function SnoopDetailsScreen() {
     api.chat.get_messages,
     snoop?.session_id ? { session_id: snoop.session_id } : "skip",
   );
+  const chatSources = useQuery(
+    api.chat.get_session_sources,
+    snoop?.session_id ? { session_id: snoop.session_id } : "skip",
+  );
 
   // Mutations
   const deactivateWatchlist = useMutation(api.watchlist.deactivate_watchlist);
@@ -1171,49 +1175,58 @@ export default function SnoopDetailsScreen() {
                   ) : (
                     <View style={{ width: "100%" }}>
                       <FormatText>{entry.content}</FormatText>
-                      {logs &&
+                      {((logs &&
                         logs.some(
                           (l) => l.type === "source" && l.chat_id === entry.id,
-                        ) && (
-                          <Pressable
-                            onPress={() => {
-                              setSelectedSources(
-                                logs.filter(
-                                  (l) =>
-                                    l.type === "source" &&
-                                    l.chat_id === entry.id,
-                                ),
-                              );
-                              setShowSources(true);
-                            }}
+                        )) ||
+                        (chatSources &&
+                          chatSources.some((s) => s.chat_id === entry.id))) && (
+                        <Pressable
+                          onPress={() => {
+                            const lgSources =
+                              logs?.filter(
+                                (l) =>
+                                  l.type === "source" && l.chat_id === entry.id,
+                              ) || [];
+                            const chSources =
+                              chatSources
+                                ?.filter((s) => s.chat_id === entry.id)
+                                .map((s) => ({
+                                  action: s.title,
+                                  url: s.url,
+                                })) || [];
+
+                            setSelectedSources([...lgSources, ...chSources]);
+                            setShowSources(true);
+                          }}
+                          style={{
+                            marginTop: 12,
+                            flexDirection: "row",
+                            alignItems: "center",
+                            gap: 6,
+                            backgroundColor: Colors[theme].border,
+                            alignSelf: "flex-start",
+                            paddingHorizontal: 12,
+                            paddingVertical: 6,
+                            borderRadius: 8,
+                          }}
+                        >
+                          <Octicons
+                            name="link"
+                            size={12}
+                            color={Colors[theme].text}
+                          />
+                          <Text
                             style={{
-                              marginTop: 12,
-                              flexDirection: "row",
-                              alignItems: "center",
-                              gap: 6,
-                              backgroundColor: Colors[theme].border,
-                              alignSelf: "flex-start",
-                              paddingHorizontal: 12,
-                              paddingVertical: 6,
-                              borderRadius: 8,
+                              color: Colors[theme].text,
+                              fontFamily: "FontMedium",
+                              fontSize: 13,
                             }}
                           >
-                            <Octicons
-                              name="link"
-                              size={12}
-                              color={Colors[theme].text}
-                            />
-                            <Text
-                              style={{
-                                color: Colors[theme].text,
-                                fontFamily: "FontMedium",
-                                fontSize: 13,
-                              }}
-                            >
-                              Sources
-                            </Text>
-                          </Pressable>
-                        )}
+                            Sources
+                          </Text>
+                        </Pressable>
+                      )}
                     </View>
                   )}
                 </Animated.View>

@@ -42,8 +42,6 @@ interface TavilySearchResult {
   publishedDate?: string;
 }
 
-
-
 // ---------------------------------------------------------------------------
 // Gemini verification
 // ---------------------------------------------------------------------------
@@ -102,11 +100,7 @@ async function generateBrief(
     .join("\n");
 
   const prompt = `You are Snoopa, a sharp AI intelligence agent. Given these verified news headlines about "${watchlistTitle}" (tracking condition: "${condition}"), write a 1-2 sentence casual briefing that captures the key takeaway.
-    Sound natural, like you're briefing a friend. Examples:
-    - "Heads up — Dangote's refinery just cracked 650k barrels/day. IPO chatter is heating up."
-    - "Militão is finally back in training, touched the ball today for the first time since November."
-    - "Bitcoin slipped below $82k overnight. Might want to keep an eye on it."
-
+    Sound natural, like you're briefing a friend. Be a bit detailed if you need to be.
     Headlines:
     ${headlineList}
 
@@ -262,10 +256,10 @@ export const run_firehose = internalAction({
     // Fetch headlines for each unique query config in parallel
     const headlineArrays = await Promise.all(
       tavilyQueries.map((tq) =>
-        ctx.runAction(internal.tavily.firehose_search, { 
-          query: tq.topic, 
-          searchType: tq.searchType, 
-          timeRange: tq.timeRange 
+        ctx.runAction(internal.tavily.firehose_search, {
+          query: tq.topic,
+          searchType: tq.searchType,
+          timeRange: tq.timeRange,
         }),
       ),
     );
