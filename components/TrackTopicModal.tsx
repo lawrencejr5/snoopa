@@ -22,10 +22,11 @@ import {
 
 interface Props {
   visible: boolean;
+  topic: string;
   onClose: () => void;
 }
 
-export default function AddWatchlistModal({ visible, onClose }: Props) {
+export default function TrackTopicModal({ visible, topic, onClose }: Props) {
   const { theme } = useTheme();
   const router = useRouter();
   const { signedIn } = useUser();
@@ -36,20 +37,19 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
   const [isFocused, setIsFocused] = useState(false);
 
   // Dynamic snap points depending on keyboard focus
-  const snapPoints = useMemo(() => ["50%", "85%"], []);
+  const snapPoints = useMemo(() => ["60%", "85%"], []);
 
-  // Directly initialize native watchlist instead of parsing text client-side
   const initializeWatchlist = useAction(api.chat.initialize_watchlist);
 
   // Sync visibility with modal state
   useEffect(() => {
-    if (visible) {
+    if (visible && topic) {
       bottomSheetRef.current?.snapToIndex(0);
     } else {
       bottomSheetRef.current?.snapToIndex(-1);
       setPrompt("");
     }
-  }, [visible]);
+  }, [visible, topic]);
 
   const handleSheetChanges = useCallback(
     (index: number) => {
@@ -81,22 +81,24 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
     setIsProcessing(true);
 
     try {
+      // Combine topic context with user prompt
+      const fullPrompt = `Topic: ${topic}. User Request: ${prompt.trim()}`;
+
       const result = await initializeWatchlist({
-        prompt: prompt.trim(),
+        prompt: fullPrompt,
       });
 
       if (result?.watchlist_id) {
         setPrompt("");
         onClose();
 
-        // Navigate instantly to inherently instantiated dashboard mapping
         router.push({
           pathname: "/snoop/[id]",
           params: { id: result.watchlist_id },
         });
       }
     } catch (error) {
-      console.error("Failed to create watchlist:", error);
+      console.error("Failed to create watchlist from topic:", error);
     } finally {
       setIsProcessing(false);
     }
@@ -134,7 +136,7 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
               letterSpacing: 1,
             }}
           >
-            NEW SNOOP
+            TRACK TOPIC
           </Text>
           <Pressable onPress={handleClose} disabled={isProcessing}>
             <Image
@@ -148,7 +150,7 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
           </Pressable>
         </View>
 
-        {/* Content Centered Stack analogous to earlier design */}
+        {/* Content Centered Stack */}
         <View style={{ alignItems: "center", marginTop: 10 }}>
           <View
             style={[
@@ -165,10 +167,13 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
               }}
             />
           </View>
+          <Text style={[styles.topicTitle, { color: Colors[theme].text }]}>
+            {topic}
+          </Text>
           <Text
             style={[styles.subtitle, { color: Colors[theme].text_secondary }]}
           >
-            What do you want me to track?
+            What exactly do you want to track on this topic?
           </Text>
         </View>
 
@@ -186,8 +191,8 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
               bottomSheetRef.current?.snapToIndex(0);
             }}
             multiline
-            maxLength={500}
-            placeholder='e.g. "Let me know when Eder Militão returns to training"'
+            maxLength={300}
+            placeholder={`e.g. "Notify me when ${topic} news leaks"`}
             placeholderTextColor={Colors[theme].text_secondary + "80"}
             editable={!isProcessing}
             style={[
@@ -199,18 +204,6 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
               },
             ]}
           />
-          <Text
-            style={{
-              alignSelf: "flex-end",
-              fontSize: 11,
-              fontFamily: "FontMedium",
-              color: Colors[theme].text_secondary + "80",
-              marginBottom: 14,
-              marginRight: 4,
-            }}
-          >
-            {prompt.length}/500
-          </Text>
         </View>
 
         {/* Actions */}
@@ -256,7 +249,7 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
                     fontSize: 14,
                   }}
                 >
-                  Start tracking
+                  Confirm Tracking
                 </Text>
                 <Image
                   source={require("@/assets/icons/tracked.png")}
@@ -291,6 +284,13 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginBottom: 12,
   },
+  topicTitle: {
+    fontSize: 20,
+    fontFamily: "FontBold",
+    textAlign: "center",
+    marginBottom: 4,
+    letterSpacing: -0.5,
+  },
   subtitle: {
     fontSize: 13,
     fontFamily: "FontRegular",
@@ -306,7 +306,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     minHeight: 100,
     textAlignVertical: "top",
-    marginBottom: 10,
+    marginBottom: 20,
   },
   actions: {
     flexDirection: "row",
@@ -321,7 +321,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   proceedBtn: {
-    flex: 1.5,
+    flex: 1.8,
     paddingVertical: 13,
     borderRadius: 12,
     flexDirection: "row",

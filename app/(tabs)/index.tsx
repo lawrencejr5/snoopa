@@ -1,6 +1,7 @@
 import AddWatchlistModal from "@/components/AddWatchlistModal";
 import Container from "@/components/Container";
 import Loading from "@/components/Loading";
+import TrackTopicModal from "@/components/TrackTopicModal";
 import Colors from "@/constants/Colors";
 import { useLoadingContext } from "@/context/LoadingContext";
 import { useTheme } from "@/context/ThemeContext";
@@ -318,6 +319,8 @@ export default function HomeScreen() {
   const { signedIn } = useUser();
 
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showTrackModal, setShowTrackModal] = useState(false);
+  const [selectedTopic, setSelectedTopic] = useState("");
 
   // Data queries
   const watchlistData = useQuery(api.watchlist.get_watchlists) || [];
@@ -442,6 +445,9 @@ export default function HomeScreen() {
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={{ gap: 10, paddingRight: 20 }}
+              snapToInterval={260} // pill width (250) + gap (10)
+              decelerationRate="fast"
+              snapToAlignment="start"
             >
               {trendingTopics.map((t) => (
                 <TopicPill
@@ -449,8 +455,8 @@ export default function HomeScreen() {
                   topic={t.topic}
                   trackerCount={t.tracker_count}
                   onTrack={() => {
-                    // Pre-fill the modal with the topic
-                    setShowAddModal(true);
+                    setSelectedTopic(t.topic);
+                    setShowTrackModal(true);
                   }}
                 />
               ))}
@@ -705,10 +711,16 @@ export default function HomeScreen() {
         </Text>
       </Pressable>
 
-      {/* Add Watchlist Modal */}
+      {/* Modals */}
       <AddWatchlistModal
         visible={showAddModal}
         onClose={() => setShowAddModal(false)}
+      />
+
+      <TrackTopicModal
+        visible={showTrackModal}
+        topic={selectedTopic}
+        onClose={() => setShowTrackModal(false)}
       />
     </Container>
   );
@@ -751,7 +763,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 14,
     borderWidth: 1,
-    minWidth: 160,
+    width: 250,
     gap: 12,
   },
   topicName: {
