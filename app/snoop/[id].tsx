@@ -280,93 +280,95 @@ function RenameModal({
       onRequestClose={onClose}
     >
       <Pressable style={cmdStyles.overlay} onPress={onClose}>
-        <Pressable
-          style={[
-            cmdStyles.renameCard,
-            {
-              backgroundColor: Colors[theme].card,
-              borderColor: Colors[theme].border,
-            },
-          ]}
-          onPress={(e) => e.stopPropagation()}
-        >
-          <Text
-            style={{
-              color: Colors[theme].text,
-              fontFamily: "FontBold",
-              fontSize: 18,
-              marginBottom: 16,
-            }}
-          >
-            Rename Watchlist
-          </Text>
-          <TextInput
-            value={title}
-            onChangeText={setTitle}
-            style={{
-              color: Colors[theme].text,
-              backgroundColor: Colors[theme].surface,
-              borderColor: Colors[theme].border,
-              borderWidth: 1,
-              borderRadius: 12,
-              padding: 12,
-              fontFamily: "FontRegular",
-              fontSize: 15,
-              marginBottom: 16,
-            }}
-            autoFocus
-          />
-          <View style={{ flexDirection: "row", gap: 10 }}>
-            <Pressable
-              onPress={onClose}
-              style={{
-                flex: 1,
-                paddingVertical: 12,
-                borderRadius: 10,
-                borderWidth: 1,
+        <KeyboardStickyView offset={{ opened: 10, closed: 0 }}>
+          <Pressable
+            style={[
+              cmdStyles.renameCard,
+              {
+                backgroundColor: Colors[theme].card,
                 borderColor: Colors[theme].border,
-                alignItems: "center",
+              },
+            ]}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <Text
+              style={{
+                color: Colors[theme].text,
+                fontFamily: "FontBold",
+                fontSize: 18,
+                marginBottom: 16,
               }}
             >
-              <Text
+              Rename Watchlist
+            </Text>
+            <TextInput
+              value={title}
+              onChangeText={setTitle}
+              style={{
+                color: Colors[theme].text,
+                backgroundColor: Colors[theme].surface,
+                borderColor: Colors[theme].border,
+                borderWidth: 1,
+                borderRadius: 12,
+                padding: 12,
+                fontFamily: "FontRegular",
+                fontSize: 15,
+                marginBottom: 16,
+              }}
+              autoFocus
+            />
+            <View style={{ flexDirection: "row", gap: 10 }}>
+              <Pressable
+                onPress={onClose}
                 style={{
-                  color: Colors[theme].text_secondary,
-                  fontFamily: "FontMedium",
+                  flex: 1,
+                  paddingVertical: 12,
+                  borderRadius: 10,
+                  borderWidth: 1,
+                  borderColor: Colors[theme].border,
+                  alignItems: "center",
                 }}
               >
-                Cancel
-              </Text>
-            </Pressable>
-            <Pressable
-              onPress={() => onSave(title.trim())}
-              disabled={!title.trim() || isProcessing}
-              style={{
-                flex: 1.5,
-                paddingVertical: 12,
-                borderRadius: 10,
-                backgroundColor: Colors[theme].primary,
-                alignItems: "center",
-                opacity: !title.trim() ? 0.5 : 1,
-              }}
-            >
-              {isProcessing ? (
-                <ActivityIndicator
-                  size="small"
-                  color={Colors[theme].background}
-                />
-              ) : (
                 <Text
                   style={{
-                    color: Colors[theme].background,
-                    fontFamily: "FontBold",
+                    color: Colors[theme].text_secondary,
+                    fontFamily: "FontMedium",
                   }}
                 >
-                  Save
+                  Cancel
                 </Text>
-              )}
-            </Pressable>
-          </View>
-        </Pressable>
+              </Pressable>
+              <Pressable
+                onPress={() => onSave(title.trim())}
+                disabled={!title.trim() || isProcessing}
+                style={{
+                  flex: 1.5,
+                  paddingVertical: 12,
+                  borderRadius: 10,
+                  backgroundColor: Colors[theme].primary,
+                  alignItems: "center",
+                  opacity: !title.trim() ? 0.5 : 1,
+                }}
+              >
+                {isProcessing ? (
+                  <ActivityIndicator
+                    size="small"
+                    color={Colors[theme].background}
+                  />
+                ) : (
+                  <Text
+                    style={{
+                      color: Colors[theme].background,
+                      fontFamily: "FontBold",
+                    }}
+                  >
+                    Save
+                  </Text>
+                )}
+              </Pressable>
+            </View>
+          </Pressable>
+        </KeyboardStickyView>
       </Pressable>
     </Modal>
   );
@@ -403,96 +405,98 @@ function EditModal({
       onRequestClose={onClose}
     >
       <Pressable style={cmdStyles.overlay} onPress={onClose}>
-        <Pressable
-          style={[
-            cmdStyles.renameCard,
-            {
-              backgroundColor: Colors[theme].card,
-              borderColor: Colors[theme].border,
-            },
-          ]}
-          onPress={(e) => e.stopPropagation()}
-        >
-          <Text
-            style={{
-              color: Colors[theme].text,
-              fontFamily: "FontBold",
-              fontSize: 18,
-              marginBottom: 16,
-            }}
-          >
-            Edit Condition
-          </Text>
-          <TextInput
-            multiline
-            value={condition}
-            onChangeText={setCondition}
-            style={{
-              color: Colors[theme].text,
-              backgroundColor: Colors[theme].surface,
-              borderColor: Colors[theme].border,
-              borderWidth: 1,
-              borderRadius: 12,
-              padding: 12,
-              fontFamily: "FontRegular",
-              fontSize: 14,
-              marginBottom: 16,
-              minHeight: 80,
-              textAlignVertical: "top",
-            }}
-            autoFocus
-          />
-          <View style={{ flexDirection: "row", gap: 10 }}>
-            <Pressable
-              onPress={onClose}
-              style={{
-                flex: 1,
-                paddingVertical: 12,
-                borderRadius: 10,
-                borderWidth: 1,
+        <KeyboardStickyView offset={{ opened: 10, closed: 0 }}>
+          <Pressable
+            style={[
+              cmdStyles.renameCard,
+              {
+                backgroundColor: Colors[theme].card,
                 borderColor: Colors[theme].border,
-                alignItems: "center",
+              },
+            ]}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <Text
+              style={{
+                color: Colors[theme].text,
+                fontFamily: "FontBold",
+                fontSize: 18,
+                marginBottom: 16,
               }}
             >
-              <Text
+              Edit Condition
+            </Text>
+            <TextInput
+              multiline
+              value={condition}
+              onChangeText={setCondition}
+              style={{
+                color: Colors[theme].text,
+                backgroundColor: Colors[theme].surface,
+                borderColor: Colors[theme].border,
+                borderWidth: 1,
+                borderRadius: 12,
+                padding: 12,
+                fontFamily: "FontRegular",
+                fontSize: 14,
+                marginBottom: 16,
+                minHeight: 80,
+                textAlignVertical: "top",
+              }}
+              autoFocus
+            />
+            <View style={{ flexDirection: "row", gap: 10 }}>
+              <Pressable
+                onPress={onClose}
                 style={{
-                  color: Colors[theme].text_secondary,
-                  fontFamily: "FontMedium",
+                  flex: 1,
+                  paddingVertical: 12,
+                  borderRadius: 10,
+                  borderWidth: 1,
+                  borderColor: Colors[theme].border,
+                  alignItems: "center",
                 }}
               >
-                Cancel
-              </Text>
-            </Pressable>
-            <Pressable
-              onPress={() => onSave(condition.trim())}
-              disabled={!condition.trim() || isProcessing}
-              style={{
-                flex: 1.5,
-                paddingVertical: 12,
-                borderRadius: 10,
-                backgroundColor: Colors[theme].primary,
-                alignItems: "center",
-                opacity: !condition.trim() ? 0.5 : 1,
-              }}
-            >
-              {isProcessing ? (
-                <ActivityIndicator
-                  size="small"
-                  color={Colors[theme].background}
-                />
-              ) : (
                 <Text
                   style={{
-                    color: Colors[theme].background,
-                    fontFamily: "FontBold",
+                    color: Colors[theme].text_secondary,
+                    fontFamily: "FontMedium",
                   }}
                 >
-                  Save
+                  Cancel
                 </Text>
-              )}
-            </Pressable>
-          </View>
-        </Pressable>
+              </Pressable>
+              <Pressable
+                onPress={() => onSave(condition.trim())}
+                disabled={!condition.trim() || isProcessing}
+                style={{
+                  flex: 1.5,
+                  paddingVertical: 12,
+                  borderRadius: 10,
+                  backgroundColor: Colors[theme].primary,
+                  alignItems: "center",
+                  opacity: !condition.trim() ? 0.5 : 1,
+                }}
+              >
+                {isProcessing ? (
+                  <ActivityIndicator
+                    size="small"
+                    color={Colors[theme].background}
+                  />
+                ) : (
+                  <Text
+                    style={{
+                      color: Colors[theme].background,
+                      fontFamily: "FontBold",
+                    }}
+                  >
+                    Save
+                  </Text>
+                )}
+              </Pressable>
+            </View>
+          </Pressable>
+        </KeyboardStickyView>
       </Pressable>
     </Modal>
   );
@@ -1383,16 +1387,17 @@ export default function SnoopDetailsScreen() {
           <TextInput
             value={input}
             onChangeText={setInput}
-            placeholder="Type a message..."
+            placeholder="Talk to me boss..."
             placeholderTextColor={Colors[theme].text_secondary + "60"}
             editable={!sending}
+            maxLength={300}
             style={{
               flex: 1,
               color: Colors[theme].text,
               fontFamily: "FontMedium",
               fontSize: 14,
               paddingVertical: 0,
-              paddingLeft: 10,
+              paddingHorizontal: 10,
             }}
             onSubmitEditing={handleSend}
             returnKeyType="send"
@@ -1410,8 +1415,8 @@ export default function SnoopDetailsScreen() {
             <Image
               source={require("@/assets/icons/arrow-up.png")}
               style={{
-                width: 14,
-                height: 14,
+                width: 15,
+                height: 15,
                 tintColor: Colors[theme].background,
               }}
             />

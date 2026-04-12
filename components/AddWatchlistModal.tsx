@@ -174,30 +174,45 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
         </View>
 
         {/* Prompt Input */}
-        <TextInput
-          value={prompt}
-          onChangeText={setPrompt}
-          onFocus={() => {
-            setIsFocused(true);
-            bottomSheetRef.current?.snapToIndex(1);
-          }}
-          onBlur={() => {
-            setIsFocused(false);
-            bottomSheetRef.current?.snapToIndex(0);
-          }}
-          multiline
-          placeholder='e.g. "Let me know when Eder Militão returns to training"'
-          placeholderTextColor={Colors[theme].text_secondary + "80"}
-          editable={!isProcessing}
-          style={[
-            styles.input,
-            {
-              color: Colors[theme].text,
-              backgroundColor: Colors[theme].surface,
-              borderColor: Colors[theme].border,
-            },
-          ]}
-        />
+        <View style={{ width: "100%" }}>
+          <TextInput
+            value={prompt}
+            onChangeText={setPrompt}
+            onFocus={() => {
+              setIsFocused(true);
+              bottomSheetRef.current?.snapToIndex(1);
+            }}
+            onBlur={() => {
+              setIsFocused(false);
+              bottomSheetRef.current?.snapToIndex(0);
+            }}
+            multiline
+            maxLength={500}
+            placeholder='e.g. "Let me know when Eder Militão returns to training"'
+            placeholderTextColor={Colors[theme].text_secondary + "80"}
+            editable={!isProcessing}
+            style={[
+              styles.input,
+              {
+                color: Colors[theme].text,
+                backgroundColor: Colors[theme].surface,
+                borderColor: Colors[theme].border,
+              },
+            ]}
+          />
+          <Text
+            style={{
+              alignSelf: "flex-end",
+              fontSize: 11,
+              fontFamily: "FontMedium",
+              color: Colors[theme].text_secondary + "80",
+              marginBottom: 14,
+              marginRight: 4,
+            }}
+          >
+            {prompt.length}/500
+          </Text>
+        </View>
 
         {/* Actions */}
         <View style={styles.actions}>
@@ -292,7 +307,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     minHeight: 100,
     textAlignVertical: "top",
-    marginBottom: 24,
+    marginBottom: 10,
   },
   actions: {
     flexDirection: "row",
