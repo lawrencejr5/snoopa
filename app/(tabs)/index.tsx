@@ -9,6 +9,7 @@ import { useUser } from "@/context/UserContext";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { Octicons } from "@expo/vector-icons";
+import { useIsFocused } from "@react-navigation/native";
 import { useConvexAuth, useQuery } from "convex/react";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
@@ -317,6 +318,7 @@ export default function HomeScreen() {
   const { isLoading } = useConvexAuth();
   const { appLoading } = useLoadingContext();
   const { signedIn } = useUser();
+  const isFocused = useIsFocused();
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [showTrackModal, setShowTrackModal] = useState(false);
@@ -403,7 +405,10 @@ export default function HomeScreen() {
       >
         {/* Trending Topics */}
         {trendingTopics.length > 0 && (
-          <Animated.View entering={FadeInDown.delay(100).duration(500)}>
+          <Animated.View
+            key={`trending-${isFocused}`}
+            entering={FadeInDown.delay(100).duration(500)}
+          >
             <View style={styles.sectionHeader}>
               <Text
                 style={[
@@ -466,6 +471,7 @@ export default function HomeScreen() {
 
         {/* Briefing Section */}
         <Animated.View
+          key={`briefing-${isFocused}`}
           entering={FadeInDown.delay(200).duration(500)}
           style={styles.section}
         >
@@ -600,6 +606,7 @@ export default function HomeScreen() {
 
         {/* Active Snoops List */}
         <Animated.View
+          key={`active-snoops-${isFocused}`}
           entering={FadeInDown.delay(300).duration(500)}
           style={styles.section}
         >

@@ -8,6 +8,7 @@ import { useUser } from "@/context/UserContext";
 import { api } from "@/convex/_generated/api";
 import { registerForPushNotificationsAsync } from "@/utils/reg_push_notifications";
 import { useAuthActions } from "@convex-dev/auth/react";
+import { useIsFocused } from "@react-navigation/native";
 import { useConvexAuth, useMutation } from "convex/react";
 import { useRouter } from "expo-router";
 import { useState } from "react";
@@ -21,6 +22,7 @@ import {
   Text,
   View,
 } from "react-native";
+import Animated, { FadeInDown } from "react-native-reanimated";
 
 export default function ProfileScreen() {
   const { theme, toggleTheme } = useTheme();
@@ -106,23 +108,31 @@ export default function ProfileScreen() {
     }
   };
 
+  const isFocused = useIsFocused();
+
   if (isLoading || !signedIn || appLoading) return <Loading />;
 
   return (
     <Container>
       {/* Header */}
-      <View style={styles.header}>
+      <Animated.View
+        key={`profile-header-${isFocused}`}
+        entering={FadeInDown.duration(400)}
+        style={styles.header}
+      >
         <Text style={[styles.headerTitle, { color: Colors[theme].text }]}>
           Profile
         </Text>
-      </View>
+      </Animated.View>
 
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 50 }}
       >
         {/* User Card */}
-        <View
+        <Animated.View
+          key={`profile-user-${isFocused}`}
+          entering={FadeInDown.delay(100).duration(400)}
           style={[
             styles.userCard,
             {
@@ -159,10 +169,12 @@ export default function ProfileScreen() {
               {signedIn?.plan} Plan
             </Text>
           </View>
-        </View>
+        </Animated.View>
 
         {/* Upgrade Card */}
-        <View
+        <Animated.View
+          key={`profile-upgrade-${isFocused}`}
+          entering={FadeInDown.delay(200).duration(400)}
           style={[
             styles.upgradeCard,
             {
@@ -202,10 +214,14 @@ export default function ProfileScreen() {
               Upgrade to Pro
             </Text>
           </Pressable>
-        </View>
+        </Animated.View>
 
         {/* Settings List */}
-        <View style={styles.menuContainer}>
+        <Animated.View
+          key={`profile-menu-${isFocused}`}
+          entering={FadeInDown.delay(300).duration(400)}
+          style={styles.menuContainer}
+        >
           {menuItems.map((item, index) => (
             <Pressable
               key={index}
@@ -278,7 +294,7 @@ export default function ProfileScreen() {
               </Text>
             </View>
           </Pressable>
-        </View>
+        </Animated.View>
       </ScrollView>
 
       {/* Theme Modal */}
