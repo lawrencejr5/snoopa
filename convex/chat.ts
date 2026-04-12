@@ -34,7 +34,9 @@ export const get_messages = query({
 
       const watchlistChats = await ctx.db
         .query("chats")
-        .withIndex("by_watchlist", (q) => q.eq("watchlist_id", args.watchlist_id!))
+        .withIndex("by_watchlist", (q) =>
+          q.eq("watchlist_id", args.watchlist_id!),
+        )
         .order("asc")
         .collect();
 
@@ -118,7 +120,9 @@ export const mark_chats_seen = mutation({
 
       const unseenWl = await ctx.db
         .query("chats")
-        .withIndex("by_watchlist", (q) => q.eq("watchlist_id", args.watchlist_id!))
+        .withIndex("by_watchlist", (q) =>
+          q.eq("watchlist_id", args.watchlist_id!),
+        )
         .filter((q) =>
           q.and(q.eq(q.field("role"), "snoopa"), q.eq(q.field("seen"), false)),
         )
@@ -132,7 +136,10 @@ export const mark_chats_seen = mutation({
             q.eq("session_id", watchlist.session_id!),
           )
           .filter((q) =>
-            q.and(q.eq(q.field("role"), "snoopa"), q.eq(q.field("seen"), false)),
+            q.and(
+              q.eq(q.field("role"), "snoopa"),
+              q.eq(q.field("seen"), false),
+            ),
           )
           .collect();
       }
@@ -386,7 +393,7 @@ export const send_message = action({
 
     // 3. Append current message and apply context window truncation
     messages.push({ role: "user", content: args.content });
-    
+
     if (messages.length > 6) {
       const head = messages.slice(0, 2);
       const tail = messages.slice(-4);
@@ -490,36 +497,10 @@ export const send_message = action({
     if (intent === "SEARCH") {
       instructions += `\n\nYou are being provided with web search results. Always cite your sources when giving news or factual information. Please be very minimal, dont be too detailed, try to go straight to the point`;
     } else if (intent === "WATCHLIST") {
-      const topicsContext =
-        recentTopics.length > 0
-          ? `\n\n Existing canonical topics in the system (use these to group similar items, or create a new one if no match):\n        ${recentTopics.map((t) => `"${t}"`).join(", ")}`
-          : "";
-
-      instructions += `\n\nThe user wants to add something to their watchlist. Extract the watchlist item details and respond with EXACTLY this format:
-
-        <Your friendly confirmation message here, 1-2 sentences acknowledging what you're tracking for them>
-        ---WATCHLIST_DATA---
-        {"title": "<concise title, max 8 words>", "keywords": ["<keyword1>", "<keyword2>", "<keyword3>"], "condition": "<clear, specific condition or rule that defines when this watchlist item should trigger an alert>", "canonical_topic": "<2-4 word topic label that best describes the watchlist for easy searching.>", "tier": <1-4>, "search_type": "<general or news>", "time_range": "<day or any_time>"}
-
-        Rules:
-        - The title should be clear and specific (e.g. "Bitcoin Price Movement", "iPhone 16 Pro Deals")
-        - The keywords array should contain 3-6 targeted search terms relevant to tracking this item
-        - The condition should be a precise, actionable rule (e.g. "Alert when Bitcoin price drops below $80,000" or "Notify when a new iPhone 16 Pro deal appears under $900")
-        - The canonical_topic must be a short 2-4 word label, most likely the first keyword. Please avoid canonical topics that are too broad, generate canonical topics that when searched would bring out results for that watchlist in the first 10 results. Reuse an existing topic if it fits, otherwise create a new one.${topicsContext}
-        - The tier is a priority level (1-4) that determines how frequently Snoopa checks for updates:
-          * Tier 1 (Critical/Real-time): 4x/day — volatile prices (crypto, forex), breaking news, live events, scores
-          * Tier 2 (High): 2x/day — stock movements, trending topics, fast-moving situations
-          * Tier 3 (Standard): 1x/day — product deals, upcoming releases, general tracking
-          * Tier 4 (Low): 1x/3 days — long-term monitoring, legislative changes, slow-moving topics
-        - Assign the tier based on how time-sensitive or volatile the topic is. When in doubt, default to tier 3.
-        - search_type determines which search endpoint Snoopa uses:
-          * "general": best for prices, product listings, deals, stats, or topics where info is updated on existing pages (e.g. iPhone price on BackMarket, stock prices)
-          * "news": best for breaking events, announcements, developments, or topics that generate new articles (e.g. crypto news, political events)
-        - time_range determines the time window for search results:
-          * "day": last 24 hours — use for breaking/time-critical topics, news, events
-          * "any_time": no time filter — use for prices, deals, or slow-moving info that lives on static/updated pages
-        - The confirmation message should be in Snoopa's voice — sharp, proactive, and cool
-        - Do NOT include markdown formatting in the response`;
+      instructions += `
+        \n\nThe user wants to track something new, but they are currently inside an existing snoop (watchlist).
+        DIRECTIVE: Tell the user that since they are already in a specific snoop, if they want to track something entirely separate, they should create a new snoop from the home dashboard. We keep each snoop focused on one primary goal. 
+        Response should be short, friendly, and direct. Do NOT use the ---WATCHLIST_DATA--- format.`;
     } else {
       instructions += `\n\nBe conversational and friendly for general chat, but incredibly minimal and straight to the point. Avoid long explanations.`;
     }
@@ -658,13 +639,18 @@ export const initialize_watchlist = action({
   returns: v.object({
     watchlist_id: v.optional(v.id("watchlist")),
   }),
-  handler: async (ctx, args): Promise<{ watchlist_id: Id<"watchlist"> | undefined }> => {
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{ watchlist_id: Id<"watchlist"> | undefined }> => {
     const user_id = await getAuthUserId(ctx);
     if (!user_id) throw new Error("Not authenticated");
 
     const userRecord = await ctx.runQuery(api.users.get_current_user);
     const username = userRecord?.username || "Boss";
-    const recentTopics = await ctx.runQuery(api.watchlist.get_recent_canonical_topics);
+    const recentTopics = await ctx.runQuery(
+      api.watchlist.get_recent_canonical_topics,
+    );
 
     const topicsContext =
       recentTopics.length > 0

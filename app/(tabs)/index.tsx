@@ -465,45 +465,45 @@ export default function HomeScreen() {
         )}
 
         {/* Briefing Section */}
-        {latestBriefings.length > 0 && (
-          <Animated.View
-            entering={FadeInDown.delay(200).duration(500)}
-            style={styles.section}
+        <Animated.View
+          entering={FadeInDown.delay(200).duration(500)}
+          style={styles.section}
+        >
+          <View
+            style={[
+              styles.singleBriefingCard,
+              {
+                backgroundColor: Colors[theme].surface,
+                borderColor: Colors[theme].border,
+              },
+            ]}
           >
             <View
-              style={[
-                styles.singleBriefingCard,
-                {
-                  backgroundColor: Colors[theme].surface,
-                  borderColor: Colors[theme].border,
-                },
-              ]}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 8,
+                marginBottom: 16,
+              }}
             >
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: 8,
-                  marginBottom: 16,
-                }}
+              <Octicons
+                name="sparkle-fill"
+                size={16}
+                color={Colors[theme].text}
+              />
+              <Text
+                style={[
+                  styles.sectionLabel,
+                  { color: Colors[theme].text, marginBottom: 0 },
+                ]}
               >
-                <Octicons
-                  name="sparkle-fill"
-                  size={16}
-                  color={Colors[theme].text}
-                />
-                <Text
-                  style={[
-                    styles.sectionLabel,
-                    { color: Colors[theme].text, marginBottom: 0 },
-                  ]}
-                >
-                  Briefings
-                </Text>
-              </View>
+                Briefings
+              </Text>
+            </View>
 
-              <View style={{ gap: 16 }}>
-                {latestBriefings.map((item) => (
+            <View style={{ gap: 16 }}>
+              {latestBriefings.length > 0 ? (
+                latestBriefings.map((item) => (
                   <Pressable
                     key={item._id}
                     onPress={() => {
@@ -563,9 +563,23 @@ export default function HomeScreen() {
                       {formatTimeAgo(item._creationTime)}
                     </Text>
                   </Pressable>
-                ))}
-              </View>
+                ))
+              ) : (
+                <View style={{ paddingVertical: 10 }}>
+                  <Text
+                    style={{
+                      color: Colors[theme].text_secondary,
+                      fontFamily: "FontRegular",
+                      fontSize: 13,
+                    }}
+                  >
+                    There are no briefings for you for now
+                  </Text>
+                </View>
+              )}
+            </View>
 
+            {latestBriefings.length > 0 && (
               <Pressable
                 onPress={() => router.push("/notifications" as any)}
                 style={{ alignSelf: "flex-end", marginTop: 16 }}
@@ -580,9 +594,9 @@ export default function HomeScreen() {
                   See more
                 </Text>
               </Pressable>
-            </View>
-          </Animated.View>
-        )}
+            )}
+          </View>
+        </Animated.View>
 
         {/* Active Snoops List */}
         <Animated.View
@@ -800,7 +814,7 @@ const styles = StyleSheet.create({
   emptyState: {
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 60,
+    paddingVertical: 0,
   },
   fab: {
     position: "absolute",
