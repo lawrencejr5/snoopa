@@ -7,7 +7,6 @@
     "icon": "./assets/images/icon.png",
     "scheme": "com.lawrencejr.snoopa",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "splash": {
       "image": "./assets/images/splash-icon.png",
       "resizeMode": "contain",
@@ -23,11 +22,9 @@
         "backgroundColor": "#121212"
       },
       "googleServicesFile": "./google-services.json",
-      "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.lawrencejr.snoopa",
-      "softwareKeyboardLayoutMode": "resize",
-      "launchMode": "singleTask"
+      "softwareKeyboardLayoutMode": "resize"
     },
     "web": {
       "bundler": "metro",
@@ -37,7 +34,14 @@
     "plugins": [
       "expo-router",
       "expo-secure-store",
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/notification-icon.png",
+          "color": "#EBEBDF"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
