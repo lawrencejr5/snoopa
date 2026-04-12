@@ -7,11 +7,21 @@ import { useUser } from "@/context/UserContext";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { Octicons, SimpleLineIcons } from "@expo/vector-icons";
+import {
+  BottomSheetBackdrop,
+  BottomSheetModal,
+  BottomSheetView,
+} from "@gorhom/bottom-sheet";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
-import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
-import { BottomSheetModal, BottomSheetBackdrop, BottomSheetView } from "@gorhom/bottom-sheet";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   ActivityIndicator,
   Image,
@@ -156,7 +166,9 @@ function CommandsModal({
       backgroundStyle={{ backgroundColor: Colors[theme].card }}
       handleIndicatorStyle={{ backgroundColor: Colors[theme].border }}
     >
-      <BottomSheetView style={{ flex: 1, paddingHorizontal: 24, paddingVertical: 8 }}>
+      <BottomSheetView
+        style={{ flex: 1, paddingHorizontal: 24, paddingVertical: 8 }}
+      >
         {/* Header */}
         <View style={cmdStyles.sheetHeader}>
           <Text
@@ -533,7 +545,11 @@ function SourcesSheet({
 
   const renderBackdrop = useCallback(
     (props: any) => (
-      <BottomSheetBackdrop {...props} disappearsOnIndex={-1} appearsOnIndex={0} />
+      <BottomSheetBackdrop
+        {...props}
+        disappearsOnIndex={-1}
+        appearsOnIndex={0}
+      />
     ),
     [],
   );
@@ -548,7 +564,9 @@ function SourcesSheet({
       backgroundStyle={{ backgroundColor: Colors[theme].card }}
       handleIndicatorStyle={{ backgroundColor: Colors[theme].border }}
     >
-      <BottomSheetView style={{ flex: 1, paddingHorizontal: 24, paddingVertical: 8 }}>
+      <BottomSheetView
+        style={{ flex: 1, paddingHorizontal: 24, paddingVertical: 8 }}
+      >
         <View style={cmdStyles.sheetHeader}>
           <Text
             style={{
@@ -596,7 +614,9 @@ function SourcesSheet({
                 {s.action}
               </Text>
               {s.url && (
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                <View
+                  style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
+                >
                   {getFaviconUrl(s.url) ? (
                     <Image
                       source={{ uri: getFaviconUrl(s.url)! }}
@@ -609,7 +629,11 @@ function SourcesSheet({
                       }}
                     />
                   ) : (
-                    <Octicons name="link" size={12} color={Colors[theme].primary} />
+                    <Octicons
+                      name="link"
+                      size={12}
+                      color={Colors[theme].primary}
+                    />
                   )}
                   <Text
                     style={{
@@ -674,11 +698,11 @@ export default function SnoopDetailsScreen() {
   );
   const chatMessages = useQuery(
     api.chat.get_messages,
-    snoop?.session_id ? { session_id: snoop.session_id } : "skip",
+    id ? { watchlist_id: id as Id<"watchlist"> } : "skip",
   );
   const chatSources = useQuery(
     api.chat.get_session_sources,
-    snoop?.session_id ? { session_id: snoop.session_id } : "skip",
+    id ? { watchlist_id: id as Id<"watchlist"> } : "skip",
   );
 
   // Mutations
@@ -694,11 +718,9 @@ export default function SnoopDetailsScreen() {
   useEffect(() => {
     if (id) {
       markLogsSeen({ watchlist_id: id as Id<"watchlist"> }).catch(() => {});
+      markChatsSeen({ watchlist_id: id as Id<"watchlist"> }).catch(() => {});
     }
-    if (snoop?.session_id) {
-      markChatsSeen({ session_id: snoop.session_id }).catch(() => {});
-    }
-  }, [id, snoop?.session_id]);
+  }, [id]);
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -786,14 +808,14 @@ export default function SnoopDetailsScreen() {
 
   // Handle send
   const handleSend = async () => {
-    if (!input.trim() || sending || !snoop?.session_id) return;
+    if (!input.trim() || sending || !id) return;
     const content = input.trim();
     setInput("");
     setSending(true);
 
     try {
       await sendMessage({
-        session_id: snoop.session_id,
+        watchlist_id: id as Id<"watchlist">,
         content,
       });
     } catch (e) {
@@ -1087,15 +1109,15 @@ export default function SnoopDetailsScreen() {
                 ? formatDateHeader(timeline[index - 1].timestamp)
                 : null;
             const showDateHeader = currentDateStr !== previousDateStr;
-            
+
             const lgSources =
               logs?.filter(
-                (l) => l.type === "source" && l.chat_id === entry.id,
+                (l: any) => l.type === "source" && l.chat_id === entry.id,
               ) || [];
             const chSources =
               chatSources
-                ?.filter((s) => s.chat_id === entry.id)
-                .map((s) => ({
+                ?.filter((s: any) => s.chat_id === entry.id)
+                .map((s: any) => ({
                   action: s.title,
                   url: s.url,
                 })) || [];
@@ -1232,7 +1254,12 @@ export default function SnoopDetailsScreen() {
                             borderRadius: 8,
                           }}
                         >
-                          <View style={{ flexDirection: "row", alignItems: "center" }}>
+                          <View
+                            style={{
+                              flexDirection: "row",
+                              alignItems: "center",
+                            }}
+                          >
                             {entrySources.slice(0, 3).map((s, i) => {
                               const fav = getFaviconUrl(s.url);
                               return fav ? (
@@ -1338,61 +1365,59 @@ export default function SnoopDetailsScreen() {
       </View>
 
       {/* Terminal Input */}
-      {snoop.session_id && (
-        <KeyboardStickyView offset={{ opened: 10, closed: 0 }}>
-          <View
-            style={[
-              styles.inputBar,
-              {
-                backgroundColor: Colors[theme].card,
-                borderColor: Colors[theme].border,
-              },
-            ]}
+      <KeyboardStickyView offset={{ opened: 10, closed: 0 }}>
+        <View
+          style={[
+            styles.inputBar,
+            {
+              backgroundColor: Colors[theme].card,
+              borderColor: Colors[theme].border,
+            },
+          ]}
+        >
+          <Octicons
+            name="command-palette"
+            size={18}
+            color={Colors[theme].text_secondary}
+          />
+          <TextInput
+            value={input}
+            onChangeText={setInput}
+            placeholder="Type a message..."
+            placeholderTextColor={Colors[theme].text_secondary + "60"}
+            editable={!sending}
+            style={{
+              flex: 1,
+              color: Colors[theme].text,
+              fontFamily: "FontMedium",
+              fontSize: 14,
+              paddingVertical: 0,
+              paddingLeft: 10,
+            }}
+            onSubmitEditing={handleSend}
+            returnKeyType="send"
+          />
+          <Pressable
+            onPress={handleSend}
+            disabled={sending || !input.trim()}
+            style={{
+              padding: 6,
+              backgroundColor: Colors[theme].primary,
+              borderRadius: 8,
+              opacity: input.trim() && !sending ? 1 : 0.3,
+            }}
           >
-            <Octicons
-              name="command-palette"
-              size={18}
-              color={Colors[theme].text_secondary}
-            />
-            <TextInput
-              value={input}
-              onChangeText={setInput}
-              placeholder="Type a message..."
-              placeholderTextColor={Colors[theme].text_secondary + "60"}
-              editable={!sending}
+            <Image
+              source={require("@/assets/icons/arrow-up.png")}
               style={{
-                flex: 1,
-                color: Colors[theme].text,
-                fontFamily: "FontMedium",
-                fontSize: 14,
-                paddingVertical: 0,
-                paddingLeft: 10,
+                width: 14,
+                height: 14,
+                tintColor: Colors[theme].background,
               }}
-              onSubmitEditing={handleSend}
-              returnKeyType="send"
             />
-            <Pressable
-              onPress={handleSend}
-              disabled={sending || !input.trim()}
-              style={{
-                padding: 6,
-                backgroundColor: Colors[theme].primary,
-                borderRadius: 8,
-                opacity: input.trim() && !sending ? 1 : 0.3,
-              }}
-            >
-              <Image
-                source={require("@/assets/icons/arrow-up.png")}
-                style={{
-                  width: 14,
-                  height: 14,
-                  tintColor: Colors[theme].background,
-                }}
-              />
-            </Pressable>
-          </View>
-        </KeyboardStickyView>
-      )}
+          </Pressable>
+        </View>
+      </KeyboardStickyView>
 
       {/* Commands Modal */}
       <CommandsModal

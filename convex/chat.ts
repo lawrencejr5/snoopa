@@ -4,77 +4,148 @@ import { v } from "convex/values";
 import OpenAI from "openai";
 import { api, internal } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
-import { action, internalMutation, mutation, query } from "./_generated/server";
+import {
+  action,
+  internalMutation,
+  internalQuery,
+  mutation,
+  query,
+} from "./_generated/server";
 
 /**
- * Get all messages for a specific session.
+ * Get all messages mapping to a watchlist (or its legacy session).
  */
 export const get_messages = query({
-  args: { session_id: v.id("sessions") },
+  args: {
+    watchlist_id: v.optional(v.id("watchlist")),
+    session_id: v.optional(v.id("sessions")),
+  },
   handler: async (ctx, args) => {
     const user_id = await getAuthUserId(ctx);
     if (!user_id) return [];
 
-    const session = await ctx.db.get(args.session_id);
-    if (!session || session.user_id !== user_id) {
-      throw new Error("Session not found or unauthorized");
+    let combined: any[] = [];
+
+    if (args.watchlist_id) {
+      const watchlist = await ctx.db.get(args.watchlist_id);
+      if (!watchlist || watchlist.user_id !== user_id) {
+        throw new Error("Watchlist not found or unauthorized");
+      }
+
+      const watchlistChats = await ctx.db
+        .query("chats")
+        .withIndex("by_watchlist", (q) => q.eq("watchlist_id", args.watchlist_id!))
+        .order("asc")
+        .collect();
+
+      let sessionChats: any[] = [];
+      if (watchlist.session_id) {
+        sessionChats = await ctx.db
+          .query("chats")
+          .withIndex("by_session", (q) =>
+            q.eq("session_id", watchlist.session_id!),
+          )
+          .order("asc")
+          .collect();
+      }
+      combined = [...sessionChats, ...watchlistChats];
+    } else if (args.session_id) {
+      combined = await ctx.db
+        .query("chats")
+        .withIndex("by_session", (q) => q.eq("session_id", args.session_id!))
+        .order("asc")
+        .collect();
     }
 
-    return await ctx.db
-      .query("chats")
-      .withIndex("by_session", (q) => q.eq("session_id", args.session_id))
-      .order("asc")
-      .collect();
+    return combined.sort((a, b) => a._creationTime - b._creationTime);
   },
 });
 
 /**
- * Count unseen snoopa messages in a session.
- * Used to show the red dot on the "Go to chat" button from the snoop details page.
+ * Count unseen snoopa messages in a watchlist.
  */
 export const get_unseen_chats_count = query({
-  args: { session_id: v.id("sessions") },
+  args: { watchlist_id: v.id("watchlist") },
   handler: async (ctx, args) => {
     const user_id = await getAuthUserId(ctx);
     if (!user_id) return 0;
 
-    const session = await ctx.db.get(args.session_id);
-    if (!session || session.user_id !== user_id) return 0;
+    const watchlist = await ctx.db.get(args.watchlist_id);
+    if (!watchlist || watchlist.user_id !== user_id) return 0;
 
-    const unseen = await ctx.db
+    const unseenWl = await ctx.db
       .query("chats")
-      .withIndex("by_session", (q) => q.eq("session_id", args.session_id))
+      .withIndex("by_watchlist", (q) => q.eq("watchlist_id", args.watchlist_id))
       .filter((q) =>
         q.and(q.eq(q.field("role"), "snoopa"), q.eq(q.field("seen"), false)),
       )
       .collect();
 
-    return unseen.length;
+    let unseenLegacy: any[] = [];
+    if (watchlist.session_id) {
+      unseenLegacy = await ctx.db
+        .query("chats")
+        .withIndex("by_session", (q) =>
+          q.eq("session_id", watchlist.session_id!),
+        )
+        .filter((q) =>
+          q.and(q.eq(q.field("role"), "snoopa"), q.eq(q.field("seen"), false)),
+        )
+        .collect();
+    }
+
+    return unseenWl.length + unseenLegacy.length;
   },
 });
 
 /**
- * Mark all unseen snoopa messages in a session as seen.
- * Called when the user opens the chat screen.
+ * Mark all unseen snoopa messages in a watchlist as seen.
  */
 export const mark_chats_seen = mutation({
-  args: { session_id: v.id("sessions") },
+  args: {
+    watchlist_id: v.optional(v.id("watchlist")),
+    session_id: v.optional(v.id("sessions")),
+  },
   handler: async (ctx, args) => {
     const user_id = await getAuthUserId(ctx);
-    if (!user_id) throw new Error("Not authenticated");
+    if (!user_id) return;
 
-    const session = await ctx.db.get(args.session_id);
-    if (!session || session.user_id !== user_id) {
-      throw new Error("Session not found or unauthorized");
+    let unseenChats: any[] = [];
+
+    if (args.watchlist_id) {
+      const watchlist = await ctx.db.get(args.watchlist_id);
+      if (!watchlist || watchlist.user_id !== user_id) return;
+
+      const unseenWl = await ctx.db
+        .query("chats")
+        .withIndex("by_watchlist", (q) => q.eq("watchlist_id", args.watchlist_id!))
+        .filter((q) =>
+          q.and(q.eq(q.field("role"), "snoopa"), q.eq(q.field("seen"), false)),
+        )
+        .collect();
+
+      let unseenLegacy: any[] = [];
+      if (watchlist.session_id) {
+        unseenLegacy = await ctx.db
+          .query("chats")
+          .withIndex("by_session", (q) =>
+            q.eq("session_id", watchlist.session_id!),
+          )
+          .filter((q) =>
+            q.and(q.eq(q.field("role"), "snoopa"), q.eq(q.field("seen"), false)),
+          )
+          .collect();
+      }
+      unseenChats = [...unseenWl, ...unseenLegacy];
+    } else if (args.session_id) {
+      unseenChats = await ctx.db
+        .query("chats")
+        .withIndex("by_session", (q) => q.eq("session_id", args.session_id!))
+        .filter((q) =>
+          q.and(q.eq(q.field("role"), "snoopa"), q.eq(q.field("seen"), false)),
+        )
+        .collect();
     }
-
-    const unseenChats = await ctx.db
-      .query("chats")
-      .withIndex("by_session", (q) => q.eq("session_id", args.session_id))
-      .filter((q) =>
-        q.and(q.eq(q.field("role"), "snoopa"), q.eq(q.field("seen"), false)),
-      )
-      .collect();
 
     await Promise.all(
       unseenChats.map((chat) => ctx.db.patch(chat._id, { seen: true })),
@@ -87,7 +158,8 @@ export const mark_chats_seen = mutation({
  */
 export const save_message = internalMutation({
   args: {
-    session_id: v.id("sessions"),
+    session_id: v.optional(v.id("sessions")),
+    watchlist_id: v.optional(v.id("watchlist")),
     role: v.union(v.literal("user"), v.literal("snoopa")),
     content: v.string(),
     type: v.optional(
@@ -103,6 +175,7 @@ export const save_message = internalMutation({
   handler: async (ctx, args) => {
     const message = await ctx.db.insert("chats", {
       session_id: args.session_id,
+      watchlist_id: args.watchlist_id,
       role: args.role,
       content: args.content,
       // User messages are always "seen" by the user; snoopa messages start unseen
@@ -111,36 +184,56 @@ export const save_message = internalMutation({
       sources: args.sources,
     });
 
-    // Update session's last_updated time
-    await ctx.db.patch(args.session_id, {
-      last_updated: Date.now(),
-    });
+    // Update session's last_updated time optionally tracking old flows
+    if (args.session_id) {
+      await ctx.db.patch(args.session_id, {
+        last_updated: Date.now(),
+      });
+    }
+
+    // Update watchlist's last_checked time
+    if (args.watchlist_id) {
+      await ctx.db.patch(args.watchlist_id, {
+        last_checked: Date.now(),
+      });
+    }
 
     return message;
   },
 });
 
 /**
- * Get sources for all chats in a session
+ * Get sources for all chats in a watchlist (and legacy session).
  */
 export const get_session_sources = query({
-  args: { session_id: v.id("sessions") },
+  args: { watchlist_id: v.id("watchlist") },
   handler: async (ctx, args) => {
     const user_id = await getAuthUserId(ctx);
     if (!user_id) return [];
 
-    const session = await ctx.db.get(args.session_id);
-    if (!session || session.user_id !== user_id) {
-      throw new Error("Session not found or unauthorized");
+    const watchlist = await ctx.db.get(args.watchlist_id);
+    if (!watchlist || watchlist.user_id !== user_id) {
+      throw new Error("Watchlist not found or unauthorized");
     }
 
-    const chats = await ctx.db
+    const watchlistChats = await ctx.db
       .query("chats")
-      .withIndex("by_session", (q) => q.eq("session_id", args.session_id))
+      .withIndex("by_watchlist", (q) => q.eq("watchlist_id", args.watchlist_id))
       .collect();
 
+    let legacyChats: any[] = [];
+    if (watchlist.session_id) {
+      legacyChats = await ctx.db
+        .query("chats")
+        .withIndex("by_session", (q) =>
+          q.eq("session_id", watchlist.session_id!),
+        )
+        .collect();
+    }
+
+    const allChats = [...legacyChats, ...watchlistChats];
     const sources = [];
-    for (const chat of chats) {
+    for (const chat of allChats) {
       const chatSources = await ctx.db
         .query("sources")
         .withIndex("by_chat", (q) => q.eq("chat_id", chat._id))
@@ -251,6 +344,7 @@ export const detect_intent = action({
 export const send_message = action({
   args: {
     session_id: v.optional(v.id("sessions")),
+    watchlist_id: v.optional(v.id("watchlist")),
     content: v.string(),
     intent: v.optional(
       v.union(v.literal("SEARCH"), v.literal("WATCHLIST"), v.literal("CHAT")),
@@ -260,39 +354,42 @@ export const send_message = action({
     const user_id = await getAuthUserId(ctx);
     if (!user_id) throw new Error("Not authenticated");
 
-    // 1. Create session if needed
-    const isNewSession = !args.session_id;
-    let currentSessionId: Id<"sessions">;
+    if (!args.session_id && !args.watchlist_id) {
+      throw new Error("Attempted to chat without an active context.");
+    }
 
-    if (args.session_id) {
-      currentSessionId = args.session_id;
-    } else {
-      currentSessionId = await ctx.runMutation(
-        internal.session.create_session,
-        {
-          user_id,
-          title: "New Chat",
-        },
+    // 1. Validate bound context
+    let messages: any[] = [];
+
+    // We fetch history optimally primarily through watchlist OR session
+    if (args.watchlist_id) {
+      const w_history = await ctx.runQuery(
+        internal.chat.get_messages_internal,
+        { watchlist_id: args.watchlist_id, user_id },
       );
+      messages = w_history;
+    } else if (args.session_id) {
+      const s_history = await ctx.runQuery(
+        internal.chat.get_messages_internal_session,
+        { session_id: args.session_id, user_id },
+      );
+      messages = s_history;
     }
 
     // 2. Save user message
     await ctx.runMutation(internal.chat.save_message, {
-      session_id: currentSessionId,
+      session_id: args.session_id,
+      watchlist_id: args.watchlist_id,
       role: "user",
       content: args.content,
     });
 
-    // 3. Fetch history for context
-    const dbMessages = await ctx.runQuery(api.chat.get_messages, {
-      session_id: currentSessionId,
-    });
-    let messages;
-    if (dbMessages.length <= 6) {
-      messages = dbMessages;
-    } else {
-      const head = dbMessages.slice(0, 2);
-      const tail = dbMessages.slice(-4);
+    // 3. Append current message and apply context window truncation
+    messages.push({ role: "user", content: args.content });
+    
+    if (messages.length > 6) {
+      const head = messages.slice(0, 2);
+      const tail = messages.slice(-4);
       messages = [...head, ...tail];
     }
 
@@ -497,7 +594,8 @@ export const send_message = action({
         const error_message =
           "Sorry, I hit a snag while snooping. Try again in a bit.";
         await ctx.runMutation(internal.chat.save_message, {
-          session_id: currentSessionId,
+          session_id: args.session_id,
+          watchlist_id: args.watchlist_id,
           role: "snoopa",
           content: error_message,
         });
@@ -508,7 +606,8 @@ export const send_message = action({
 
     // 9. Save AI response
     const chatMsgId = await ctx.runMutation(internal.chat.save_message, {
-      session_id: currentSessionId,
+      session_id: args.session_id,
+      watchlist_id: args.watchlist_id,
       role: "snoopa",
       content: response_text,
       type: intent.toLowerCase() as "watchlist" | "search" | "chat",
@@ -525,28 +624,129 @@ export const send_message = action({
       });
     }
 
-    // 10. Generate session title with Gemini if this is a new session
-    if (isNewSession) {
-      try {
-        const titleModel = gen_ai.getGenerativeModel({
-          model: "gemini-2.0-flash-lite",
-        });
-        const titleResult = await titleModel.generateContent(
-          `Generate a short, concise title (max 6 words) for a chat that starts with this question: "${args.content}". Return ONLY the title text, nothing else. No quotes.`,
-        );
-        const title = titleResult.response.text().trim();
-        if (title) {
-          await ctx.runMutation(internal.session.set_title, {
-            session_id: currentSessionId,
-            title,
-          });
-        }
-      } catch (err) {
-        console.warn("Failed to generate session title:", err);
-        // Not critical — the session still works with "New Chat"
-      }
-    }
+    return { response: response_text };
+  },
+});
 
-    return { response: response_text, session_id: currentSessionId };
+export const get_messages_internal = internalQuery({
+  args: { watchlist_id: v.id("watchlist"), user_id: v.id("users") },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("chats")
+      .withIndex("by_watchlist", (q) => q.eq("watchlist_id", args.watchlist_id))
+      .order("asc")
+      .collect();
+  },
+});
+
+export const get_messages_internal_session = internalQuery({
+  args: { session_id: v.id("sessions"), user_id: v.id("users") },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("chats")
+      .withIndex("by_session", (q) => q.eq("session_id", args.session_id))
+      .order("asc")
+      .collect();
+  },
+});
+
+/**
+ * Automates the initial AI parsing and native watchlist instantiation flow.
+ */
+export const initialize_watchlist = action({
+  args: { prompt: v.string() },
+  returns: v.object({
+    watchlist_id: v.optional(v.id("watchlist")),
+  }),
+  handler: async (ctx, args): Promise<{ watchlist_id: Id<"watchlist"> | undefined }> => {
+    const user_id = await getAuthUserId(ctx);
+    if (!user_id) throw new Error("Not authenticated");
+
+    const userRecord = await ctx.runQuery(api.users.get_current_user);
+    const username = userRecord?.username || "Boss";
+
+    const instructions = `
+      # CORE IDENTITY
+      You are Snoopa, a proactive AI agent developed by Lawjun Labs. 
+      Mascot: Greyhound (Fast, lean, sharp).
+
+      # STRICT DIRECTIVES
+      1. EXTREME BREVITY: You must be incredibly direct, concise, and straight to the point.
+      
+      The user wants to add something to their watchlist. Extract the watchlist item details and respond with EXACTLY this format:
+
+      <Your friendly confirmation message here, exactly 1 short sentence acknowledging what you're tracking for them>
+      ---WATCHLIST_DATA---
+      {"title": "<concise title, max 8 words>", "keywords": ["<keyword1>", "<keyword2>"], "condition": "<specific condition>", "canonical_topic": "<2-4 word theme label>", "tier": 3, "search_type": "general", "time_range": "day"}
+
+      Rules:
+      - The confirmation message should be in Snoopa's voice — sharp, proactive, and cool
+      - Do NOT include any markdown formatting or ticks.
+    `;
+
+    try {
+      const deepseek_api_key = process.env.DEEPSEEK_API_KEY;
+      if (!deepseek_api_key) {
+        throw new Error("DEEPSEEK_API_KEY is not set in environment variables");
+      }
+
+      const openai = new OpenAI({
+        baseURL: "https://api.deepseek.com",
+        apiKey: deepseek_api_key,
+      });
+
+      const result = await openai.chat.completions.create({
+        model: "deepseek-chat",
+        messages: [
+          { role: "system", content: instructions },
+          { role: "user", content: args.prompt },
+        ],
+      });
+
+      const response_text = result.choices[0].message.content ?? "";
+      let wl_id: Id<"watchlist"> | undefined;
+      let final_snoop_text = response_text;
+
+      // Extract JSON payload natively
+      const delimiterIndex = response_text.indexOf("---WATCHLIST_DATA---");
+      if (delimiterIndex !== -1) {
+        final_snoop_text = response_text.substring(0, delimiterIndex).trim();
+        const jsonBody = response_text.substring(delimiterIndex + 20).trim();
+
+        const payload = JSON.parse(jsonBody);
+
+        // Spin up the native watchlist item using parsed AI metrics
+        wl_id = await ctx.runMutation(api.watchlist.add_watchlist_item, {
+          title: payload.title,
+          keywords: payload.keywords,
+          condition: payload.condition,
+          canonical_topic: payload.canonical_topic,
+          tier: payload.tier,
+          search_type: payload.search_type,
+          time_range: payload.time_range,
+        });
+      } else {
+        throw new Error("Could not map WATCHLIST_DATA dynamically.");
+      }
+
+      // Automatically store both user action prompt and snoopa confirmation mapped cleanly!
+      await ctx.runMutation(internal.chat.save_message, {
+        watchlist_id: wl_id,
+        role: "user",
+        content: args.prompt,
+      });
+
+      await ctx.runMutation(internal.chat.save_message, {
+        watchlist_id: wl_id,
+        role: "snoopa",
+        content: final_snoop_text,
+        type: "watchlist",
+      });
+
+      return { watchlist_id: wl_id };
+    } catch (err) {
+      console.error(err);
+      throw new Error("Failed generating tracking intelligence.");
+    }
   },
 });

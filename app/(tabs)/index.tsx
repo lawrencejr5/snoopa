@@ -325,8 +325,8 @@ export default function HomeScreen() {
   const unreadCount = useQuery(api.notifications.unread_count) ?? 0;
 
   const activeSnoops = watchlistData
-    .filter((i) => i.status === "active")
-    .sort((a, b) => b.last_checked - a.last_checked); // Latest first
+    .filter((i: any) => i.status === "active")
+    .sort((a: any, b: any) => b.last_checked - a.last_checked); // Latest first
   const allSnoops = watchlistData;
 
   const notifications = useQuery(api.notifications.get_notifications) || [];

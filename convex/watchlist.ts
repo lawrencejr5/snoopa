@@ -1,6 +1,6 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { internalMutation, mutation, query } from "./_generated/server";
 
 // --- Queries ---
 
@@ -114,11 +114,10 @@ export const get_recent_canonical_topics = query({
 });
 
 /**
- * Internal mutation to add a watchlist item (called from chat action).
+ * Mutation to add a watchlist item (now secures user_id internally).
  */
 export const add_watchlist_item = mutation({
   args: {
-    user_id: v.id("users"),
     title: v.string(),
     keywords: v.array(v.string()),
     condition: v.string(),
@@ -133,8 +132,11 @@ export const add_watchlist_item = mutation({
     session_id: v.optional(v.id("sessions")),
   },
   handler: async (ctx, args) => {
+    const user_id = await getAuthUserId(ctx);
+    if (!user_id) throw new Error("Not authenticated");
+
     const id = await ctx.db.insert("watchlist", {
-      user_id: args.user_id,
+      user_id,
       title: args.title,
       keywords: args.keywords,
       condition: args.condition,

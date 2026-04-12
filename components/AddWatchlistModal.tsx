@@ -2,13 +2,17 @@ import Colors from "@/constants/Colors";
 import { useTheme } from "@/context/ThemeContext";
 import { useUser } from "@/context/UserContext";
 import { api } from "@/convex/_generated/api";
+import {
+  default as BottomSheet,
+  BottomSheetBackdrop,
+  BottomSheetView,
+} from "@gorhom/bottom-sheet";
 import { useAction } from "convex/react";
 import { useRouter } from "expo-router";
-import { useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Image,
-  Modal,
   Pressable,
   StyleSheet,
   Text,
@@ -25,10 +29,52 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
   const { theme } = useTheme();
   const router = useRouter();
   const { signedIn } = useUser();
+  const bottomSheetRef = useRef<BottomSheet>(null);
+
   const [prompt, setPrompt] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
 
-  const sendMessage = useAction(api.chat.send_message);
+  // Dynamic snap points depending on keyboard focus
+  const snapPoints = useMemo(() => ["50%", "85%"], []);
+
+  // Directly initialize native watchlist instead of parsing text client-side
+  const initializeWatchlist = useAction(api.chat.initialize_watchlist);
+
+  // Sync visibility with modal state
+  useEffect(() => {
+    if (visible) {
+      bottomSheetRef.current?.snapToIndex(0);
+    } else {
+      bottomSheetRef.current?.snapToIndex(-1);
+      setPrompt("");
+    }
+  }, [visible]);
+
+  const handleSheetChanges = useCallback(
+    (index: number) => {
+      if (index === -1) {
+        onClose();
+        setIsProcessing(false);
+      }
+      if (index === 1) {
+        bottomSheetRef.current?.snapToIndex(1);
+        // setIsProcessing(false);
+      }
+    },
+    [onClose],
+  );
+
+  const renderBackdrop = useCallback(
+    (props: any) => (
+      <BottomSheetBackdrop
+        {...props}
+        disappearsOnIndex={-1}
+        appearsOnIndex={0}
+      />
+    ),
+    [],
+  );
 
   const handleProceed = async () => {
     if (!prompt.trim() || isProcessing || !signedIn?._id) return;
@@ -36,21 +82,18 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
     setIsProcessing(true);
 
     try {
-      // Send the prompt as a WATCHLIST intent message — the AI will create the watchlist
-      const result = (await sendMessage({
-        content: prompt.trim(),
-        intent: "WATCHLIST",
-      })) as { response: string; session_id: string };
+      const result = await initializeWatchlist({
+        prompt: prompt.trim(),
+      });
 
-      // Parse the watchlist data from the response to find the created watchlist
-      if (result?.session_id) {
+      if (result?.watchlist_id) {
         setPrompt("");
         onClose();
 
-        // Navigate to the tabs index with session context
+        // Navigate instantly to inherently instantiated dashboard mapping
         router.push({
-          pathname: "/(tabs)",
-          params: { sessionId: result.session_id },
+          pathname: "/snoop/[id]",
+          params: { id: result.watchlist_id },
         });
       }
     } catch (error) {
@@ -61,30 +104,53 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
   };
 
   const handleClose = () => {
-    if (isProcessing) return;
-    setPrompt("");
+    bottomSheetRef.current?.close();
     onClose();
   };
 
   return (
-    <Modal
-      animationType="fade"
-      transparent
-      visible={visible}
-      onRequestClose={handleClose}
+    <BottomSheet
+      ref={bottomSheetRef}
+      snapPoints={snapPoints}
+      enableContentPanningGesture={true}
+      enableHandlePanningGesture={true}
+      enableDynamicSizing={false}
+      enableOverDrag={false}
+      index={-1}
+      onChange={handleSheetChanges}
+      backdropComponent={renderBackdrop}
+      backgroundStyle={{ backgroundColor: Colors[theme].card }}
+      handleIndicatorStyle={{ backgroundColor: Colors[theme].border }}
+      enablePanDownToClose
     >
-      <Pressable style={styles.overlay} onPress={handleClose}>
-        <Pressable
-          style={[
-            styles.card,
-            {
-              backgroundColor: Colors[theme].card,
-              borderColor: Colors[theme].border,
-            },
-          ]}
-          onPress={(e) => e.stopPropagation()}
-        >
-          {/* Header icon */}
+      <BottomSheetView
+        style={{ flex: 1, paddingHorizontal: 24, paddingBottom: 24 }}
+      >
+        <View style={styles.sheetHeader}>
+          <Text
+            style={{
+              color: Colors[theme].text_secondary,
+              fontFamily: "FontBold",
+              fontSize: 12,
+              letterSpacing: 1,
+            }}
+          >
+            NEW SNOOP
+          </Text>
+          <Pressable onPress={handleClose} disabled={isProcessing}>
+            <Image
+              source={require("@/assets/icons/times.png")}
+              style={{
+                width: 16,
+                height: 16,
+                tintColor: Colors[theme].text_secondary,
+              }}
+            />
+          </Pressable>
+        </View>
+
+        {/* Content Centered Stack analogous to earlier design */}
+        <View style={{ alignItems: "center", marginTop: 10 }}>
           <View
             style={[
               styles.iconContainer,
@@ -100,117 +166,108 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
               }}
             />
           </View>
-
-          {/* Title */}
-          <Text style={[styles.title, { color: Colors[theme].text }]}>
-            New Snoop
-          </Text>
           <Text
             style={[styles.subtitle, { color: Colors[theme].text_secondary }]}
           >
             What do you want me to track?
           </Text>
+        </View>
 
-          {/* Prompt Input */}
-          <TextInput
-            value={prompt}
-            onChangeText={setPrompt}
-            multiline
-            placeholder='e.g. "Let me know when Eder Militão returns to training"'
-            placeholderTextColor={Colors[theme].text_secondary + "80"}
-            editable={!isProcessing}
+        {/* Prompt Input */}
+        <TextInput
+          value={prompt}
+          onChangeText={setPrompt}
+          onFocus={() => {
+            setIsFocused(true);
+            bottomSheetRef.current?.snapToIndex(1);
+          }}
+          onBlur={() => {
+            setIsFocused(false);
+            bottomSheetRef.current?.snapToIndex(0);
+          }}
+          multiline
+          placeholder='e.g. "Let me know when Eder Militão returns to training"'
+          placeholderTextColor={Colors[theme].text_secondary + "80"}
+          editable={!isProcessing}
+          style={[
+            styles.input,
+            {
+              color: Colors[theme].text,
+              backgroundColor: Colors[theme].surface,
+              borderColor: Colors[theme].border,
+            },
+          ]}
+        />
+
+        {/* Actions */}
+        <View style={styles.actions}>
+          <Pressable
+            onPress={handleClose}
+            disabled={isProcessing}
+            style={[styles.cancelBtn, { borderColor: Colors[theme].border }]}
+          >
+            <Text
+              style={{
+                color: Colors[theme].text_secondary,
+                fontFamily: "FontMedium",
+                fontSize: 14,
+              }}
+            >
+              Cancel
+            </Text>
+          </Pressable>
+
+          <Pressable
+            onPress={handleProceed}
+            disabled={!prompt.trim() || isProcessing}
             style={[
-              styles.input,
+              styles.proceedBtn,
               {
-                color: Colors[theme].text,
-                backgroundColor: Colors[theme].surface,
-                borderColor: Colors[theme].border,
+                backgroundColor: Colors[theme].primary,
+                opacity: !prompt.trim() || isProcessing ? 0.5 : 1,
               },
             ]}
-          />
-
-          {/* Actions */}
-          <View style={styles.actions}>
-            <Pressable
-              onPress={handleClose}
-              disabled={isProcessing}
-              style={[styles.cancelBtn, { borderColor: Colors[theme].border }]}
-            >
-              <Text
-                style={{
-                  color: Colors[theme].text_secondary,
-                  fontFamily: "FontMedium",
-                  fontSize: 14,
-                }}
-              >
-                Cancel
-              </Text>
-            </Pressable>
-
-            <Pressable
-              onPress={handleProceed}
-              disabled={!prompt.trim() || isProcessing}
-              style={[
-                styles.proceedBtn,
-                {
-                  backgroundColor: Colors[theme].primary,
-                  opacity: !prompt.trim() || isProcessing ? 0.5 : 1,
-                },
-              ]}
-            >
-              {isProcessing ? (
-                <ActivityIndicator
-                  size="small"
-                  color={Colors[theme].background}
+          >
+            {isProcessing ? (
+              <ActivityIndicator
+                size="small"
+                color={Colors[theme].background}
+              />
+            ) : (
+              <>
+                <Text
+                  style={{
+                    color: Colors[theme].background,
+                    fontFamily: "FontBold",
+                    fontSize: 14,
+                  }}
+                >
+                  Start tracking
+                </Text>
+                <Image
+                  source={require("@/assets/icons/tracked.png")}
+                  style={{
+                    width: 14,
+                    height: 14,
+                    tintColor: Colors[theme].background,
+                  }}
                 />
-              ) : (
-                <>
-                  <Text
-                    style={{
-                      color: Colors[theme].background,
-                      fontFamily: "FontBold",
-                      fontSize: 14,
-                    }}
-                  >
-                    Start tracking
-                  </Text>
-                  <Image
-                    source={require("@/assets/icons/tracked.png")}
-                    style={{
-                      width: 14,
-                      height: 14,
-                      tintColor: Colors[theme].background,
-                    }}
-                  />
-                </>
-              )}
-            </Pressable>
-          </View>
-        </Pressable>
-      </Pressable>
-    </Modal>
+              </>
+            )}
+          </Pressable>
+        </View>
+      </BottomSheetView>
+    </BottomSheet>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.6)",
-    justifyContent: "center",
+  sheetHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
-    padding: 24,
-  },
-  card: {
-    width: "100%",
-    maxWidth: 360,
-    borderRadius: 20,
-    padding: 24,
-    borderWidth: 1,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 10,
+    marginBottom: 10,
+    marginTop: 8,
   },
   iconContainer: {
     width: 48,
@@ -218,15 +275,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
-    alignSelf: "center",
-    marginBottom: 16,
-  },
-  title: {
-    fontSize: 20,
-    fontFamily: "FontBold",
-    textAlign: "center",
-    letterSpacing: -0.5,
-    marginBottom: 4,
+    marginBottom: 12,
   },
   subtitle: {
     fontSize: 13,
@@ -241,9 +290,9 @@ const styles = StyleSheet.create({
     fontFamily: "FontRegular",
     fontSize: 14,
     lineHeight: 20,
-    minHeight: 80,
+    minHeight: 100,
     textAlignVertical: "top",
-    marginBottom: 20,
+    marginBottom: 24,
   },
   actions: {
     flexDirection: "row",

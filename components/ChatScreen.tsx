@@ -287,7 +287,6 @@ export default function ChatScreen() {
 
     try {
       await addWatchlist({
-        user_id: signedIn._id,
         title: watchlistData.title,
         keywords: watchlistData.keywords,
         condition: watchlistData.condition,
