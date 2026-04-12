@@ -29,7 +29,7 @@ export const get_messages = query({
     if (args.watchlist_id) {
       const watchlist = await ctx.db.get(args.watchlist_id);
       if (!watchlist || watchlist.user_id !== user_id) {
-        throw new Error("Watchlist not found or unauthorized");
+        return [];
       }
 
       const watchlistChats = await ctx.db
@@ -213,7 +213,7 @@ export const get_session_sources = query({
 
     const watchlist = await ctx.db.get(args.watchlist_id);
     if (!watchlist || watchlist.user_id !== user_id) {
-      throw new Error("Watchlist not found or unauthorized");
+      return [];
     }
 
     const watchlistChats = await ctx.db

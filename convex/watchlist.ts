@@ -354,6 +354,14 @@ export const delete_watchlist_item = mutation({
 
     await Promise.all(logs.map((log) => ctx.db.delete(log._id)));
 
+    // Delete associated chats
+    const chats = await ctx.db
+      .query("chats")
+      .withIndex("by_watchlist", (q) => q.eq("watchlist_id", args.watchlist_id))
+      .collect();
+
+    await Promise.all(chats.map((chat) => ctx.db.delete(chat._id)));
+
     // Delete the watchlist item
     await ctx.db.delete(args.watchlist_id);
   },
