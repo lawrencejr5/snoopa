@@ -664,6 +664,12 @@ export const initialize_watchlist = action({
 
     const userRecord = await ctx.runQuery(api.users.get_current_user);
     const username = userRecord?.username || "Boss";
+    const recentTopics = await ctx.runQuery(api.watchlist.get_recent_canonical_topics);
+
+    const topicsContext =
+      recentTopics.length > 0
+        ? `\n\n Existing canonical topics in the system (use these to group similar items, or create a new one if no match):\n        ${recentTopics.map((t) => `"${t}"`).join(", ")}`
+        : "";
 
     const instructions = `
       # CORE IDENTITY
@@ -675,13 +681,29 @@ export const initialize_watchlist = action({
       
       The user wants to add something to their watchlist. Extract the watchlist item details and respond with EXACTLY this format:
 
-      <Your friendly confirmation message here, exactly 1 short sentence acknowledging what you're tracking for them>
+      <Your friendly confirmation message here, 1-2 sentences acknowledging what you're tracking for them>
       ---WATCHLIST_DATA---
-      {"title": "<concise title, max 8 words>", "keywords": ["<keyword1>", "<keyword2>"], "condition": "<specific condition>", "canonical_topic": "<2-4 word theme label>", "tier": 3, "search_type": "general", "time_range": "day"}
+      {"title": "<concise title, max 8 words>", "keywords": ["<keyword1>", "<keyword2>", "<keyword3>"], "condition": "<clear, specific condition or rule that defines when this watchlist item should trigger an alert>", "canonical_topic": "<2-4 word topic label that best describes the watchlist for easy searching.>", "tier": <1-4>, "search_type": "<general or news>", "time_range": "<day or any_time>"}
 
       Rules:
+      - The title should be clear and specific (e.g. "Bitcoin Price Movement", "iPhone 16 Pro Deals")
+      - The keywords array should contain 3-6 targeted search terms relevant to tracking this item
+      - The condition should be a precise, actionable rule (e.g. "Alert when Bitcoin price drops below $80,000" or "Notify when a new iPhone 16 Pro deal appears under $900")
+      - The canonical_topic must be a short 2-4 word label, most likely the first keyword. Please avoid canonical topics that are too broad, generate canonical topics that when searched would bring out results for that watchlist in the first 10 results. Reuse an existing topic if it fits, otherwise create a new one.${topicsContext}
+      - The tier is a priority level (1-4) that determines how frequently Snoopa checks for updates:
+        * Tier 1 (Critical/Real-time): 4x/day — volatile prices (crypto, forex), breaking news, live events, scores
+        * Tier 2 (High): 2x/day — stock movements, trending topics, fast-moving situations
+        * Tier 3 (Standard): 1x/day — product deals, upcoming releases, general tracking
+        * Tier 4 (Low): 1x/3 days — long-term monitoring, legislative changes, slow-moving topics
+      - Assign the tier based on how time-sensitive or volatile the topic is. When in doubt, default to tier 3.
+      - search_type determines which search endpoint Snoopa uses:
+        * "general": best for prices, product listings, deals, stats, or topics where info is updated on existing pages (e.g. iPhone price on BackMarket, stock prices)
+        * "news": best for breaking events, announcements, developments, or topics that generate new articles (e.g. crypto news, political events)
+      - time_range determines the time window for search results:
+        * "day": last 24 hours — use for breaking/time-critical topics, news, events
+        * "any_time": no time filter — use for prices, deals, or slow-moving info that lives on static/updated pages
       - The confirmation message should be in Snoopa's voice — sharp, proactive, and cool
-      - Do NOT include any markdown formatting or ticks.
+      - Do NOT include markdown formatting in the response
     `;
 
     try {
