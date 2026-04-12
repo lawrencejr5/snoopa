@@ -8,10 +8,10 @@ import { useUser } from "@/context/UserContext";
 import { api } from "@/convex/_generated/api";
 import { registerForPushNotificationsAsync } from "@/utils/reg_push_notifications";
 import { useAuthActions } from "@convex-dev/auth/react";
-import { useIsFocused } from "@react-navigation/native";
+import { useIsFocused, useNavigation } from "@react-navigation/native";
 import { useConvexAuth, useMutation } from "convex/react";
 import { useRouter } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -108,7 +108,15 @@ export default function ProfileScreen() {
     }
   };
 
-  const isFocused = useIsFocused();
+  const navigation = useNavigation();
+  const [animationKey, setAnimationKey] = useState(0);
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener("tabPress" as any, (e: any) => {
+      setAnimationKey((prev) => prev + 1);
+    });
+    return unsubscribe;
+  }, [navigation]);
 
   if (isLoading || !signedIn || appLoading) return <Loading />;
 
@@ -116,7 +124,7 @@ export default function ProfileScreen() {
     <Container>
       {/* Header */}
       <Animated.View
-        key={`profile-header-${isFocused}`}
+        key={`profile-header-${animationKey}`}
         entering={FadeInDown.duration(400)}
         style={styles.header}
       >
@@ -131,7 +139,7 @@ export default function ProfileScreen() {
       >
         {/* User Card */}
         <Animated.View
-          key={`profile-user-${isFocused}`}
+          key={`profile-user-${animationKey}`}
           entering={FadeInDown.delay(100).duration(400)}
           style={[
             styles.userCard,
@@ -173,7 +181,7 @@ export default function ProfileScreen() {
 
         {/* Upgrade Card */}
         <Animated.View
-          key={`profile-upgrade-${isFocused}`}
+          key={`profile-upgrade-${animationKey}`}
           entering={FadeInDown.delay(200).duration(400)}
           style={[
             styles.upgradeCard,
@@ -218,7 +226,7 @@ export default function ProfileScreen() {
 
         {/* Settings List */}
         <Animated.View
-          key={`profile-menu-${isFocused}`}
+          key={`profile-menu-${animationKey}`}
           entering={FadeInDown.delay(300).duration(400)}
           style={styles.menuContainer}
         >

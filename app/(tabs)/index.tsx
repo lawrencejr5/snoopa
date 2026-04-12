@@ -9,7 +9,7 @@ import { useUser } from "@/context/UserContext";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { Octicons } from "@expo/vector-icons";
-import { useIsFocused } from "@react-navigation/native";
+import { useIsFocused, useNavigation } from "@react-navigation/native";
 import { useConvexAuth, useQuery } from "convex/react";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
@@ -318,7 +318,15 @@ export default function HomeScreen() {
   const { isLoading } = useConvexAuth();
   const { appLoading } = useLoadingContext();
   const { signedIn } = useUser();
-  const isFocused = useIsFocused();
+  const navigation = useNavigation();
+  const [animationKey, setAnimationKey] = useState(0);
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener("tabPress" as any, (e: any) => {
+      setAnimationKey((prev) => prev + 1);
+    });
+    return unsubscribe;
+  }, [navigation]);
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [showTrackModal, setShowTrackModal] = useState(false);
@@ -406,7 +414,7 @@ export default function HomeScreen() {
         {/* Trending Topics */}
         {trendingTopics.length > 0 && (
           <Animated.View
-            key={`trending-${isFocused}`}
+            key={`trending-${animationKey}`}
             entering={FadeInDown.delay(100).duration(500)}
           >
             <View style={styles.sectionHeader}>
@@ -471,7 +479,7 @@ export default function HomeScreen() {
 
         {/* Briefing Section */}
         <Animated.View
-          key={`briefing-${isFocused}`}
+          key={`briefing-${animationKey}`}
           entering={FadeInDown.delay(200).duration(500)}
           style={styles.section}
         >
@@ -606,7 +614,7 @@ export default function HomeScreen() {
 
         {/* Active Snoops List */}
         <Animated.View
-          key={`active-snoops-${isFocused}`}
+          key={`active-snoops-${animationKey}`}
           entering={FadeInDown.delay(300).duration(500)}
           style={styles.section}
         >

@@ -5,10 +5,10 @@ import { useLoadingContext } from "@/context/LoadingContext";
 import { useTheme } from "@/context/ThemeContext";
 import { useUser } from "@/context/UserContext";
 import { api } from "@/convex/_generated/api";
-import { useIsFocused } from "@react-navigation/native";
+import { useIsFocused, useNavigation } from "@react-navigation/native";
 import { useConvexAuth, useQuery } from "convex/react";
 import { useRouter } from "expo-router";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
   Image,
   Pressable,
@@ -215,7 +215,15 @@ export default function WatchlistScreen() {
   const { isLoading } = useConvexAuth();
   const { appLoading } = useLoadingContext();
   const { signedIn } = useUser();
-  const isFocused = useIsFocused();
+  const navigation = useNavigation();
+  const [animationKey, setAnimationKey] = useState(0);
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener("tabPress" as any, (e: any) => {
+      setAnimationKey((prev) => prev + 1);
+    });
+    return unsubscribe;
+  }, [navigation]);
 
   const watchlistData = useQuery(api.watchlist.get_watchlists) || [];
 
@@ -265,7 +273,7 @@ export default function WatchlistScreen() {
         {watchlistData.length === 0 ? (
           /* Empty State */
           <Animated.View
-            key={`empty-${isFocused}`}
+            key={`empty-${animationKey}`}
             entering={FadeInDown.duration(500)}
             style={{
               flex: 1,
@@ -340,7 +348,7 @@ export default function WatchlistScreen() {
           <>
             {/* Stats Section */}
             <Animated.View
-              key={`stats-${isFocused}`}
+              key={`stats-${animationKey}`}
               entering={FadeInDown.delay(100).duration(400)}
               style={styles.statsContainer}
             >
@@ -412,7 +420,7 @@ export default function WatchlistScreen() {
             {/* Active Snoops */}
             {activeSnoops.length > 0 && (
               <Animated.View
-                key={`active-${isFocused}`}
+                key={`active-${animationKey}`}
                 entering={FadeInDown.delay(200).duration(400)}
                 style={styles.section}
               >
@@ -435,7 +443,7 @@ export default function WatchlistScreen() {
             {/* Closed/Confirmed Snoops */}
             {closedSnoops.length > 0 && (
               <Animated.View
-                key={`closed-${isFocused}`}
+                key={`closed-${animationKey}`}
                 entering={FadeInDown.delay(300).duration(400)}
                 style={styles.section}
               >
