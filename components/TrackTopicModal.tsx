@@ -191,7 +191,7 @@ export default function TrackTopicModal({ visible, topic, onClose }: Props) {
               bottomSheetRef.current?.snapToIndex(0);
             }}
             multiline
-            maxLength={300}
+            maxLength={500}
             placeholder={`e.g. "Notify me when ${topic} news leaks"`}
             placeholderTextColor={Colors[theme].text_secondary + "80"}
             editable={!isProcessing}
@@ -204,6 +204,18 @@ export default function TrackTopicModal({ visible, topic, onClose }: Props) {
               },
             ]}
           />
+          <Text
+            style={{
+              alignSelf: "flex-end",
+              fontSize: 11,
+              fontFamily: "FontMedium",
+              color: Colors[theme].text_secondary + "80",
+              marginBottom: 14,
+              marginRight: 4,
+            }}
+          >
+            {prompt.length}/500
+          </Text>
         </View>
 
         {/* Actions */}
@@ -306,7 +318,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     minHeight: 100,
     textAlignVertical: "top",
-    marginBottom: 20,
+    marginBottom: 10,
   },
   actions: {
     flexDirection: "row",
