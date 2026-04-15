@@ -37,6 +37,8 @@ import { KeyboardStickyView } from "react-native-keyboard-controller";
 import Animated, {
   FadeIn,
   FadeInDown,
+  FadeOut,
+  LinearTransition,
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
@@ -709,6 +711,7 @@ export default function SnoopDetailsScreen() {
   const [showSources, setShowSources] = useState(false);
   const [selectedSources, setSelectedSources] = useState<any[]>([]);
   const [isSourceMode, setIsSourceMode] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
 
   // Data
   const snoop = useQuery(
@@ -940,6 +943,73 @@ export default function SnoopDetailsScreen() {
   const statusColor = isActive
     ? Colors[theme].success
     : Colors[theme].text_secondary;
+
+  const leftIconElement = isSourceMode ? (
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
+        opacity: sending ? 0.5 : 1,
+      }}
+    >
+      <Octicons name="link" size={18} color={Colors[theme].text} />
+      <Text
+        style={{
+          color: Colors[theme].text,
+          fontFamily: "FontMedium",
+          fontSize: 13,
+          marginLeft: 2,
+        }}
+      >
+        source
+      </Text>
+      <Pressable disabled={sending} onPress={() => setIsSourceMode(false)}>
+        <Octicons
+          name="x"
+          size={16}
+          color={Colors[theme].text_secondary}
+          style={{ padding: 4 }}
+        />
+      </Pressable>
+      <View
+        style={{
+          width: 1,
+          height: 20,
+          backgroundColor: Colors[theme].border,
+          marginHorizontal: 4,
+        }}
+      />
+    </View>
+  ) : (
+    <Octicons
+      name="command-palette"
+      size={18}
+      color={Colors[theme].text_secondary}
+    />
+  );
+
+  const rightIconElement = (
+    <Pressable
+      onPress={handleSend}
+      disabled={sending || !input.trim()}
+      style={{
+        padding: 6,
+        backgroundColor: Colors[theme].primary,
+        borderRadius: 8,
+        opacity: input.trim() && !sending ? 1 : 0.3,
+      }}
+    >
+      <Image
+        source={require("@/assets/icons/arrow-up.png")}
+        style={{
+          width: 15,
+          height: 15,
+          tintColor: Colors[theme].background,
+        }}
+      />
+    </Pressable>
+  );
 
   return (
     <Container>
@@ -1452,62 +1522,24 @@ export default function SnoopDetailsScreen() {
 
       {/* Terminal Input */}
       <KeyboardStickyView offset={{ opened: 10, closed: 0 }}>
-        <View
+        <Animated.View
+          layout={LinearTransition.duration(300)}
           style={[
             styles.inputBar,
             {
               backgroundColor: Colors[theme].card,
               borderColor: Colors[theme].border,
+              flexDirection: isFocused ? "column" : "row",
+              alignItems: isFocused ? "stretch" : "center",
             },
           ]}
         >
-          {isSourceMode ? (
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                gap: 6,
-                opacity: sending ? 0.5 : 1,
-              }}
-            >
-              <Octicons name="link" size={18} color={Colors[theme].text} />
-              <Text
-                style={{
-                  color: Colors[theme].text,
-                  fontFamily: "FontMedium",
-                  fontSize: 13,
-                  marginLeft: 2,
-                }}
-              >
-                source
-              </Text>
-              <Pressable
-                disabled={sending}
-                onPress={() => setIsSourceMode(false)}
-              >
-                <Octicons
-                  name="x"
-                  size={16}
-                  color={Colors[theme].text_secondary}
-                  style={{ padding: 4 }}
-                />
-              </Pressable>
-              <View
-                style={{
-                  width: 1,
-                  height: 20,
-                  backgroundColor: Colors[theme].border,
-                  marginHorizontal: 4,
-                }}
-              />
-            </View>
-          ) : (
-            <Octicons
-              name="command-palette"
-              size={18}
-              color={Colors[theme].text_secondary}
-            />
+          {!isFocused && (
+            <Animated.View entering={FadeIn} exiting={FadeOut}>
+              {leftIconElement}
+            </Animated.View>
           )}
+
           <TextInput
             value={input}
             onChangeText={setInput}
@@ -1515,37 +1547,45 @@ export default function SnoopDetailsScreen() {
             placeholderTextColor={Colors[theme].text_secondary + "60"}
             editable={!sending}
             maxLength={300}
+            multiline={true}
+            onFocus={() => setIsFocused(true)}
+            onBlur={() => setIsFocused(false)}
             style={{
-              flex: 1,
+              flex: isFocused ? undefined : 1,
               color: Colors[theme].text,
               fontFamily: "FontMedium",
               fontSize: 14,
-              paddingVertical: 0,
-              paddingHorizontal: 10,
+              paddingVertical: isFocused ? 4 : 0,
+              paddingHorizontal: isFocused ? 4 : 10,
+              minHeight: isFocused ? 20 : undefined,
+              maxHeight: 70,
+              textAlignVertical: "top",
             }}
-            onSubmitEditing={handleSend}
-            returnKeyType="send"
           />
-          <Pressable
-            onPress={handleSend}
-            disabled={sending || !input.trim()}
-            style={{
-              padding: 6,
-              backgroundColor: Colors[theme].primary,
-              borderRadius: 8,
-              opacity: input.trim() && !sending ? 1 : 0.3,
-            }}
-          >
-            <Image
-              source={require("@/assets/icons/arrow-up.png")}
+
+          {!isFocused && (
+            <Animated.View entering={FadeIn} exiting={FadeOut}>
+              {rightIconElement}
+            </Animated.View>
+          )}
+
+          {isFocused && (
+            <Animated.View
+              entering={FadeIn.duration(200)}
+              exiting={FadeOut.duration(200)}
               style={{
-                width: 15,
-                height: 15,
-                tintColor: Colors[theme].background,
+                flexDirection: "row",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginTop: 8,
+                paddingHorizontal: 4,
               }}
-            />
-          </Pressable>
-        </View>
+            >
+              {leftIconElement}
+              {rightIconElement}
+            </Animated.View>
+          )}
+        </Animated.View>
       </KeyboardStickyView>
 
       {/* Commands Modal */}
