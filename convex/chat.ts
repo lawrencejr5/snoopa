@@ -4,7 +4,6 @@ import { v } from "convex/values";
 import OpenAI from "openai";
 import { api, internal } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
-import { hashString } from "./utils";
 import {
   action,
   internalMutation,
@@ -12,6 +11,7 @@ import {
   mutation,
   query,
 } from "./_generated/server";
+import { hashString } from "./utils";
 
 /**
  * Get all messages mapping to a watchlist (or its legacy session).
@@ -286,6 +286,7 @@ export const save_monitored_source_and_link = internalMutation({
     last_snapshot: v.string(),
     last_hash: v.string(),
     watchlist_id: v.id("watchlist"),
+    source_weight: v.union(v.literal("primary"), v.literal("secondary")),
   },
   handler: async (ctx, args) => {
     const monitored_source_id = await ctx.db.insert("monitored_sources", {
@@ -293,8 +294,9 @@ export const save_monitored_source_and_link = internalMutation({
       url: args.url,
       last_snapshot: args.last_snapshot,
       last_hash: args.last_hash,
+      source_weight: args.source_weight,
     });
-    
+
     const watchlist = await ctx.db.get(args.watchlist_id);
     if (watchlist) {
       const sources = watchlist.sources || [];
@@ -372,6 +374,36 @@ async function _detectIntent(
   }
 }
 
+async function _determineSourceWeight(
+  content: string,
+  condition: string,
+): Promise<"primary" | "secondary"> {
+  const api_key = process.env.GOOGLE_GEMINI_API_KEY;
+  if (!api_key) return "secondary";
+
+  try {
+    const gen_ai = new GoogleGenerativeAI(api_key);
+    const model = gen_ai.getGenerativeModel({ model: "gemini-2.0-flash-lite" });
+
+    const prompt = `Analyze this user's request to track a specific URL for their watchlist.
+      WATCHLIST CONDITION: "${condition}"
+      USER MESSAGE: "${content}"
+
+      Classify the source weight as:
+      - primary: The information requested is highly specific to THIS exact page (e.g. price tracking, personal blogs, exact stock on a specific site). Snoopa should only trust this page.
+      - secondary: The information is more general news or public facts that could exist elsewhere (e.g. sports news, celeb injury, broad announcements). This site is just a starting point/suggestion.
+
+      Reply with ONLY one word: primary or secondary.`;
+
+    const result = await model.generateContent(prompt);
+    const text = result.response.text().trim().toLowerCase();
+    return text.includes("primary") ? "primary" : "secondary";
+  } catch (err) {
+    console.warn("Weight detection failed, defaulting to secondary:", err);
+    return "secondary";
+  }
+}
+
 /**
  * Lightweight action to detect the intent of a user message.
  * Call this before send_message to show context-aware loading text on the frontend.
@@ -393,7 +425,12 @@ export const send_message = action({
     watchlist_id: v.optional(v.id("watchlist")),
     content: v.string(),
     intent: v.optional(
-      v.union(v.literal("SEARCH"), v.literal("WATCHLIST"), v.literal("CHAT"), v.literal("SOURCE")),
+      v.union(
+        v.literal("SEARCH"),
+        v.literal("WATCHLIST"),
+        v.literal("CHAT"),
+        v.literal("SOURCE"),
+      ),
     ),
   },
   handler: async (ctx, args) => {
@@ -474,55 +511,72 @@ export const send_message = action({
     console.log(`🔍 Intent${args.intent ? " (pre-detected)" : ""}: ${intent}`);
 
     if (intent === "SOURCE") {
-      const urlRegex = /(?:https?:\/\/)?([a-zA-Z0-9][-a-zA-Z0-9]*\.[a-zA-Z][-a-zA-Z0-9.]*[a-zA-Z]{2,}(?:\/[^\s]*)?)/;
+      const urlRegex =
+        /(?:https?:\/\/)?([a-zA-Z0-9][-a-zA-Z0-9]*\.[a-zA-Z][-a-zA-Z0-9.]*[a-zA-Z]{2,}(?:\/[^\s]*)?)/;
       const urlMatch = args.content.match(urlRegex);
-      
+
       if (!urlMatch) {
-         const response_text = "Please provide a valid URL for me to track.";
-         await ctx.runMutation(internal.chat.save_message, {
-           session_id: args.session_id,
-           watchlist_id: args.watchlist_id,
-           role: "snoopa",
-           content: response_text,
-           type: "source",
-         });
-         return { response: response_text };
+        const response_text = "Please provide a valid URL for me to track.";
+        await ctx.runMutation(internal.chat.save_message, {
+          session_id: args.session_id,
+          watchlist_id: args.watchlist_id,
+          role: "snoopa",
+          content: response_text,
+          type: "source",
+        });
+        return { response: response_text };
       }
-      
+
       let url = urlMatch[0];
       // Clean up punctuation if it matches trailing characters in the match (like periods)
       url = url.replace(/[.,;!?]$/, "");
-      
+
       if (!url.startsWith("http")) {
         url = `https://${url}`;
       }
-      const extractResult = await ctx.runAction(internal.tavily.extract_source, { url });
-      
+      const extractResult = await ctx.runAction(
+        internal.tavily.extract_source,
+        { url },
+      );
+
       if (!extractResult.success) {
-         const response_text = "I couldn't fetch data from that URL right now. Make sure the link is correct.";
-         await ctx.runMutation(internal.chat.save_message, {
-           session_id: args.session_id,
-           watchlist_id: args.watchlist_id,
-           role: "snoopa",
-           content: response_text,
-           type: "source",
-         });
-         return { response: response_text };
+        const response_text =
+          "I couldn't fetch data from that URL right now. Make sure the link is correct.";
+        await ctx.runMutation(internal.chat.save_message, {
+          session_id: args.session_id,
+          watchlist_id: args.watchlist_id,
+          role: "snoopa",
+          content: response_text,
+          type: "source",
+        });
+        return { response: response_text };
       }
 
       const { content: snapshot } = extractResult;
       const last_hash = await hashString(snapshot as string);
 
       if (args.watchlist_id) {
-         await ctx.runMutation(internal.chat.save_monitored_source_and_link, {
-           url,
-           last_snapshot: snapshot as string,
-           last_hash: last_hash as string,
-           watchlist_id: args.watchlist_id,
-         });
+        // Get watchlist condition for weight context
+        const watchlist = await ctx.runQuery(api.watchlist.get_watchlist_item, {
+          watchlist_id: args.watchlist_id,
+        });
+
+        const source_weight = await _determineSourceWeight(
+          args.content,
+          watchlist?.condition || "",
+        );
+
+        await ctx.runMutation(internal.chat.save_monitored_source_and_link, {
+          url,
+          last_snapshot: snapshot as string,
+          last_hash: last_hash as string,
+          watchlist_id: args.watchlist_id,
+          source_weight,
+        });
       }
 
-      const response_text = "Source saved successfully! I'll keep a close eye on it.";
+      const response_text =
+        "Source saved successfully! I'll keep a close eye on it.";
       await ctx.runMutation(internal.chat.save_message, {
         session_id: args.session_id,
         watchlist_id: args.watchlist_id,

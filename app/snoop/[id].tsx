@@ -1231,6 +1231,31 @@ export default function SnoopDetailsScreen() {
                       >
                         {ms.url}
                       </Text>
+                      <View
+                        style={{
+                          backgroundColor:
+                            ms.source_weight === "primary"
+                              ? Colors[theme].primary + "20"
+                              : Colors[theme].border,
+                          paddingHorizontal: 8,
+                          paddingVertical: 2,
+                          borderRadius: 8,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            color:
+                              ms.source_weight === "primary"
+                                ? Colors[theme].primary
+                                : Colors[theme].text_secondary,
+                            fontSize: 10,
+                            fontFamily: "FontBold",
+                            textTransform: "uppercase",
+                          }}
+                        >
+                          {ms.source_weight}
+                        </Text>
+                      </View>
                     </Pressable>
                   ))}
                 </View>

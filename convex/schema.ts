@@ -118,6 +118,7 @@ const schema = defineSchema({
     url: v.string(),
     last_hash: v.string(),
     last_snapshot: v.string(),
+    source_weight: v.union(v.literal("primary"), v.literal("secondary")),
   }).index("by_watchlist", ["watchlist_id"]),
 });
 
