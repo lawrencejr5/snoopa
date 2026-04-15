@@ -474,7 +474,9 @@ export const send_message = action({
     console.log(`🔍 Intent${args.intent ? " (pre-detected)" : ""}: ${intent}`);
 
     if (intent === "SOURCE") {
-      const urlMatch = args.content.match(/(https?:\/\/[^\s]+)/);
+      const urlRegex = /(?:https?:\/\/)?([a-zA-Z0-9][-a-zA-Z0-9]*\.[a-zA-Z][-a-zA-Z0-9.]*[a-zA-Z]{2,}(?:\/[^\s]*)?)/;
+      const urlMatch = args.content.match(urlRegex);
+      
       if (!urlMatch) {
          const response_text = "Please provide a valid URL for me to track.";
          await ctx.runMutation(internal.chat.save_message, {
@@ -487,7 +489,13 @@ export const send_message = action({
          return { response: response_text };
       }
       
-      const url = urlMatch[1];
+      let url = urlMatch[0];
+      // Clean up punctuation if it matches trailing characters in the match (like periods)
+      url = url.replace(/[.,;!?]$/, "");
+      
+      if (!url.startsWith("http")) {
+        url = `https://${url}`;
+      }
       const extractResult = await ctx.runAction(internal.tavily.extract_source, { url });
       
       if (!extractResult.success) {
