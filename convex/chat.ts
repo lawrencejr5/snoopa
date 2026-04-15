@@ -4,6 +4,7 @@ import { v } from "convex/values";
 import OpenAI from "openai";
 import { api, internal } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
+import { hashString } from "./utils";
 import {
   action,
   internalMutation,
@@ -175,6 +176,7 @@ export const save_message = internalMutation({
         v.literal("watchlist"),
         v.literal("chat"),
         v.literal("search"),
+        v.literal("source"),
       ),
     ),
     sources: v.optional(v.array(v.string())),
@@ -278,6 +280,41 @@ export const batch_insert_sources = internalMutation({
   },
 });
 
+export const save_monitored_source_and_link = internalMutation({
+  args: {
+    url: v.string(),
+    last_snapshot: v.string(),
+    last_hash: v.string(),
+    watchlist_id: v.id("watchlist"),
+  },
+  handler: async (ctx, args) => {
+    const monitored_source_id = await ctx.db.insert("monitored_sources", {
+      watchlist_id: args.watchlist_id,
+      url: args.url,
+      last_snapshot: args.last_snapshot,
+      last_hash: args.last_hash,
+    });
+    
+    const watchlist = await ctx.db.get(args.watchlist_id);
+    if (watchlist) {
+      const sources = watchlist.sources || [];
+      sources.push(monitored_source_id as string);
+      await ctx.db.patch(args.watchlist_id, { sources });
+    }
+    return monitored_source_id;
+  },
+});
+
+export const get_monitored_sources = query({
+  args: { watchlist_id: v.id("watchlist") },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("monitored_sources")
+      .withIndex("by_watchlist", (q) => q.eq("watchlist_id", args.watchlist_id))
+      .collect();
+  },
+});
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -297,7 +334,7 @@ function getCurrentDateTime() {
 }
 
 // Function to detect intention
-type Intent = "SEARCH" | "WATCHLIST" | "CHAT";
+type Intent = "SEARCH" | "WATCHLIST" | "CHAT" | "SOURCE";
 async function _detectIntent(
   content: string,
   history?: string,
@@ -316,9 +353,10 @@ async function _detectIntent(
       Classify as ONE of:
       - SEARCH: current/live web information, news, prices, scores, recent events, anything requiring data from the last 24 hours. Includes 'is X happening', 'did Y happen', 'I heard Z is happening'.
       - WATCHLIST: user wants to track, monitor, save, or be notified about something. E.g. 'track Bitcoin', 'watch for iPhone deals', 'notify me when Z happens', 'snoop on X'.
+      - SOURCE: user wants to track a specific URL/source or save a source. E.g. 'track this url', 'monitor this website', 'add source: https://example.com'.
       - CHAT: conversational, general knowledge, opinions, or greetings.
 
-      Reply with ONLY one word: SEARCH, WATCHLIST, or CHAT.`;
+      Reply with ONLY one word: SEARCH, WATCHLIST, SOURCE, or CHAT.`;
 
     const result = await model.generateContent(prompt);
     const text = result.response.text().trim().toUpperCase();
@@ -326,6 +364,7 @@ async function _detectIntent(
 
     if (text.includes("WATCHLIST")) return "WATCHLIST";
     if (text.includes("SEARCH")) return "SEARCH";
+    if (text.includes("SOURCE")) return "SOURCE";
     return "CHAT";
   } catch (err) {
     console.warn("Intent detection failed, defaulting to CHAT:", err);
@@ -354,7 +393,7 @@ export const send_message = action({
     watchlist_id: v.optional(v.id("watchlist")),
     content: v.string(),
     intent: v.optional(
-      v.union(v.literal("SEARCH"), v.literal("WATCHLIST"), v.literal("CHAT")),
+      v.union(v.literal("SEARCH"), v.literal("WATCHLIST"), v.literal("CHAT"), v.literal("SOURCE")),
     ),
   },
   handler: async (ctx, args) => {
@@ -433,6 +472,58 @@ export const send_message = action({
       ));
 
     console.log(`🔍 Intent${args.intent ? " (pre-detected)" : ""}: ${intent}`);
+
+    if (intent === "SOURCE") {
+      const urlMatch = args.content.match(/(https?:\/\/[^\s]+)/);
+      if (!urlMatch) {
+         const response_text = "Please provide a valid URL for me to track.";
+         await ctx.runMutation(internal.chat.save_message, {
+           session_id: args.session_id,
+           watchlist_id: args.watchlist_id,
+           role: "snoopa",
+           content: response_text,
+           type: "source",
+         });
+         return { response: response_text };
+      }
+      
+      const url = urlMatch[1];
+      const extractResult = await ctx.runAction(internal.tavily.extract_source, { url });
+      
+      if (!extractResult.success) {
+         const response_text = "I couldn't fetch data from that URL right now. Make sure the link is correct.";
+         await ctx.runMutation(internal.chat.save_message, {
+           session_id: args.session_id,
+           watchlist_id: args.watchlist_id,
+           role: "snoopa",
+           content: response_text,
+           type: "source",
+         });
+         return { response: response_text };
+      }
+
+      const { content: snapshot } = extractResult;
+      const last_hash = await hashString(snapshot as string);
+
+      if (args.watchlist_id) {
+         await ctx.runMutation(internal.chat.save_monitored_source_and_link, {
+           url,
+           last_snapshot: snapshot as string,
+           last_hash: last_hash as string,
+           watchlist_id: args.watchlist_id,
+         });
+      }
+
+      const response_text = "Source saved successfully! I'll keep a close eye on it.";
+      await ctx.runMutation(internal.chat.save_message, {
+        session_id: args.session_id,
+        watchlist_id: args.watchlist_id,
+        role: "snoopa",
+        content: response_text,
+        type: "source",
+      });
+      return { response: response_text };
+    }
 
     // 6. Conditionally fetch search results from Tavily (only for SEARCH intent)
     const needsSearch = intent === "SEARCH";
@@ -591,7 +682,7 @@ export const send_message = action({
       watchlist_id: args.watchlist_id,
       role: "snoopa",
       content: response_text,
-      type: intent.toLowerCase() as "watchlist" | "search" | "chat",
+      type: intent.toLowerCase() as "watchlist" | "search" | "chat" | "source",
     });
 
     if (capturedSources.length > 0) {

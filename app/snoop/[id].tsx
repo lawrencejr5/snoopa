@@ -82,6 +82,7 @@ function CommandsModal({
   onPauseResume,
   onRename,
   onEdit,
+  onAddSource,
   isProcessing,
 }: {
   visible: boolean;
@@ -91,11 +92,19 @@ function CommandsModal({
   onPauseResume: () => void;
   onRename: () => void;
   onEdit: () => void;
+  onAddSource: () => void;
   isProcessing: boolean;
 }) {
   const { theme } = useTheme();
 
   const options = [
+    {
+      id: "add_source",
+      label: "Add source URL",
+      icon: "link",
+      action: onAddSource,
+      color: Colors[theme].text,
+    },
     {
       id: "pause_resume",
       label: snoop.status === "inactive" ? "Resume tracking" : "Pause tracking",
@@ -225,23 +234,32 @@ function CommandsModal({
                 {o.label}
               </Text>
             </View>
-            <Image
-              source={
-                o.icon === "play"
-                  ? require("@/assets/icons/play.png")
-                  : o.icon === "pause"
-                    ? require("@/assets/icons/pause.png")
-                    : o.icon === "document"
-                      ? require("@/assets/icons/document.png")
-                      : require("@/assets/icons/times.png")
-              }
-              style={{
-                width: 16,
-                height: 16,
-                tintColor: o.color,
-                opacity: 0.7,
-              }}
-            />
+            {o.icon === "link" ? (
+              <Octicons
+                name="link"
+                size={16}
+                color={o.color}
+                style={{ opacity: 0.7 }}
+              />
+            ) : (
+              <Image
+                source={
+                  o.icon === "play"
+                    ? require("@/assets/icons/play.png")
+                    : o.icon === "pause"
+                      ? require("@/assets/icons/pause.png")
+                      : o.icon === "document"
+                        ? require("@/assets/icons/document.png")
+                        : require("@/assets/icons/times.png")
+                }
+                style={{
+                  width: 16,
+                  height: 16,
+                  tintColor: o.color,
+                  opacity: 0.7,
+                }}
+              />
+            )}
           </Pressable>
         ))}
       </BottomSheetView>
@@ -690,6 +708,7 @@ export default function SnoopDetailsScreen() {
   const [showDetails, setShowDetails] = useState(false);
   const [showSources, setShowSources] = useState(false);
   const [selectedSources, setSelectedSources] = useState<any[]>([]);
+  const [isSourceMode, setIsSourceMode] = useState(false);
 
   // Data
   const snoop = useQuery(
@@ -706,6 +725,10 @@ export default function SnoopDetailsScreen() {
   );
   const chatSources = useQuery(
     api.chat.get_session_sources,
+    id ? { watchlist_id: id as Id<"watchlist"> } : "skip",
+  );
+  const monitoredSources = useQuery(
+    api.chat.get_monitored_sources,
     id ? { watchlist_id: id as Id<"watchlist"> } : "skip",
   );
 
@@ -821,7 +844,11 @@ export default function SnoopDetailsScreen() {
       await sendMessage({
         watchlist_id: id as Id<"watchlist">,
         content,
+        intent: isSourceMode ? "SOURCE" : undefined,
       });
+      if (isSourceMode) {
+        setIsSourceMode(false);
+      }
     } catch (e) {
       console.error("Failed to send:", e);
     } finally {
@@ -1080,6 +1107,61 @@ export default function SnoopDetailsScreen() {
                         {kw}
                       </Text>
                     </View>
+                  ))}
+                </View>
+              </>
+            )}
+
+            {monitoredSources && monitoredSources.length > 0 && (
+              <>
+                <Text
+                  style={{
+                    fontFamily: "FontMedium",
+                    fontSize: 12,
+                    color: Colors[theme].text_secondary,
+                    marginBottom: 8,
+                    marginTop:
+                      snoop.keywords && snoop.keywords.length > 0 ? 16 : 0,
+                  }}
+                >
+                  Monitored Sources
+                </Text>
+                <View style={{ gap: 8 }}>
+                  {monitoredSources.map((ms: any) => (
+                    <Pressable
+                      key={ms._id}
+                      onPress={async () => {
+                        if (ms.url)
+                          await WebBrowser.openAuthSessionAsync(ms.url);
+                      }}
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 8,
+                        backgroundColor: Colors[theme].card,
+                        padding: 12,
+                        borderRadius: 12,
+                        borderWidth: 1,
+                        borderColor: Colors[theme].border,
+                      }}
+                    >
+                      <Octicons
+                        name="link"
+                        size={14}
+                        color={Colors[theme].primary}
+                      />
+                      <Text
+                        style={{
+                          flex: 1,
+                          fontFamily: "FontRegular",
+                          fontSize: 13,
+                          color: Colors[theme].text,
+                        }}
+                        numberOfLines={1}
+                      >
+                        {ms.url}
+                      </Text>
+                    </Pressable>
                   ))}
                 </View>
               </>
@@ -1379,11 +1461,53 @@ export default function SnoopDetailsScreen() {
             },
           ]}
         >
-          <Octicons
-            name="command-palette"
-            size={18}
-            color={Colors[theme].text_secondary}
-          />
+          {isSourceMode ? (
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 6,
+                opacity: sending ? 0.5 : 1,
+              }}
+            >
+              <Octicons name="link" size={18} color={Colors[theme].text} />
+              <Text
+                style={{
+                  color: Colors[theme].text,
+                  fontFamily: "FontMedium",
+                  fontSize: 13,
+                  marginLeft: 2,
+                }}
+              >
+                source
+              </Text>
+              <Pressable
+                disabled={sending}
+                onPress={() => setIsSourceMode(false)}
+              >
+                <Octicons
+                  name="x"
+                  size={16}
+                  color={Colors[theme].text_secondary}
+                  style={{ padding: 4 }}
+                />
+              </Pressable>
+              <View
+                style={{
+                  width: 1,
+                  height: 20,
+                  backgroundColor: Colors[theme].border,
+                  marginHorizontal: 4,
+                }}
+              />
+            </View>
+          ) : (
+            <Octicons
+              name="command-palette"
+              size={18}
+              color={Colors[theme].text_secondary}
+            />
+          )}
           <TextInput
             value={input}
             onChangeText={setInput}
@@ -1438,6 +1562,10 @@ export default function SnoopDetailsScreen() {
         onEdit={() => {
           setShowCommands(false);
           setTimeout(() => setShowEdit(true), 300);
+        }}
+        onAddSource={() => {
+          setShowCommands(false);
+          setTimeout(() => setIsSourceMode(true), 300);
         }}
         isProcessing={isProcessing}
       />
