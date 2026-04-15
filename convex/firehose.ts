@@ -72,6 +72,30 @@ async function verifyHeadlineWithGemini(
   }
 }
 
+async function verifySourceWithGemini(
+  content: string,
+  condition: string,
+  geminiKey: string,
+): Promise<boolean> {
+  const genAI = new GoogleGenerativeAI(geminiKey);
+  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
+
+  const prompt = `You are a strict fact-checker. Given the content of a web page, determine whether it satisfies the following condition.
+        Condition: "${condition}"
+        Content: "${content.substring(0, 15000)}"
+
+        Reply with ONLY "true" if the condition is satisfied, or "false" if it is not. No explanation.`;
+
+  try {
+    const result = await model.generateContent(prompt);
+    const text = result.response.text().trim().toLowerCase();
+    return text === "true";
+  } catch (err) {
+    console.error("Gemini source verification error:", err);
+    return false;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Gemini brief generation
 // ---------------------------------------------------------------------------
@@ -174,6 +198,21 @@ export const get_unique_canonical_topics = internalQuery({
   },
 });
 
+export const get_monitored_sources_for_items = internalQuery({
+  args: { watchlist_ids: v.array(v.id("watchlist")) },
+  handler: async (ctx, args) => {
+    const sources = await Promise.all(
+      args.watchlist_ids.map(async (id) => {
+        return await ctx.db
+          .query("monitored_sources")
+          .withIndex("by_watchlist", (q) => q.eq("watchlist_id", id))
+          .collect();
+      }),
+    );
+    return sources.flat();
+  },
+});
+
 // ---------------------------------------------------------------------------
 // Core internal action — runs the full firehose pipeline
 // ---------------------------------------------------------------------------
@@ -222,14 +261,141 @@ export const run_firehose = internalAction({
     );
     const processedSet = new Set<string>(processedKeys);
 
-    // 3. Build unique Tavily queries grouped by (topic, search_type, time_range)
+    // Collect verified headlines per watchlist item for brief generation
+    const verifiedByItem = new Map<
+      string,
+      {
+        item: (typeof activeItems)[0];
+        headlines: VerifiedHeadline[];
+      }
+    >();
+
+    // -----------------------------------------------------------------------
+    // NEW Phase 3A: Process Monitored Sources (The "First Option")
+    // -----------------------------------------------------------------------
+    const allMonitoredSources = await ctx.runQuery(
+      internal.firehose.get_monitored_sources_for_items,
+      { watchlist_ids: watchlistIds },
+    );
+
+    const sourcesByWatchlistId = new Map<
+      Id<"watchlist">,
+      typeof allMonitoredSources
+    >();
+    for (const source of allMonitoredSources) {
+      if (!sourcesByWatchlistId.has(source.watchlist_id)) {
+        sourcesByWatchlistId.set(source.watchlist_id, []);
+      }
+      sourcesByWatchlistId.get(source.watchlist_id)!.push(source);
+    }
+
+    const sourceUpdates: Array<{
+      source: (typeof allMonitoredSources)[0];
+      newHash: string;
+      newSnapshot: string;
+      satisfied: boolean;
+    }> = [];
+
+    // Parallel fetch and verify all sources
+    await Promise.all(
+      allMonitoredSources.map(async (source) => {
+        const extractResult = await ctx.runAction(
+          internal.tavily.extract_source,
+          { url: source.url },
+        );
+        if (!extractResult.success) return;
+
+        const snapshot = extractResult.content as string;
+        const newHash = await hashString(snapshot);
+
+        // Only process if the content hash has changed
+        if (newHash !== source.last_hash) {
+          const item = activeItems.find((i) => i._id === source.watchlist_id);
+          if (!item) return;
+
+          const satisfied = await verifySourceWithGemini(
+            snapshot,
+            item.condition,
+            geminiKey,
+          );
+
+          sourceUpdates.push({
+            source,
+            newHash,
+            newSnapshot: snapshot,
+            satisfied,
+          });
+        }
+      }),
+    );
+
+    // Save hash updates and process satisfied hits
+    for (const update of sourceUpdates) {
+      await ctx.runMutation(internal.chat.update_monitored_source_hash, {
+        monitored_source_id: update.source._id,
+        last_hash: update.newHash,
+        last_snapshot: update.newSnapshot,
+      });
+
+      if (update.satisfied) {
+        const item = activeItems.find(
+          (i) => i._id === update.source.watchlist_id,
+        )!;
+        if (!verifiedByItem.has(item._id)) {
+          verifiedByItem.set(item._id, { item, headlines: [] });
+        }
+
+        let hostname = "Source";
+        try {
+          hostname = new URL(update.source.url).hostname;
+        } catch {}
+
+        verifiedByItem.get(item._id)!.headlines.push({
+          title: `Source Update detected on ${hostname}`,
+          snippet:
+            update.newSnapshot.substring(0, 200).replace(/\n/g, " ") + "...",
+          url: update.source.url,
+          source: hostname,
+          hash: update.newHash,
+        });
+
+        console.log(`Firehose: Monitored Source HIT for "${item.title}"`);
+      }
+    }
+
+    // Determine fallback for general search
+    const itemsForGeneralSearch = activeItems.filter((item) => {
+      const sources = sourcesByWatchlistId.get(item._id) || [];
+
+      // Exclude if it has a primary source (primary = NO general search)
+      const primarySrc = sources.find((s) => s.source_weight === "primary");
+      if (primarySrc) return false;
+
+      // Exclude if it has a secondary source that got a HIT (skip general search if first option succeeded)
+      const secondarySatisfied = sources.some(
+        (s) =>
+          s.source_weight === "secondary" &&
+          sourceUpdates.some((su) => su.source._id === s._id && su.satisfied),
+      );
+      if (secondarySatisfied) return false;
+
+      return true; // Use general search
+    });
+
+    console.log(
+      `Firehose: ${itemsForGeneralSearch.length} items proceeding to General Search.`,
+    );
+
+    // -----------------------------------------------------------------------
+    // NEW Phase 3B: Build unique Tavily queries for items needing General Search
+    // -----------------------------------------------------------------------
     interface TavilyQuery {
       topic: string;
       searchType: "general" | "news";
       timeRange: "day" | "any_time";
     }
     const queryMap = new Map<string, TavilyQuery>();
-    for (const item of activeItems) {
+    for (const item of itemsForGeneralSearch) {
       if (!item.canonical_topic) continue;
       const type = item.search_type ?? "general";
       const range = item.time_range ?? "day";
@@ -290,16 +456,7 @@ export const run_firehose = internalAction({
       watchlist_id: Id<"watchlist">;
     }> = [];
 
-    // Collect verified headlines per watchlist item for brief generation
-    const verifiedByItem = new Map<
-      string,
-      {
-        item: (typeof activeItems)[0];
-        headlines: VerifiedHeadline[];
-      }
-    >();
-
-    for (const item of activeItems) {
+    for (const item of itemsForGeneralSearch) {
       let keywordMatches = 0;
       let verified = 0;
 

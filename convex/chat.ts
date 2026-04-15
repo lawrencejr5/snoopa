@@ -317,6 +317,20 @@ export const get_monitored_sources = query({
   },
 });
 
+export const update_monitored_source_hash = internalMutation({
+  args: {
+    monitored_source_id: v.id("monitored_sources"),
+    last_snapshot: v.string(),
+    last_hash: v.string(),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.monitored_source_id, {
+      last_snapshot: args.last_snapshot,
+      last_hash: args.last_hash,
+    });
+  },
+});
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
