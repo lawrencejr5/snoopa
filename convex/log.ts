@@ -50,7 +50,6 @@ export const get_new_logs_count = query({
       .withIndex("by_watchlist_time", (q) =>
         q.eq("watchlist_id", args.watchlist_id).gt("timestamp", args.since),
       )
-      .filter((q) => q.eq(q.field("verified"), true))
       .collect();
 
     return recent.length;
@@ -89,23 +88,15 @@ export const insert_log = internalMutation({
   args: {
     watchlist_id: v.id("watchlist"),
     action: v.string(),
-    verified: v.boolean(),
-    url: v.optional(v.string()),
-    session_id: v.optional(v.id("sessions")),
-    type: v.optional(v.union(v.literal("system"), v.literal("source"))),
-    chat_id: v.optional(v.id("chats")),
+    type: v.optional(v.union(v.literal("success"), v.literal("error"))),
   },
   handler: async (ctx, args) => {
     return await ctx.db.insert("logs", {
       watchlist_id: args.watchlist_id,
       timestamp: Date.now(),
       action: args.action,
-      verified: args.verified,
       seen: false,
-      url: args.url,
-      session_id: args.session_id,
       type: args.type,
-      chat_id: args.chat_id,
     });
   },
 });
@@ -259,10 +250,7 @@ export const batch_insert_logs = internalMutation({
       v.object({
         watchlist_id: v.id("watchlist"),
         action: v.string(),
-        url: v.optional(v.string()),
-        session_id: v.optional(v.id("sessions")),
-        type: v.optional(v.union(v.literal("system"), v.literal("source"))),
-        chat_id: v.optional(v.id("chats")),
+        type: v.optional(v.union(v.literal("success"), v.literal("error"))),
       }),
     ),
   },
@@ -274,12 +262,8 @@ export const batch_insert_logs = internalMutation({
           watchlist_id: e.watchlist_id,
           timestamp: now,
           action: e.action,
-          verified: true,
           seen: false,
-          url: e.url,
-          session_id: e.session_id,
           type: e.type,
-          chat_id: e.chat_id,
         }),
       ),
     );

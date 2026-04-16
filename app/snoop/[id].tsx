@@ -761,24 +761,21 @@ export default function SnoopDetailsScreen() {
   const timeline = useMemo(() => {
     const entries: Array<{
       id: string;
-      type: "log" | "user" | "snoopa" | "system";
+      type: "log" | "user" | "snoopa";
       content: string;
       timestamp: number;
-      verified?: boolean;
-      url?: string;
+      logType?: "success" | "error";
     }> = [];
 
     // Add logs
     if (logs) {
       for (const log of logs) {
-        if (log.type === "source") continue;
         entries.push({
           id: log._id,
           type: "log",
           content: log.action,
           timestamp: log.timestamp,
-          verified: log.verified,
-          url: log.url,
+          logType: log.type as "success" | "error",
         });
       }
     }
@@ -1291,18 +1288,13 @@ export default function SnoopDetailsScreen() {
                 : null;
             const showDateHeader = currentDateStr !== previousDateStr;
 
-            const lgSources =
-              logs?.filter(
-                (l: any) => l.type === "source" && l.chat_id === entry.id,
-              ) || [];
-            const chSources =
+            const entrySources =
               chatSources
                 ?.filter((s: any) => s.chat_id === entry.id)
                 .map((s: any) => ({
                   action: s.title,
                   url: s.url,
                 })) || [];
-            const entrySources = [...lgSources, ...chSources];
 
             return (
               <React.Fragment key={entry.id}>
@@ -1346,7 +1338,9 @@ export default function SnoopDetailsScreen() {
                       style={{
                         color:
                           entry.type === "log"
-                            ? Colors[theme].success
+                            ? entry.logType === "error"
+                              ? Colors[theme].danger
+                              : Colors[theme].success
                             : entry.type === "user"
                               ? Colors[theme].warning
                               : "#fff",
@@ -1387,22 +1381,21 @@ export default function SnoopDetailsScreen() {
                   </View>
 
                   {entry.type === "log" ? (
-                    <Pressable
-                      onPress={async () => {
-                        if (entry.url)
-                          await WebBrowser.openAuthSessionAsync(entry.url);
-                      }}
-                      style={{ width: "100%" }}
-                    >
+                    <View style={{ width: "100%" }}>
                       <Text
                         style={[
                           styles.termContent,
-                          { color: Colors[theme].lightgreen },
+                          {
+                            color:
+                              entry.logType === "error"
+                                ? Colors[theme].lightred
+                                : Colors[theme].lightgreen,
+                          },
                         ]}
                       >
                         {entry.content}
                       </Text>
-                    </Pressable>
+                    </View>
                   ) : entry.type === "user" ? (
                     <View style={{ width: "100%" }}>
                       <Text

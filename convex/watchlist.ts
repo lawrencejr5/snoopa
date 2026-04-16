@@ -156,10 +156,8 @@ export const add_watchlist_item = mutation({
       watchlist_id: id,
       timestamp: Date.now(),
       action: "Watchlist item created",
-      verified: true,
       seen: true,
-      session_id: args.session_id,
-      type: "system",
+      type: "success",
     });
 
     return id;
@@ -224,9 +222,8 @@ export const toggle_watchlist_status = mutation({
       watchlist_id: args.watchlist_id,
       timestamp: Date.now(),
       action: `Status changed to ${newStatus}`,
-      verified: true,
       seen: true,
-      type: "system",
+      type: "success",
     });
   },
 });
@@ -257,9 +254,8 @@ export const deactivate_watchlist = mutation({
       watchlist_id: args.watchlist_id,
       timestamp: Date.now(),
       action: "Tracking stopped (Inactive)",
-      verified: true,
       seen: true,
-      type: "system",
+      type: "success",
     });
   },
 });
@@ -290,9 +286,8 @@ export const reactivate_watchlist = mutation({
       watchlist_id: args.watchlist_id,
       timestamp: Date.now(),
       action: "Tracking resumed (Active)",
-      verified: true,
       seen: true,
-      type: "system",
+      type: "success",
     });
   },
 });

@@ -190,7 +190,6 @@ export const save_message = internalMutation({
       // User messages are always "seen" by the user; snoopa messages start unseen
       seen: args.role === "user" ? true : false,
       type: args.type,
-      sources: args.sources,
     });
 
     // Update session's last_updated time optionally tracking old flows
@@ -329,10 +328,8 @@ export const save_monitored_source_and_link = internalMutation({
       watchlist_id: args.watchlist_id,
       timestamp: Date.now(),
       action: action_text,
-      verified: true,
       seen: true,
-      url: args.url,
-      type: "system",
+      type: args.status === "success" ? "success" : "error",
     });
 
     return args.status === "success";

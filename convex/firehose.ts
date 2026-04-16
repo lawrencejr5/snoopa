@@ -531,41 +531,34 @@ export const run_firehose = internalAction({
 
       console.log(`Firehose: brief for "${item.title}" → "${brief}"`);
 
-      // 1. Send the brief as a chat message if the watchlist has a linked session
-      let chatId: Id<"chats"> | undefined;
-      if (item.session_id) {
-        chatId = await ctx.runMutation(internal.chat.save_message, {
-          session_id: item.session_id,
-          role: "snoopa",
-          content: brief,
-          type: "snoop",
-        });
-      }
+      // 1. Send the brief as a chat message mapping directly to the watchlist
+      const chatId = await ctx.runMutation(internal.chat.save_message, {
+        watchlist_id: item._id, // Focus correctly on watchlist mapping
+        role: "snoopa",
+        content: brief,
+        type: "snoop",
+      });
 
-      // 2. Build log entries: individual headlines as sources
-      const logEntries: Array<{
-        watchlist_id: (typeof activeItems)[0]["_id"];
-        action: string;
+      // 2. Build source entries: individual headlines as sources
+      const sourceEntries: Array<{
+        chat_id: Id<"chats">;
+        title: string;
         url?: string;
-        type: "source";
-        chat_id?: Id<"chats">;
       }> = [];
 
       for (const h of headlines) {
-        logEntries.push({
-          watchlist_id: item._id,
-          action: `${h.title}${h.source ? ` — ${h.source}` : ""}`,
-          url: h.url,
-          type: "source",
+        sourceEntries.push({
           chat_id: chatId,
+          title: `${h.title}${h.source ? ` — ${h.source}` : ""}`,
+          url: h.url,
         });
       }
 
-      // Batch insert logs
-      await ctx.runMutation(internal.log.batch_insert_logs, {
-        entries: logEntries,
+      // Batch insert sources
+      await ctx.runMutation(internal.chat.batch_insert_sources, {
+        entries: sourceEntries,
       });
-      totalAlerts += logEntries.length;
+      totalAlerts += sourceEntries.length;
 
       // 3. Save notification with the brief
       await ctx.runMutation(internal.notifications.save_notification, {
@@ -651,31 +644,26 @@ export const run_simulated_firehose = internalAction({
 
     console.log(`Simulated Firehose: triggering for "${item.title}"`);
 
-    // Send the brief as a chat message if the watchlist has a linked session
-    let chatId: Id<"chats"> | undefined;
-    if (item.session_id) {
-      chatId = await ctx.runMutation(internal.chat.save_message, {
-        session_id: item.session_id,
-        role: "snoopa",
-        content: args.briefing,
-        type: "snoop",
-      });
-    }
+    // Send the brief as a chat message tracking on watchlist mapping natively
+    const chatId = await ctx.runMutation(internal.chat.save_message, {
+      watchlist_id: item._id,
+      role: "snoopa",
+      content: args.briefing,
+      type: "snoop",
+    });
 
-    // Build log entries
-    const logEntries = [
+    // Build source entries
+    const sourceEntries = [
       {
-        watchlist_id: item._id,
-        action: `${args.fake_headline.title}${args.fake_headline.source ? ` — ${args.fake_headline.source}` : ""}`,
-        url: args.fake_headline.url,
-        type: "source" as const,
         chat_id: chatId,
+        title: `${args.fake_headline.title}${args.fake_headline.source ? ` — ${args.fake_headline.source}` : ""}`,
+        url: args.fake_headline.url,
       },
     ];
 
-    // Batch insert logs
-    await ctx.runMutation(internal.log.batch_insert_logs, {
-      entries: logEntries,
+    // Batch insert sources
+    await ctx.runMutation(internal.chat.batch_insert_sources, {
+      entries: sourceEntries,
     });
 
     // Save notification with the brief

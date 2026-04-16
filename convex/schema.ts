@@ -40,7 +40,6 @@ const schema = defineSchema({
         v.literal("source"),
       ),
     ),
-    sources: v.optional(v.array(v.string())),
   })
     .index("by_session", ["session_id"])
     .index("by_watchlist", ["watchlist_id"]),
@@ -79,15 +78,17 @@ const schema = defineSchema({
     watchlist_id: v.id("watchlist"),
     timestamp: v.number(),
     action: v.string(),
-    verified: v.boolean(),
     seen: v.optional(v.boolean()),
-    url: v.optional(v.string()),
-    session_id: v.optional(v.id("sessions")),
-    type: v.optional(v.union(v.literal("system"), v.literal("source"))),
-    chat_id: v.optional(v.id("chats")),
+    type: v.optional(
+      v.union(
+        v.literal("success"),
+        v.literal("error"),
+        v.literal("source"),
+        v.literal("system"),
+      ),
+    ),
   })
     .index("by_watchlist", ["watchlist_id"])
-    .index("by_session", ["session_id"])
     .index("by_watchlist_time", ["watchlist_id", "timestamp"]),
 
   notifications: defineTable({
