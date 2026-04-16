@@ -11,7 +11,7 @@ import {
   mutation,
   query,
 } from "./_generated/server";
-import { hashString } from "./utils";
+import { cleanUrl, hashString } from "./utils";
 
 /**
  * Get all messages mapping to a watchlist (or its legacy session).
@@ -580,6 +580,7 @@ export const send_message = action({
       if (!url.startsWith("http")) {
         url = `https://${url}`;
       }
+      url = cleanUrl(url);
       const extractResult = await ctx.runAction(
         internal.tavily.extract_source,
         { url },
@@ -963,6 +964,7 @@ export const initialize_watchlist = action({
         let url = urlMatch[0];
         url = url.replace(/[.,;!?]$/, "");
         if (!url.startsWith("http")) url = `https://${url}`;
+        url = cleanUrl(url);
 
         try {
           const extractResult = await ctx.runAction(

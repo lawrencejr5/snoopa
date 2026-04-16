@@ -9,3 +9,13 @@ export async function hashString(str: string): Promise<string> {
   const hashArray = Array.from(new Uint8Array(hashBuffer));
   return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
 }
+
+/**
+ * Strips tracking parameters from long URLs.
+ */
+export function cleanUrl(url: string): string {
+  if (url.length > 200 && url.includes("?")) {
+    return url.split("?")[0];
+  }
+  return url;
+}

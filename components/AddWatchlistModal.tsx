@@ -107,6 +107,20 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
     onClose();
   };
 
+  const handleInputChange = (text: string) => {
+    const urlRegex =
+      /(?:https?:\/\/)?([a-zA-Z0-9][-a-zA-Z0-9]*\.[a-zA-Z][-a-zA-Z0-9.]*[a-zA-Z]{2,}(?:\/[^\s]*)?)/g;
+
+    const cleanedText = text.replace(urlRegex, (match) => {
+      if (match.length > 200 && match.includes("?")) {
+        return match.split("?")[0];
+      }
+      return match;
+    });
+
+    setPrompt(cleanedText);
+  };
+
   return (
     <BottomSheet
       ref={bottomSheetRef}
@@ -176,7 +190,7 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
         <View style={{ width: "100%" }}>
           <TextInput
             value={prompt}
-            onChangeText={setPrompt}
+            onChangeText={handleInputChange}
             onFocus={() => {
               setIsFocused(true);
               bottomSheetRef.current?.snapToIndex(1);
