@@ -33,31 +33,28 @@ export const get_messages = query({
         return [];
       }
 
-      const watchlistChats = await ctx.db
+      combined = await ctx.db
         .query("chats")
         .withIndex("by_watchlist", (q) =>
           q.eq("watchlist_id", args.watchlist_id!),
         )
         .order("asc")
         .collect();
-
-      let sessionChats: any[] = [];
-      if (watchlist.session_id) {
-        sessionChats = await ctx.db
-          .query("chats")
-          .withIndex("by_session", (q) =>
-            q.eq("session_id", watchlist.session_id!),
-          )
-          .order("asc")
-          .collect();
-      }
-      combined = [...sessionChats, ...watchlistChats];
     } else if (args.session_id) {
-      combined = await ctx.db
-        .query("chats")
+      // Find watchlists for this session
+      const watchlists = await ctx.db
+        .query("watchlist")
         .withIndex("by_session", (q) => q.eq("session_id", args.session_id!))
-        .order("asc")
         .collect();
+
+      for (const w of watchlists) {
+        const chats = await ctx.db
+          .query("chats")
+          .withIndex("by_watchlist", (q) => q.eq("watchlist_id", w._id))
+          .collect();
+        combined.push(...chats);
+      }
+      combined.sort((a, b) => a._creationTime - b._creationTime);
     }
 
     return combined.sort((a, b) => a._creationTime - b._creationTime);
@@ -84,20 +81,7 @@ export const get_unseen_chats_count = query({
       )
       .collect();
 
-    let unseenLegacy: any[] = [];
-    if (watchlist.session_id) {
-      unseenLegacy = await ctx.db
-        .query("chats")
-        .withIndex("by_session", (q) =>
-          q.eq("session_id", watchlist.session_id!),
-        )
-        .filter((q) =>
-          q.and(q.eq(q.field("role"), "snoopa"), q.eq(q.field("seen"), false)),
-        )
-        .collect();
-    }
-
-    return unseenWl.length + unseenLegacy.length;
+    return unseenWl.length;
   },
 });
 
@@ -113,8 +97,6 @@ export const mark_chats_seen = mutation({
     const user_id = await getAuthUserId(ctx);
     if (!user_id) return;
 
-    let unseenChats: any[] = [];
-
     if (args.watchlist_id) {
       const watchlist = await ctx.db.get(args.watchlist_id);
       if (!watchlist || watchlist.user_id !== user_id) return;
@@ -129,13 +111,20 @@ export const mark_chats_seen = mutation({
         )
         .collect();
 
-      let unseenLegacy: any[] = [];
-      if (watchlist.session_id) {
-        unseenLegacy = await ctx.db
+      await Promise.all(
+        unseenWl.map((chat) => ctx.db.patch(chat._id, { seen: true })),
+      );
+    } else if (args.session_id) {
+      // Find watchlists for this session and mark their chats
+      const watchlists = await ctx.db
+        .query("watchlist")
+        .withIndex("by_session", (q) => q.eq("session_id", args.session_id!))
+        .collect();
+
+      for (const w of watchlists) {
+        const chats = await ctx.db
           .query("chats")
-          .withIndex("by_session", (q) =>
-            q.eq("session_id", watchlist.session_id!),
-          )
+          .withIndex("by_watchlist", (q) => q.eq("watchlist_id", w._id))
           .filter((q) =>
             q.and(
               q.eq(q.field("role"), "snoopa"),
@@ -143,21 +132,11 @@ export const mark_chats_seen = mutation({
             ),
           )
           .collect();
+        await Promise.all(
+          chats.map((chat) => ctx.db.patch(chat._id, { seen: true })),
+        );
       }
-      unseenChats = [...unseenWl, ...unseenLegacy];
-    } else if (args.session_id) {
-      unseenChats = await ctx.db
-        .query("chats")
-        .withIndex("by_session", (q) => q.eq("session_id", args.session_id!))
-        .filter((q) =>
-          q.and(q.eq(q.field("role"), "snoopa"), q.eq(q.field("seen"), false)),
-        )
-        .collect();
     }
-
-    await Promise.all(
-      unseenChats.map((chat) => ctx.db.patch(chat._id, { seen: true })),
-    );
   },
 });
 
@@ -166,7 +145,6 @@ export const mark_chats_seen = mutation({
  */
 export const save_message = internalMutation({
   args: {
-    session_id: v.optional(v.id("sessions")),
     watchlist_id: v.optional(v.id("watchlist")),
     role: v.union(v.literal("user"), v.literal("snoopa")),
     content: v.string(),
@@ -183,7 +161,6 @@ export const save_message = internalMutation({
   },
   handler: async (ctx, args) => {
     const message = await ctx.db.insert("chats", {
-      session_id: args.session_id,
       watchlist_id: args.watchlist_id,
       role: args.role,
       content: args.content,
@@ -191,13 +168,6 @@ export const save_message = internalMutation({
       seen: args.role === "user" ? true : false,
       type: args.type,
     });
-
-    // Update session's last_updated time optionally tracking old flows
-    if (args.session_id) {
-      await ctx.db.patch(args.session_id, {
-        last_updated: Date.now(),
-      });
-    }
 
     // Update watchlist's last_checked time
     if (args.watchlist_id) {
@@ -229,17 +199,7 @@ export const get_session_sources = query({
       .withIndex("by_watchlist", (q) => q.eq("watchlist_id", args.watchlist_id))
       .collect();
 
-    let legacyChats: any[] = [];
-    if (watchlist.session_id) {
-      legacyChats = await ctx.db
-        .query("chats")
-        .withIndex("by_session", (q) =>
-          q.eq("session_id", watchlist.session_id!),
-        )
-        .collect();
-    }
-
-    const allChats = [...legacyChats, ...watchlistChats];
+    const allChats = watchlistChats;
     const sources = [];
     for (const chat of allChats) {
       const chatSources = await ctx.db
@@ -504,10 +464,10 @@ export const send_message = action({
 
     // 2. Save user message
     await ctx.runMutation(internal.chat.save_message, {
-      session_id: args.session_id,
       watchlist_id: args.watchlist_id,
       role: "user",
       content: args.content,
+      type: "chat",
     });
 
     // 3. Append current message and apply context window truncation
@@ -561,7 +521,6 @@ export const send_message = action({
       if (!urlMatch) {
         const response_text = "Please provide a valid URL for me to track.";
         await ctx.runMutation(internal.chat.save_message, {
-          session_id: args.session_id,
           watchlist_id: args.watchlist_id,
           role: "snoopa",
           content: response_text,
@@ -593,7 +552,6 @@ export const send_message = action({
         }
         const response_text = `I noticed you provided a link (${url}), but I couldn't extract any trackable content from it. Please double-check the URL or try a different source if you want me to monitor it.`;
         await ctx.runMutation(internal.chat.save_message, {
-          session_id: args.session_id,
           watchlist_id: args.watchlist_id,
           role: "snoopa",
           content: response_text,
@@ -629,7 +587,6 @@ export const send_message = action({
       const response_text =
         "Source saved successfully! I'll keep a close eye on it.";
       await ctx.runMutation(internal.chat.save_message, {
-        session_id: args.session_id,
         watchlist_id: args.watchlist_id,
         role: "snoopa",
         content: response_text,
@@ -779,7 +736,6 @@ export const send_message = action({
         const error_message =
           "Sorry, I hit a snag while snooping. Try again in a bit.";
         await ctx.runMutation(internal.chat.save_message, {
-          session_id: args.session_id,
           watchlist_id: args.watchlist_id,
           role: "snoopa",
           content: error_message,
@@ -791,7 +747,6 @@ export const send_message = action({
 
     // 9. Save AI response
     const chatMsgId = await ctx.runMutation(internal.chat.save_message, {
-      session_id: args.session_id,
       watchlist_id: args.watchlist_id,
       role: "snoopa",
       content: response_text,
@@ -827,11 +782,20 @@ export const get_messages_internal = internalQuery({
 export const get_messages_internal_session = internalQuery({
   args: { session_id: v.id("sessions"), user_id: v.id("users") },
   handler: async (ctx, args) => {
-    return await ctx.db
-      .query("chats")
+    const watchlists = await ctx.db
+      .query("watchlist")
       .withIndex("by_session", (q) => q.eq("session_id", args.session_id))
-      .order("asc")
       .collect();
+
+    let combined: any[] = [];
+    for (const w of watchlists) {
+      const chats = await ctx.db
+        .query("chats")
+        .withIndex("by_watchlist", (q) => q.eq("watchlist_id", w._id))
+        .collect();
+      combined.push(...chats);
+    }
+    return combined.sort((a, b) => a._creationTime - b._creationTime);
   },
 });
 

@@ -26,7 +26,6 @@ const schema = defineSchema({
     .index("by_user_updated", ["user_id", "last_updated"]),
 
   chats: defineTable({
-    session_id: v.optional(v.id("sessions")),
     watchlist_id: v.optional(v.id("watchlist")),
     role: v.union(v.literal("user"), v.literal("snoopa")),
     content: v.string(),
@@ -40,9 +39,7 @@ const schema = defineSchema({
         v.literal("source"),
       ),
     ),
-  })
-    .index("by_session", ["session_id"])
-    .index("by_watchlist", ["watchlist_id"]),
+  }).index("by_watchlist", ["watchlist_id"]),
 
   watchlist: defineTable({
     user_id: v.id("users"),

@@ -76,12 +76,8 @@ export const get_saved_message_ids = query({
     // Filter for items that have message_id and belong to this session
     const messageIds: string[] = [];
     for (const item of watchlistItems) {
-      if (item.message_id) {
-        // Verify the message belongs to this session
-        const message = await ctx.db.get(item.message_id);
-        if (message && message.session_id === args.session_id) {
-          messageIds.push(item.message_id);
-        }
+      if (item.message_id && item.session_id === args.session_id) {
+        messageIds.push(item.message_id);
       }
     }
 

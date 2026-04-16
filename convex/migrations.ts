@@ -98,3 +98,65 @@ export const remove_watchlist_id_from_sources = internalMutation({
     return `Cleared watchlist_id from ${count} sources.`;
   },
 });
+
+export const migrate_chat_types = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const chats = await ctx.db.query("chats").collect();
+    let count = 0;
+    for (const chat of chats) {
+      if (chat.type === undefined) {
+        await ctx.db.patch(chat._id, { type: "chat" });
+        count++;
+      }
+    }
+    return `Migrated ${count} chats to type 'chat'.`;
+  },
+});
+
+export const migrate_chats_session_to_watchlist = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const watchlists = await ctx.db.query("watchlist").collect();
+    let chatUpdateCount = 0;
+    let sessionClearCount = 0;
+
+    // 1. Map chats with session_id to their watchlist_id
+    for (const watchlist of watchlists) {
+      if (watchlist.session_id) {
+        const chats = await ctx.db
+          .query("chats")
+          .collect();
+        const filteredChats = chats.filter((c: any) => c.session_id === watchlist.session_id);
+
+        for (const chat of filteredChats) {
+          if (!chat.watchlist_id) {
+            await ctx.db.patch(chat._id, { watchlist_id: watchlist._id });
+            chatUpdateCount++;
+          }
+        }
+      }
+    }
+
+    // 2. Clear all session_id from all chats
+    const allChats = await ctx.db.query("chats").collect();
+    for (const chat of allChats) {
+      if ((chat as any).session_id !== undefined) {
+        await ctx.db.patch(chat._id, { session_id: undefined } as any);
+        sessionClearCount++;
+      }
+    }
+
+    // 3. Delete every chat where watchlist_id is empty
+    const finalChats = await ctx.db.query("chats").collect();
+    let deleteCount = 0;
+    for (const chat of finalChats) {
+      if (!chat.watchlist_id) {
+        await ctx.db.delete(chat._id);
+        deleteCount++;
+      }
+    }
+
+    return `Updated ${chatUpdateCount} chats with watchlist IDs, cleared ${sessionClearCount} session IDs, and deleted ${deleteCount} orphaned chats.`;
+  },
+});
