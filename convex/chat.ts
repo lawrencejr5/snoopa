@@ -283,27 +283,59 @@ export const batch_insert_sources = internalMutation({
 export const save_monitored_source_and_link = internalMutation({
   args: {
     url: v.string(),
-    last_snapshot: v.string(),
-    last_hash: v.string(),
     watchlist_id: v.id("watchlist"),
-    source_weight: v.union(v.literal("primary"), v.literal("secondary")),
+    status: v.union(v.literal("success"), v.literal("failure")),
+    last_snapshot: v.optional(v.string()),
+    last_hash: v.optional(v.string()),
+    source_weight: v.optional(
+      v.union(v.literal("primary"), v.literal("secondary")),
+    ),
   },
   handler: async (ctx, args) => {
-    const monitored_source_id = await ctx.db.insert("monitored_sources", {
+    let action_text = "";
+    let hostname = "Source";
+    try {
+      hostname = new URL(args.url).hostname;
+    } catch {}
+
+    if (
+      args.status === "success" &&
+      args.last_snapshot &&
+      args.last_hash &&
+      args.source_weight
+    ) {
+      const monitored_source_id = await ctx.db.insert("monitored_sources", {
+        watchlist_id: args.watchlist_id,
+        url: args.url,
+        last_snapshot: args.last_snapshot,
+        last_hash: args.last_hash,
+        source_weight: args.source_weight,
+      });
+
+      const watchlist = await ctx.db.get(args.watchlist_id);
+      if (watchlist) {
+        const sources = watchlist.sources || [];
+        sources.push(monitored_source_id as string);
+        await ctx.db.patch(args.watchlist_id, { sources });
+      }
+
+      action_text = `Source saved successfully: ${hostname}`;
+    } else {
+      action_text = `Failed to save source: ${hostname}`;
+    }
+
+    // Save system log
+    await ctx.db.insert("logs", {
       watchlist_id: args.watchlist_id,
+      timestamp: Date.now(),
+      action: action_text,
+      verified: true,
+      seen: true,
       url: args.url,
-      last_snapshot: args.last_snapshot,
-      last_hash: args.last_hash,
-      source_weight: args.source_weight,
+      type: "system",
     });
 
-    const watchlist = await ctx.db.get(args.watchlist_id);
-    if (watchlist) {
-      const sources = watchlist.sources || [];
-      sources.push(monitored_source_id as string);
-      await ctx.db.patch(args.watchlist_id, { sources });
-    }
-    return monitored_source_id;
+    return args.status === "success";
   },
 });
 
@@ -554,8 +586,14 @@ export const send_message = action({
       );
 
       if (!extractResult.success) {
-        const response_text =
-          "I couldn't fetch data from that URL right now. Make sure the link is correct.";
+        if (args.watchlist_id) {
+          await ctx.runMutation(internal.chat.save_monitored_source_and_link, {
+            url,
+            watchlist_id: args.watchlist_id,
+            status: "failure",
+          });
+        }
+        const response_text = `I noticed you provided a link (${url}), but I couldn't extract any trackable content from it. Please double-check the URL or try a different source if you want me to monitor it.`;
         await ctx.runMutation(internal.chat.save_message, {
           session_id: args.session_id,
           watchlist_id: args.watchlist_id,
@@ -586,6 +624,7 @@ export const send_message = action({
           last_hash: last_hash as string,
           watchlist_id: args.watchlist_id,
           source_weight,
+          status: "success",
         });
       }
 
@@ -881,14 +920,14 @@ export const initialize_watchlist = action({
       const response_text = result.choices[0].message.content ?? "";
       let wl_id: Id<"watchlist"> | undefined;
       let final_snoop_text = response_text;
+      let payload: any;
 
       // Extract JSON payload natively
       const delimiterIndex = response_text.indexOf("---WATCHLIST_DATA---");
       if (delimiterIndex !== -1) {
         final_snoop_text = response_text.substring(0, delimiterIndex).trim();
         const jsonBody = response_text.substring(delimiterIndex + 20).trim();
-
-        const payload = JSON.parse(jsonBody);
+        payload = JSON.parse(jsonBody);
 
         // Spin up the native watchlist item using parsed AI metrics
         wl_id = await ctx.runMutation(api.watchlist.add_watchlist_item, {
@@ -911,10 +950,83 @@ export const initialize_watchlist = action({
         content: args.prompt,
       });
 
+      // -----------------------------------------------------------------------
+      // NEW: Source Extraction phase for initial prompt
+      // -----------------------------------------------------------------------
+      const urlRegex =
+        /(?:https?:\/\/)?([a-zA-Z0-9][-a-zA-Z0-9]*\.[a-zA-Z][-a-zA-Z0-9.]*[a-zA-Z]{2,}(?:\/[^\s]*)?)/;
+      const urlMatch = args.prompt.match(urlRegex);
+      let sourceInfoText = "";
+      let extractionFailed = false;
+
+      if (urlMatch && wl_id) {
+        let url = urlMatch[0];
+        url = url.replace(/[.,;!?]$/, "");
+        if (!url.startsWith("http")) url = `https://${url}`;
+
+        try {
+          const extractResult = await ctx.runAction(
+            internal.tavily.extract_source,
+            { url },
+          );
+          if (extractResult.success) {
+            const snapshot = extractResult.content as string;
+            const last_hash = await hashString(snapshot);
+
+            // Determine source weight
+            const source_weight = await _determineSourceWeight(
+              args.prompt,
+              payload.condition,
+            );
+
+            await ctx.runMutation(
+              internal.chat.save_monitored_source_and_link,
+              {
+                url,
+                last_snapshot: snapshot,
+                last_hash,
+                watchlist_id: wl_id,
+                source_weight,
+                status: "success",
+              },
+            );
+
+            sourceInfoText = `\n\nI've also added ${url} as a ${source_weight} source to keep a close eye on it for changes.`;
+          } else {
+            extractionFailed = true;
+            await ctx.runMutation(
+              internal.chat.save_monitored_source_and_link,
+              {
+                url,
+                watchlist_id: wl_id,
+                status: "failure",
+              },
+            );
+            sourceInfoText = `I noticed you provided a link (${url}), but I couldn't extract any trackable content from it. Please double-check the URL or try a different source later if you want me to monitor it.`;
+          }
+        } catch (err) {
+          console.error("Failed to extract source during initialization:", err);
+          extractionFailed = true;
+          if (wl_id) {
+            await ctx.runMutation(
+              internal.chat.save_monitored_source_and_link,
+              {
+                url,
+                watchlist_id: wl_id,
+                status: "failure",
+              },
+            );
+          }
+          sourceInfoText = `I encountered an issue trying to process the link you provided (${url}). You might want to try adding it again once we're inside the snoop dashboard.`;
+        }
+      }
+
       await ctx.runMutation(internal.chat.save_message, {
         watchlist_id: wl_id,
         role: "snoopa",
-        content: final_snoop_text,
+        content: extractionFailed
+          ? sourceInfoText
+          : final_snoop_text + sourceInfoText,
         type: "watchlist",
       });
 

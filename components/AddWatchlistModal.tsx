@@ -187,7 +187,7 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
             }}
             multiline
             maxLength={500}
-            placeholder='e.g. "Let me know when Eder Militão returns to training"'
+            placeholder='e.g. "Track the price of this product from https://example.com/product"'
             placeholderTextColor={Colors[theme].text_secondary + "80"}
             editable={!isProcessing}
             style={[
@@ -304,7 +304,7 @@ const styles = StyleSheet.create({
     fontFamily: "FontRegular",
     fontSize: 14,
     lineHeight: 20,
-    minHeight: 100,
+    height: 100,
     textAlignVertical: "top",
     marginBottom: 10,
   },
