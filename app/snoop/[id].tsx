@@ -523,6 +523,112 @@ function EditModal({
 }
 
 // ---------------------------------------------------------------------------
+// Confirmation Modal
+// ---------------------------------------------------------------------------
+function ConfirmationModal({
+  visible,
+  onClose,
+  onConfirm,
+  title,
+  message,
+  isProcessing,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  title: string;
+  message: string;
+  isProcessing: boolean;
+}) {
+  const { theme } = useTheme();
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: "rgba(0,0,0,0.8)",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: 24,
+        }}
+      >
+        <Animated.View
+          entering={FadeInDown}
+          style={{
+            width: "100%",
+            backgroundColor: Colors[theme].card,
+            borderRadius: 24,
+            padding: 24,
+            borderWidth: 1,
+            borderColor: Colors[theme].border,
+          }}
+        >
+          <Text
+            style={{
+              color: Colors[theme].text,
+              fontFamily: "FontBold",
+              fontSize: 20,
+              marginBottom: 12,
+            }}
+          >
+            {title}
+          </Text>
+          <Text
+            style={{
+              color: Colors[theme].text_secondary,
+              fontFamily: "FontRegular",
+              fontSize: 15,
+              lineHeight: 22,
+              marginBottom: 32,
+            }}
+          >
+            {message}
+          </Text>
+
+          <View style={{ flexDirection: "row", gap: 12 }}>
+            <Pressable
+              onPress={onClose}
+              disabled={isProcessing}
+              style={{
+                flex: 1,
+                paddingVertical: 14,
+                borderRadius: 14,
+                backgroundColor: Colors[theme].surface,
+                alignItems: "center",
+                borderWidth: 1,
+                borderColor: Colors[theme].border,
+              }}
+            >
+              <Text style={{ color: Colors[theme].text, fontFamily: "FontBold", fontSize: 15 }}>
+                No, Keep it
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={onConfirm}
+              disabled={isProcessing}
+              style={{
+                flex: 1,
+                paddingVertical: 14,
+                borderRadius: 14,
+                backgroundColor: Colors[theme].danger,
+                alignItems: "center",
+              }}
+            >
+              {isProcessing ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <Text style={{ color: "#fff", fontFamily: "FontBold", fontSize: 15 }}>Yes, Delete</Text>
+              )}
+            </Pressable>
+          </View>
+        </Animated.View>
+      </View>
+    </Modal>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 const getFaviconUrl = (url?: string) => {
@@ -712,6 +818,7 @@ export default function SnoopDetailsScreen() {
   const [selectedSources, setSelectedSources] = useState<any[]>([]);
   const [isSourceMode, setIsSourceMode] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
+  const [showConfirmation, setShowConfirmation] = useState(false);
 
   // Data
   const snoop = useQuery(
@@ -857,7 +964,12 @@ export default function SnoopDetailsScreen() {
   };
 
   // Command handlers
-  const handleTerminate = async () => {
+  const handleTerminate = () => {
+    setShowCommands(false);
+    setTimeout(() => setShowConfirmation(true), 300);
+  };
+
+  const confirmTerminate = async () => {
     if (!id || isProcessing) return;
     setIsProcessing(true);
     try {
@@ -867,6 +979,7 @@ export default function SnoopDetailsScreen() {
       console.error("Terminate failed:", e);
     } finally {
       setIsProcessing(false);
+      setShowConfirmation(false);
     }
   };
 
@@ -1643,6 +1756,16 @@ export default function SnoopDetailsScreen() {
         onClose={() => setShowEdit(false)}
         currentCondition={snoop.condition}
         onSave={handleEdit}
+        isProcessing={isProcessing}
+      />
+
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        visible={showConfirmation}
+        onClose={() => setShowConfirmation(false)}
+        onConfirm={confirmTerminate}
+        title="Delete Watchlist?"
+        message={`Are you sure you want to delete "${snoop.title}"? This will permanently remove all logs, chat history, and sources associated with this snoop.`}
         isProcessing={isProcessing}
       />
 

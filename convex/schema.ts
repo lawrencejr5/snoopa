@@ -92,7 +92,9 @@ const schema = defineSchema({
     seen: v.boolean(),
     read: v.boolean(),
     watchlist_id: v.optional(v.id("watchlist")),
-  }).index("by_user", ["user_id"]),
+  })
+    .index("by_user", ["user_id"])
+    .index("by_watchlist", ["watchlist_id"]),
 
   waitlist: defineTable({
     email: v.string(),

@@ -327,23 +327,26 @@ export const delete_watchlist_item = mutation({
       throw new Error("Watchlist item not found or unauthorized");
     }
 
-    // Delete associated logs first
-    const logs = await ctx.db
-      .query("logs")
-      .withIndex("by_watchlist", (q) => q.eq("watchlist_id", args.watchlist_id))
-      .collect();
+    // 1. Gather all related data IDs
+    const [logs, chats, sources, monitoredSources, notifications, processedHeadlines] = await Promise.all([
+      ctx.db.query("logs").withIndex("by_watchlist", (q) => q.eq("watchlist_id", args.watchlist_id)).collect(),
+      ctx.db.query("chats").withIndex("by_watchlist", (q) => q.eq("watchlist_id", args.watchlist_id)).collect(),
+      ctx.db.query("sources").withIndex("by_watchlist", (q) => q.eq("watchlist_id", args.watchlist_id)).collect(),
+      ctx.db.query("monitored_sources").withIndex("by_watchlist", (q) => q.eq("watchlist_id", args.watchlist_id)).collect(),
+      ctx.db.query("notifications").withIndex("by_watchlist", (q) => q.eq("watchlist_id", args.watchlist_id)).collect(),
+      ctx.db.query("processed_headlines").withIndex("by_watchlist", (q) => q.eq("watchlist_id", args.watchlist_id)).collect(),
+    ]);
 
-    await Promise.all(logs.map((log) => ctx.db.delete(log._id)));
-
-    // Delete associated chats
-    const chats = await ctx.db
-      .query("chats")
-      .withIndex("by_watchlist", (q) => q.eq("watchlist_id", args.watchlist_id))
-      .collect();
-
-    await Promise.all(chats.map((chat) => ctx.db.delete(chat._id)));
-
-    // Delete the watchlist item
-    await ctx.db.delete(args.watchlist_id);
+    // 2. Delete everything in parallel groups to avoid large single transaction if possible
+    // (Though Convex handles this as one transaction anyway)
+    await Promise.all([
+      ...logs.map((log) => ctx.db.delete(log._id)),
+      ...chats.map((chat) => ctx.db.delete(chat._id)),
+      ...sources.map((s) => ctx.db.delete(s._id)),
+      ...monitoredSources.map((ms) => ctx.db.delete(ms._id)),
+      ...notifications.map((n) => ctx.db.delete(n._id)),
+      ...processedHeadlines.map((ph) => ctx.db.delete(ph._id)),
+      ctx.db.delete(args.watchlist_id),
+    ]);
   },
 });
