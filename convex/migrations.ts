@@ -37,13 +37,18 @@ export const migrate_logs_to_sources = internalMutation({
     let migratedCount = 0;
 
     for (const log of logs) {
-      if ((log as any).type === "source" && (log as any).chat_id) {
-        await ctx.db.insert("sources", {
-          chat_id: (log as any).chat_id,
-          title: log.action,
-          url: (log as any).url,
-        });
-        migratedCount++;
+      const dbLog = log as any;
+      if (dbLog.type === "source" && dbLog.chat_id) {
+        const chat = (await ctx.db.get(dbLog.chat_id)) as any;
+        if (chat && chat.watchlist_id) {
+          await ctx.db.insert("sources", {
+            watchlist_id: chat.watchlist_id,
+            chat_id: dbLog.chat_id,
+            title: log.action,
+            url: dbLog.url,
+          });
+          migratedCount++;
+        }
       }
     }
 
@@ -177,5 +182,23 @@ export const wipe_watchlist_ids = internalMutation({
       }
     }
     return `Wiped IDs from ${count} watchlist items.`;
+  },
+});
+
+export const backfill_watchlist_id_to_sources = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const sources = await ctx.db.query("sources").collect();
+    let count = 0;
+    for (const source of sources) {
+      if (!(source as any).watchlist_id) {
+        const chat = await ctx.db.get(source.chat_id);
+        if (chat && chat.watchlist_id) {
+          await ctx.db.patch(source._id, { watchlist_id: chat.watchlist_id });
+          count++;
+        }
+      }
+    }
+    return `Backfilled watchlist_id for ${count} sources.`;
   },
 });

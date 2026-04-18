@@ -189,6 +189,7 @@ export const batch_insert_sources = internalMutation({
   args: {
     entries: v.array(
       v.object({
+        watchlist_id: v.id("watchlist"),
         chat_id: v.id("chats"),
         title: v.string(),
         url: v.optional(v.string()),
@@ -199,6 +200,7 @@ export const batch_insert_sources = internalMutation({
     await Promise.all(
       args.entries.map((e) =>
         ctx.db.insert("sources", {
+          watchlist_id: e.watchlist_id,
           chat_id: e.chat_id,
           title: e.title,
           url: e.url,
@@ -724,6 +726,7 @@ export const send_message = action({
 
     if (capturedSources.length > 0) {
       const sourceEntries = capturedSources.map((s) => ({
+        watchlist_id: args.watchlist_id!,
         chat_id: chatMsgId,
         title: s.title,
         url: s.url,

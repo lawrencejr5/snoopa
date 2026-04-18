@@ -541,6 +541,7 @@ export const run_firehose = internalAction({
 
       // 2. Build source entries: individual headlines as sources
       const sourceEntries: Array<{
+        watchlist_id: Id<"watchlist">;
         chat_id: Id<"chats">;
         title: string;
         url?: string;
@@ -548,6 +549,7 @@ export const run_firehose = internalAction({
 
       for (const h of headlines) {
         sourceEntries.push({
+          watchlist_id: item._id,
           chat_id: chatId,
           title: `${h.title}${h.source ? ` — ${h.source}` : ""}`,
           url: h.url,
@@ -655,6 +657,7 @@ export const run_simulated_firehose = internalAction({
     // Build source entries
     const sourceEntries = [
       {
+        watchlist_id: item._id,
         chat_id: chatId,
         title: `${args.fake_headline.title}${args.fake_headline.source ? ` — ${args.fake_headline.source}` : ""}`,
         url: args.fake_headline.url,

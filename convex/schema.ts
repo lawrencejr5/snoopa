@@ -102,10 +102,13 @@ const schema = defineSchema({
   }).index("by_email", ["email"]),
 
   sources: defineTable({
+    watchlist_id: v.optional(v.id("watchlist")),
     chat_id: v.id("chats"),
     title: v.string(),
-    url: v.optional(v.string()), // The original schema says url can be string or omitted from tavily sometimes, so let's make it optional just in case. Wait, if we want strict url, we keep it v.string() but let's use optional as well to be safe
-  }).index("by_chat", ["chat_id"]),
+    url: v.optional(v.string()),
+  })
+    .index("by_watchlist", ["watchlist_id"])
+    .index("by_chat", ["chat_id"]),
 
   monitored_sources: defineTable({
     watchlist_id: v.id("watchlist"),
