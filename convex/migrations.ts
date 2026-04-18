@@ -123,11 +123,12 @@ export const migrate_chats_session_to_watchlist = internalMutation({
 
     // 1. Map chats with session_id to their watchlist_id
     for (const watchlist of watchlists) {
-      if (watchlist.session_id) {
+      const dbWl = watchlist as any;
+      if (dbWl.session_id) {
         const chats = await ctx.db
           .query("chats")
           .collect();
-        const filteredChats = chats.filter((c: any) => c.session_id === watchlist.session_id);
+        const filteredChats = chats.filter((c: any) => c.session_id === dbWl.session_id);
 
         for (const chat of filteredChats) {
           if (!chat.watchlist_id) {
@@ -158,5 +159,23 @@ export const migrate_chats_session_to_watchlist = internalMutation({
     }
 
     return `Updated ${chatUpdateCount} chats with watchlist IDs, cleared ${sessionClearCount} session IDs, and deleted ${deleteCount} orphaned chats.`;
+  },
+});
+
+export const wipe_watchlist_ids = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const items = await ctx.db.query("watchlist").collect();
+    let count = 0;
+    for (const item of items) {
+      if ((item as any).message_id !== undefined || (item as any).session_id !== undefined) {
+        await ctx.db.patch(item._id, {
+          message_id: undefined,
+          session_id: undefined,
+        } as any);
+        count++;
+      }
+    }
+    return `Wiped IDs from ${count} watchlist items.`;
   },
 });

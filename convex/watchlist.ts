@@ -63,8 +63,8 @@ export const get_watchlist_logs = query({
  * Used to show which messages have already been saved.
  */
 export const get_saved_message_ids = query({
-  args: { session_id: v.id("sessions") },
-  handler: async (ctx, args) => {
+  args: {},
+  handler: async (ctx) => {
     const user_id = await getAuthUserId(ctx);
     if (!user_id) return [];
 
@@ -73,15 +73,9 @@ export const get_saved_message_ids = query({
       .withIndex("by_user", (q) => q.eq("user_id", user_id))
       .collect();
 
-    // Filter for items that have message_id and belong to this session
-    const messageIds: string[] = [];
-    for (const item of watchlistItems) {
-      if (item.message_id && item.session_id === args.session_id) {
-        messageIds.push(item.message_id);
-      }
-    }
-
-    return messageIds;
+    // Filter for items that have a message_id (Wait, we removed it, so this whole logic is likely deprecated)
+    // For now we'll just return an empty array if the user is asking for saved message IDs via session
+    return [];
   },
 });
 
@@ -124,8 +118,6 @@ export const add_watchlist_item = mutation({
       v.union(v.literal("day"), v.literal("any_time")),
     ),
     sources: v.optional(v.array(v.string())),
-    message_id: v.optional(v.id("chats")),
-    session_id: v.optional(v.id("sessions")),
   },
   handler: async (ctx, args) => {
     const user_id = await getAuthUserId(ctx);
@@ -143,8 +135,6 @@ export const add_watchlist_item = mutation({
       status: "active",
       last_checked: Date.now(),
       sources: args.sources ?? [],
-      message_id: args.message_id,
-      session_id: args.session_id,
     });
 
     // Create an initial log entry

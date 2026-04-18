@@ -57,11 +57,7 @@ const schema = defineSchema({
     time_range: v.optional(v.union(v.literal("day"), v.literal("any_time"))),
     last_checked: v.number(),
     sources: v.array(v.string()),
-    message_id: v.optional(v.id("chats")),
-    session_id: v.optional(v.id("sessions")),
-  })
-    .index("by_user", ["user_id"])
-    .index("by_session", ["session_id"]),
+  }).index("by_user", ["user_id"]),
 
   processed_headlines: defineTable({
     urlHash: v.string(),

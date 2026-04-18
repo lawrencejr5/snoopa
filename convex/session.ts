@@ -21,31 +21,9 @@ export const list_sessions = query({
 
     return await Promise.all(
       sessions.map(async (session) => {
-        // Find watchlists for this session
-        const watchlists = await ctx.db
-          .query("watchlist")
-          .withIndex("by_session", (q) => q.eq("session_id", session._id))
-          .collect();
-
-        // Find last message from any of these watchlists
-        let last_message = null;
-        for (const w of watchlists) {
-          const msg = await ctx.db
-            .query("chats")
-            .withIndex("by_watchlist", (q) => q.eq("watchlist_id", w._id))
-            .order("desc")
-            .first();
-          if (
-            !last_message ||
-            (msg && msg._creationTime > last_message._creationTime)
-          ) {
-            last_message = msg;
-          }
-        }
-
         return {
           ...session,
-          excerpt: last_message?.content || "No messages yet...",
+          excerpt: "Session data...",
         };
       }),
     );
@@ -111,49 +89,8 @@ export const delete_session = mutation({
       throw new Error("Unauthorized");
     }
 
-    // 1. Load watchlists linked to this session
-    const watchlistItems = await ctx.db
-      .query("watchlist")
-      .withIndex("by_session", (q) => q.eq("session_id", args.session_id))
-      .collect();
-
-    // 2. Load chats, logs, and processed_headlines for the watchlist items
-    const [messages, processedData] = await Promise.all([
-      // Fetch all chats for the session's watchlists
-      Promise.all(
-        watchlistItems.map((item) =>
-          ctx.db
-            .query("chats")
-            .withIndex("by_watchlist", (q) => q.eq("watchlist_id", item._id))
-            .collect(),
-        ),
-      ).then((res) => res.flat()),
-
-      // Fetch all processed_headlines and logs for the session's watchlists
-      await Promise.all(
-        watchlistItems.map(async (item) => {
-          const [headlines, itemLogs] = await Promise.all([
-            ctx.db
-              .query("processed_headlines")
-              .withIndex("by_watchlist", (q) => q.eq("watchlist_id", item._id))
-              .collect(),
-            ctx.db
-              .query("logs")
-              .withIndex("by_watchlist", (q) => q.eq("watchlist_id", item._id))
-              .collect(),
-          ]);
-          return [...headlines, ...itemLogs];
-        }),
-      ).then((res) => res.flat()),
-    ]);
-
-    // 3. Delete everything at once
-    await Promise.all([
-      ...messages.map((m) => ctx.db.delete(m._id)),
-      ...watchlistItems.map((w) => ctx.db.delete(w._id)),
-      ...processedData.map((p) => ctx.db.delete(p._id)),
-      ctx.db.delete(args.session_id),
-    ]);
+    // Note: session_id was removed from watchlist table, so we can't delete linked watchlists here anymore
+    await ctx.db.delete(args.session_id);
   },
 });
 

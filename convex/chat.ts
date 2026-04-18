@@ -41,20 +41,8 @@ export const get_messages = query({
         .order("asc")
         .collect();
     } else if (args.session_id) {
-      // Find watchlists for this session
-      const watchlists = await ctx.db
-        .query("watchlist")
-        .withIndex("by_session", (q) => q.eq("session_id", args.session_id!))
-        .collect();
-
-      for (const w of watchlists) {
-        const chats = await ctx.db
-          .query("chats")
-          .withIndex("by_watchlist", (q) => q.eq("watchlist_id", w._id))
-          .collect();
-        combined.push(...chats);
-      }
-      combined.sort((a, b) => a._creationTime - b._creationTime);
+      // session_id was removed from watchlist, so we can't find chats via session anymore
+      return [];
     }
 
     return combined.sort((a, b) => a._creationTime - b._creationTime);
@@ -115,27 +103,8 @@ export const mark_chats_seen = mutation({
         unseenWl.map((chat) => ctx.db.patch(chat._id, { seen: true })),
       );
     } else if (args.session_id) {
-      // Find watchlists for this session and mark their chats
-      const watchlists = await ctx.db
-        .query("watchlist")
-        .withIndex("by_session", (q) => q.eq("session_id", args.session_id!))
-        .collect();
-
-      for (const w of watchlists) {
-        const chats = await ctx.db
-          .query("chats")
-          .withIndex("by_watchlist", (q) => q.eq("watchlist_id", w._id))
-          .filter((q) =>
-            q.and(
-              q.eq(q.field("role"), "snoopa"),
-              q.eq(q.field("seen"), false),
-            ),
-          )
-          .collect();
-        await Promise.all(
-          chats.map((chat) => ctx.db.patch(chat._id, { seen: true })),
-        );
-      }
+      // session_id was removed from watchlist
+      return;
     }
   },
 });
@@ -781,21 +750,8 @@ export const get_messages_internal = internalQuery({
 
 export const get_messages_internal_session = internalQuery({
   args: { session_id: v.id("sessions"), user_id: v.id("users") },
-  handler: async (ctx, args) => {
-    const watchlists = await ctx.db
-      .query("watchlist")
-      .withIndex("by_session", (q) => q.eq("session_id", args.session_id))
-      .collect();
-
-    let combined: any[] = [];
-    for (const w of watchlists) {
-      const chats = await ctx.db
-        .query("chats")
-        .withIndex("by_watchlist", (q) => q.eq("watchlist_id", w._id))
-        .collect();
-      combined.push(...chats);
-    }
-    return combined.sort((a, b) => a._creationTime - b._creationTime);
+  handler: async () => {
+    return [];
   },
 });
 
