@@ -177,6 +177,17 @@ export const update_watchlist_item = mutation({
     if (args.condition !== undefined) updates.condition = args.condition;
 
     await ctx.db.patch(args.watchlist_id, updates);
+
+    // If condition was updated, add a log entry
+    if (args.condition !== undefined) {
+      await ctx.db.insert("logs", {
+        watchlist_id: args.watchlist_id,
+        timestamp: Date.now(),
+        action: "Condition updated",
+        seen: true,
+        type: "success",
+      });
+    }
   },
 });
 
@@ -241,7 +252,7 @@ export const deactivate_watchlist = mutation({
       timestamp: Date.now(),
       action: "Tracking stopped (Inactive)",
       seen: true,
-      type: "success",
+      type: "error",
     });
   },
 });

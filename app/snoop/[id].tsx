@@ -829,13 +829,13 @@ export default function SnoopDetailsScreen() {
   const [input, setInput] = useState("");
   const [showCommands, setShowCommands] = useState(false);
   const [showRename, setShowRename] = useState(false);
-  const [showEdit, setShowEdit] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [sending, setSending] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [showSources, setShowSources] = useState(false);
   const [selectedSources, setSelectedSources] = useState<any[]>([]);
-  const [isSourceMode, setIsSourceMode] = useState(false);
+  // commandMode: null | "source" | "edit"
+  const [commandMode, setCommandMode] = useState<"source" | "edit" | null>(null);
   const [isFocused, setIsFocused] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
 
@@ -864,8 +864,6 @@ export default function SnoopDetailsScreen() {
   );
 
   // Mutations
-  const deactivateWatchlist = useMutation(api.watchlist.deactivate_watchlist);
-  const reactivateWatchlist = useMutation(api.watchlist.reactivate_watchlist);
   const updateWatchlist = useMutation(api.watchlist.update_watchlist_item);
   const deleteWatchlist = useMutation(api.watchlist.delete_watchlist_item);
   const markLogsSeen = useMutation(api.log.mark_logs_seen);
@@ -966,15 +964,21 @@ export default function SnoopDetailsScreen() {
     const content = input.trim();
     setInput("");
     setSending(true);
+    const current_mode = commandMode;
 
     try {
       await sendMessage({
         watchlist_id: id as Id<"watchlist">,
         content,
-        intent: isSourceMode ? "SOURCE" : undefined,
+        intent:
+          current_mode === "source"
+            ? "SOURCE"
+            : current_mode === "edit"
+              ? "EDIT_CONDITION"
+              : undefined,
       });
-      if (isSourceMode) {
-        setIsSourceMode(false);
+      if (current_mode) {
+        setCommandMode(null);
       }
     } catch (e) {
       console.error("Failed to send:", e);
@@ -1003,19 +1007,22 @@ export default function SnoopDetailsScreen() {
     }
   };
 
+  // Pause/Resume now routes through chat so timeline gets a log
   const handlePauseResume = async () => {
-    if (!id || isProcessing) return;
-    setIsProcessing(true);
+    if (!id || sending) return;
+    const is_paused = snoop?.status === "inactive";
+    const content = is_paused ? "Resume tracking" : "Pause tracking";
+    setSending(true);
     try {
-      if (snoop?.status === "inactive") {
-        await reactivateWatchlist({ watchlist_id: id as Id<"watchlist"> });
-      } else {
-        await deactivateWatchlist({ watchlist_id: id as Id<"watchlist"> });
-      }
+      await sendMessage({
+        watchlist_id: id as Id<"watchlist">,
+        content,
+        intent: is_paused ? "RESUME" : "PAUSE",
+      });
     } catch (e) {
-      console.error("Pause/resume failed:", e);
+      console.error("Pause/resume via chat failed:", e);
     } finally {
-      setIsProcessing(false);
+      setSending(false);
     }
   };
 
@@ -1030,22 +1037,6 @@ export default function SnoopDetailsScreen() {
       setShowRename(false);
     } catch (e) {
       console.error("Rename failed:", e);
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const handleEdit = async (newCondition: string) => {
-    if (!id || isProcessing || !newCondition) return;
-    setIsProcessing(true);
-    try {
-      await updateWatchlist({
-        watchlist_id: id as Id<"watchlist">,
-        condition: newCondition,
-      });
-      setShowEdit(false);
-    } catch (e) {
-      console.error("Edit failed:", e);
     } finally {
       setIsProcessing(false);
     }
@@ -1074,50 +1065,97 @@ export default function SnoopDetailsScreen() {
     ? Colors[theme].success
     : Colors[theme].text_secondary;
 
-  const leftIconElement = isSourceMode ? (
-    <View
-      style={{
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 6,
-        opacity: sending ? 0.5 : 1,
-      }}
-    >
-      <Octicons name="link" size={18} color={Colors[theme].text} />
-      <Text
-        style={{
-          color: Colors[theme].text,
-          fontFamily: "FontMedium",
-          fontSize: 13,
-          marginLeft: 2,
-        }}
-      >
-        source
-      </Text>
-      <Pressable disabled={sending} onPress={() => setIsSourceMode(false)}>
-        <Octicons
-          name="x"
-          size={16}
-          color={Colors[theme].text_secondary}
-          style={{ padding: 4 }}
-        />
-      </Pressable>
+  const leftIconElement =
+    commandMode === "source" ? (
       <View
         style={{
-          width: 1,
-          height: 20,
-          backgroundColor: Colors[theme].border,
-          marginHorizontal: 4,
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 6,
+          opacity: sending ? 0.5 : 1,
         }}
-      />
-    </View>
-  ) : (
-    <Octicons
-      name="command-palette"
-      size={18}
-      color={Colors[theme].text_secondary}
-    />
-  );
+      >
+        <Octicons name="link" size={18} color={Colors[theme].text} />
+        <Text
+          style={{
+            color: Colors[theme].text,
+            fontFamily: "FontMedium",
+            fontSize: 13,
+            marginLeft: 2,
+          }}
+        >
+          source
+        </Text>
+        <Pressable disabled={sending} onPress={() => setCommandMode(null)}>
+          <Octicons
+            name="x"
+            size={16}
+            color={Colors[theme].text_secondary}
+            style={{ padding: 4 }}
+          />
+        </Pressable>
+        <View
+          style={{
+            width: 1,
+            height: 20,
+            backgroundColor: Colors[theme].border,
+            marginHorizontal: 4,
+          }}
+        />
+      </View>
+    ) : commandMode === "edit" ? (
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 6,
+          opacity: sending ? 0.5 : 1,
+        }}
+      >
+        <Image
+          source={require("@/assets/icons/document.png")}
+          style={{
+            width: 18,
+            height: 18,
+            tintColor: Colors[theme].text,
+          }}
+        />
+        <Text
+          style={{
+            color: Colors[theme].text,
+            fontFamily: "FontMedium",
+            fontSize: 13,
+            marginLeft: 2,
+          }}
+        >
+          condition
+        </Text>
+        <Pressable disabled={sending} onPress={() => setCommandMode(null)}>
+          <Octicons
+            name="x"
+            size={16}
+            color={Colors[theme].text_secondary}
+            style={{ padding: 4 }}
+          />
+        </Pressable>
+        <View
+          style={{
+            width: 1,
+            height: 20,
+            backgroundColor: Colors[theme].border,
+            marginHorizontal: 4,
+          }}
+        />
+      </View>
+    ) : (
+      <Pressable onPress={() => setShowCommands(true)}>
+        <Octicons
+          name="command-palette"
+          size={18}
+          color={Colors[theme].text_secondary}
+        />
+      </Pressable>
+    );
 
   const rightIconElement = (
     <Pressable
@@ -1753,18 +1791,22 @@ export default function SnoopDetailsScreen() {
         onClose={() => setShowCommands(false)}
         snoop={{ status: snoop.status, title: snoop.title }}
         onTerminate={handleTerminate}
-        onPauseResume={handlePauseResume}
+        onPauseResume={() => {
+          setShowCommands(false);
+          // Short delay to let sheet dismiss before sending
+          setTimeout(() => handlePauseResume(), 300);
+        }}
         onRename={() => {
           setShowCommands(false);
           setTimeout(() => setShowRename(true), 300);
         }}
         onEdit={() => {
           setShowCommands(false);
-          setTimeout(() => setShowEdit(true), 300);
+          setTimeout(() => setCommandMode("edit"), 300);
         }}
         onAddSource={() => {
           setShowCommands(false);
-          setTimeout(() => setIsSourceMode(true), 300);
+          setTimeout(() => setCommandMode("source"), 300);
         }}
         isProcessing={isProcessing}
       />
@@ -1775,15 +1817,6 @@ export default function SnoopDetailsScreen() {
         onClose={() => setShowRename(false)}
         currentTitle={snoop.title}
         onSave={handleRename}
-        isProcessing={isProcessing}
-      />
-
-      {/* Edit Modal */}
-      <EditModal
-        visible={showEdit}
-        onClose={() => setShowEdit(false)}
-        currentCondition={snoop.condition}
-        onSave={handleEdit}
         isProcessing={isProcessing}
       />
 

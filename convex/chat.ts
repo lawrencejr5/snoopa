@@ -229,7 +229,7 @@ function getCurrentDateTime() {
 }
 
 // Function to detect intention
-type Intent = "SEARCH" | "WATCHLIST" | "CHAT" | "SOURCE";
+type Intent = "SEARCH" | "WATCHLIST" | "CHAT" | "SOURCE" | "PAUSE" | "RESUME" | "EDIT_CONDITION";
 async function _detectIntent(
   content: string,
   history?: string,
@@ -247,9 +247,12 @@ async function _detectIntent(
       - SEARCH: current/live web information, news, prices, scores, recent events, anything requiring data from the last 24 hours. Includes 'is X happening', 'did Y happen', 'I heard Z is happening'.
       - WATCHLIST: user wants to track, monitor, save, or be notified about something. E.g. 'track Bitcoin', 'watch for iPhone deals', 'notify me when Z happens', 'snoop on X'.
       - SOURCE: user wants to track a specific URL/source or save a source. E.g. 'track this url', 'monitor this website', 'add source: https://example.com'.
+      - PAUSE: user wants to pause or stop tracking this watchlist. E.g. 'pause tracking', 'stop watching', 'pause this snoop', 'deactivate'.
+      - RESUME: user wants to resume or restart tracking this watchlist. E.g. 'resume tracking', 'start watching again', 'reactivate', 'unpause'.
+      - EDIT_CONDITION: user wants to change, update, or modify the watchlist condition or alert criteria. E.g. 'change the condition to...', 'update condition', 'edit what you're tracking', 'track X instead', 'modify the alert'.
       - CHAT: conversational, general knowledge, opinions, or greetings.
 
-      Reply with ONLY one word: SEARCH, WATCHLIST, SOURCE, or CHAT.`;
+      Reply with ONLY one word: SEARCH, WATCHLIST, SOURCE, PAUSE, RESUME, EDIT_CONDITION, or CHAT.`;
 
     let result;
     try {
@@ -267,6 +270,9 @@ async function _detectIntent(
     const text = result.response.text().trim().toUpperCase();
     console.log(`🔍 Intent: "${content.substring(0, 50)}" → ${text}`);
 
+    if (text.includes("EDIT_CONDITION")) return "EDIT_CONDITION";
+    if (text.includes("PAUSE")) return "PAUSE";
+    if (text.includes("RESUME")) return "RESUME";
     if (text.includes("WATCHLIST")) return "WATCHLIST";
     if (text.includes("SEARCH")) return "SEARCH";
     if (text.includes("SOURCE")) return "SOURCE";
@@ -274,6 +280,47 @@ async function _detectIntent(
   } catch (err) {
     console.warn("Intent detection failed, defaulting to CHAT:", err);
     return "CHAT";
+  }
+}
+
+/**
+ * Uses AI to extract and shape a clean condition string from natural language.
+ */
+async function _extractConditionFromMessage(
+  content: string,
+  current_condition: string,
+): Promise<string> {
+  const api_key = process.env.GOOGLE_GEMINI_API_KEY;
+  if (!api_key) return content;
+
+  try {
+    const gen_ai = new GoogleGenerativeAI(api_key);
+    const prompt = `You are helping update a watchlist alert condition.
+      CURRENT CONDITION: "${current_condition}"
+      USER REQUEST: "${content}"
+
+      Extract and rewrite a clean, specific condition string from the user's request.
+      Rules:
+      - Be precise and actionable (e.g. "Alert when Bitcoin price drops below $80,000")
+      - Keep it concise (1-2 sentences max)
+      - If the user gave something vague, improve it while staying true to their intent
+      - If the user is just stating they want to edit or change the condition WITHOUT providing the new criteria yet, respond with exactly: "MISSING".
+      - Do NOT include any preamble, just output the condition string itself.
+
+      Reply with ONLY the new condition string or the word MISSING.`;
+
+    let result;
+    try {
+      const model = gen_ai.getGenerativeModel({ model: "gemini-2.0-flash-lite" });
+      result = await model.generateContent(prompt);
+    } catch (e) {
+      const fallback = gen_ai.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
+      result = await fallback.generateContent(prompt);
+    }
+    return result.response.text().trim();
+  } catch (err) {
+    console.warn("Condition extraction failed, using raw input:", err);
+    return content;
   }
 }
 
@@ -366,6 +413,15 @@ export const detect_intent = action({
     history: v.optional(v.string()),
   },
   handler: async (_ctx, args) => _detectIntent(args.content, args.history),
+  returns: v.union(
+    v.literal("SEARCH"),
+    v.literal("WATCHLIST"),
+    v.literal("CHAT"),
+    v.literal("SOURCE"),
+    v.literal("PAUSE"),
+    v.literal("RESUME"),
+    v.literal("EDIT_CONDITION"),
+  ),
 });
 
 /**
@@ -382,6 +438,9 @@ export const send_message = action({
         v.literal("WATCHLIST"),
         v.literal("CHAT"),
         v.literal("SOURCE"),
+        v.literal("PAUSE"),
+        v.literal("RESUME"),
+        v.literal("EDIT_CONDITION"),
       ),
     ),
   },
@@ -461,6 +520,80 @@ export const send_message = action({
       ));
 
     console.log(`🔍 Intent${args.intent ? " (pre-detected)" : ""}: ${intent}`);
+
+    // --- PAUSE intent ---
+    if (intent === "PAUSE") {
+      if (args.watchlist_id) {
+        await ctx.runMutation(api.watchlist.deactivate_watchlist, {
+          watchlist_id: args.watchlist_id,
+        });
+      }
+      const pause_text = "Tracking paused. I'll stand down until you say the word.";
+      await ctx.runMutation(internal.chat.save_message, {
+        watchlist_id: args.watchlist_id,
+        role: "snoopa",
+        content: pause_text,
+        type: "chat",
+      });
+      return { response: pause_text };
+    }
+
+    // --- RESUME intent ---
+    if (intent === "RESUME") {
+      if (args.watchlist_id) {
+        await ctx.runMutation(api.watchlist.reactivate_watchlist, {
+          watchlist_id: args.watchlist_id,
+        });
+      }
+      const resume_text = "Back on the trail. Tracking resumed.";
+      await ctx.runMutation(internal.chat.save_message, {
+        watchlist_id: args.watchlist_id,
+        role: "snoopa",
+        content: resume_text,
+        type: "chat",
+      });
+      return { response: resume_text };
+    }
+
+    // --- EDIT_CONDITION intent ---
+    if (intent === "EDIT_CONDITION") {
+      let new_condition = args.content;
+      if (args.watchlist_id) {
+        const watchlist = await ctx.runQuery(api.watchlist.get_watchlist_item, {
+          watchlist_id: args.watchlist_id,
+        });
+        new_condition = await _extractConditionFromMessage(
+          args.content,
+          watchlist?.condition || "",
+        );
+
+        if (new_condition === "MISSING") {
+          const ask_text =
+            "What would you like to update the condition to? Just let me know the new criteria and I'll settle it.";
+          await ctx.runMutation(internal.chat.save_message, {
+            watchlist_id: args.watchlist_id,
+            role: "snoopa",
+            content: ask_text,
+            type: "chat",
+          });
+          return { response: ask_text };
+        }
+
+        await ctx.runMutation(api.watchlist.update_watchlist_item, {
+          watchlist_id: args.watchlist_id,
+          condition: new_condition,
+        });
+      }
+
+      const edit_text = `Condition updated. I'm now watching for: "${new_condition}"`;
+      await ctx.runMutation(internal.chat.save_message, {
+        watchlist_id: args.watchlist_id,
+        role: "snoopa",
+        content: edit_text,
+        type: "chat",
+      });
+      return { response: edit_text };
+    }
 
     if (intent === "SOURCE") {
       const urlRegex =
