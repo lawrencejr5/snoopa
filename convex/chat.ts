@@ -210,8 +210,6 @@ export const batch_insert_sources = internalMutation({
   },
 });
 
-
-
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -296,6 +294,37 @@ async function _determineSourceWeight(
   } catch (err) {
     console.warn("Weight detection failed, defaulting to secondary:", err);
     return "secondary";
+  }
+}
+
+async function _generateSourceBrief(
+  snapshot: string,
+  condition: string,
+): Promise<string> {
+  const api_key = process.env.GOOGLE_GEMINI_API_KEY;
+  if (!api_key)
+    return "Source saved successfully! I'll keep a close eye on it.";
+
+  try {
+    const gen_ai = new GoogleGenerativeAI(api_key);
+    const model = gen_ai.getGenerativeModel({ model: "gemini-2.0-flash" });
+
+    const prompt = `You are Snoopa, a proactive AI agent (Greyhound mascot). 
+      The user just added a source URL to their watchlist. 
+      WATCHLIST CONDITION: "${condition}"
+      PAGE CONTENT SNAPSHOT:
+      "${snapshot.substring(0, 20000)}"
+
+      Provide a VERY brief (1-2 sentences) summary of the current state of this page relevant to the watchlist condition. 
+      Use a tactical and proactive tone. 
+      Then conclude by saying you'll keep tracking it for updates.
+      Reply with ONLY the response text.`;
+
+    const result = await model.generateContent(prompt);
+    return result.response.text().trim();
+  } catch (err) {
+    console.warn("Source brief generation failed:", err);
+    return "Source saved successfully! I'll keep a close eye on it.";
   }
 }
 
@@ -436,11 +465,14 @@ export const send_message = action({
 
       if (!extractResult.success) {
         if (args.watchlist_id) {
-          await ctx.runMutation(internal.monitored_sources.save_monitored_source_and_link, {
-            url,
-            watchlist_id: args.watchlist_id,
-            status: "failure",
-          });
+          await ctx.runMutation(
+            internal.monitored_sources.save_monitored_source_and_link,
+            {
+              url,
+              watchlist_id: args.watchlist_id,
+              status: "failure",
+            },
+          );
         }
         const response_text = `I noticed you provided a link (${url}), but I couldn't extract any trackable content from it. Please double-check the URL or try a different source if you want me to monitor it.`;
         await ctx.runMutation(internal.chat.save_message, {
@@ -466,14 +498,40 @@ export const send_message = action({
           watchlist?.condition || "",
         );
 
-        await ctx.runMutation(internal.monitored_sources.save_monitored_source_and_link, {
-          url,
-          last_snapshot: snapshot as string,
-          last_hash: last_hash as string,
+        await ctx.runMutation(
+          internal.monitored_sources.save_monitored_source_and_link,
+          {
+            url,
+            last_snapshot: snapshot as string,
+            last_hash: last_hash as string,
+            watchlist_id: args.watchlist_id,
+            source_weight,
+            status: "success",
+          },
+        );
+
+        const response_text = await _generateSourceBrief(
+          snapshot as string,
+          watchlist?.condition || "",
+        );
+        const chatMsgId = await ctx.runMutation(internal.chat.save_message, {
           watchlist_id: args.watchlist_id,
-          source_weight,
-          status: "success",
+          role: "snoopa",
+          content: response_text,
+          type: "source",
         });
+        const hostname = new URL(url).hostname;
+        await ctx.runMutation(internal.chat.batch_insert_sources, {
+          entries: [
+            {
+              watchlist_id: args.watchlist_id,
+              chat_id: chatMsgId,
+              title: hostname,
+              url,
+            },
+          ],
+        });
+        return { response: response_text };
       }
 
       const response_text =
@@ -834,7 +892,11 @@ export const initialize_watchlist = action({
               },
             );
 
-            sourceInfoText = `\n\nI've also added ${url} as a ${source_weight} source to keep a close eye on it for changes.`;
+            const brief = await _generateSourceBrief(
+              snapshot,
+              payload.condition,
+            );
+            sourceInfoText = `\n\n${brief}`;
           } else {
             extractionFailed = true;
             await ctx.runMutation(
@@ -864,7 +926,7 @@ export const initialize_watchlist = action({
         }
       }
 
-      await ctx.runMutation(internal.chat.save_message, {
+      const resultMsgId = await ctx.runMutation(internal.chat.save_message, {
         watchlist_id: wl_id,
         role: "snoopa",
         content: extractionFailed
@@ -872,6 +934,24 @@ export const initialize_watchlist = action({
           : final_snoop_text + sourceInfoText,
         type: "watchlist",
       });
+
+      if (urlMatch && wl_id && !extractionFailed) {
+        let url = urlMatch[0];
+        url = url.replace(/[.,;!?]$/, "");
+        if (!url.startsWith("http")) url = `https://${url}`;
+        const hostname = new URL(url).hostname;
+
+        await ctx.runMutation(internal.chat.batch_insert_sources, {
+          entries: [
+            {
+              watchlist_id: wl_id,
+              chat_id: resultMsgId,
+              title: hostname,
+              url,
+            },
+          ],
+        });
+      }
 
       return { watchlist_id: wl_id };
     } catch (err) {
