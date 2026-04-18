@@ -840,6 +840,7 @@ export default function SnoopDetailsScreen() {
   );
   const [isFocused, setIsFocused] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
+  const [loadingStatus, setLoadingStatus] = useState("...");
 
   // Data
   const snoop = useQuery(
@@ -873,6 +874,7 @@ export default function SnoopDetailsScreen() {
   const deleteMonitoredSource = useMutation(
     api.monitored_sources.delete_monitored_source,
   );
+  const detectIntent = useAction(api.chat.detect_intent);
   const sendMessage = useAction(api.chat.send_message);
 
   useEffect(() => {
@@ -931,10 +933,17 @@ export default function SnoopDetailsScreen() {
     return entries;
   }, [logs, chatMessages]);
 
-  // Auto-scroll to bottom
+  // Auto-scroll to bottom when new messages/logs arrive
   useEffect(() => {
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 300);
   }, [logs, chatMessages]);
+
+  // Also scroll immediately when sending starts so the status label is visible
+  useEffect(() => {
+    if (sending) {
+      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 50);
+    }
+  }, [sending]);
 
   // Format Date Header
   const getOrdinalSuffix = (i: number) => {
@@ -965,15 +974,42 @@ export default function SnoopDetailsScreen() {
     return `${hours}:${d.getMinutes().toString().padStart(2, "0")}${ampm}`;
   };
 
+  // Intent → friendly loading label
+  const getStatusLabel = (intent: string) => {
+    switch (intent) {
+      case "SEARCH":         return "Snooping the web...";
+      case "WATCHLIST":      return "Setting up watchlist...";
+      case "SOURCE":         return "Tracking source...";
+      case "PAUSE":          return "Pausing watchlist...";
+      case "RESUME":         return "Resuming watchlist...";
+      case "EDIT_CONDITION": return "Updating condition...";
+      case "CHAT":           return "Thinking...";
+      default:               return "Working on it...";
+    }
+  };
+
   // Handle send
   const handleSend = async () => {
     if (!input.trim() || sending || !id) return;
     const content = input.trim();
     setInput("");
     setSending(true);
+    setLoadingStatus("...");
     const current_mode = commandMode;
 
     try {
+      // If commandMode pre-determines intent, set status immediately
+      if (current_mode === "source") {
+        setLoadingStatus("Tracking source...");
+      } else if (current_mode === "edit") {
+        setLoadingStatus("Updating condition...");
+      } else {
+        // Detect intent concurrently so loading text updates ASAP
+        detectIntent({ content }).then((intent) => {
+          setLoadingStatus(getStatusLabel(intent));
+        }).catch(() => {});
+      }
+
       await sendMessage({
         watchlist_id: id as Id<"watchlist">,
         content,
@@ -991,6 +1027,7 @@ export default function SnoopDetailsScreen() {
       console.error("Failed to send:", e);
     } finally {
       setSending(false);
+      setLoadingStatus("...");
     }
   };
 
@@ -1755,7 +1792,7 @@ export default function SnoopDetailsScreen() {
                   style={{
                     color: Colors[theme].text,
                     fontFamily: "FontBold",
-                    fontSize: 12,
+                    fontSize: 15,
                   }}
                 >
                   Snoopa
@@ -1776,7 +1813,7 @@ export default function SnoopDetailsScreen() {
                     { color: Colors[theme].text_secondary },
                   ]}
                 >
-                  [...]
+                  {loadingStatus}
                 </Text>
                 <Octicons
                   name="chevron-right"
