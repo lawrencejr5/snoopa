@@ -131,12 +131,22 @@ async function generateBrief(
     Return ONLY the brief, no quotes, no markdown.`;
 
   try {
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-lite" });
     const result = await model.generateContent(prompt);
     return result.response.text().trim();
   } catch (err) {
-    console.error("Gemini brief generation error:", err);
-    // Fallback: use the first headline title
-    return headlines[0].title;
+    console.warn("Primary model failed, falling back to gemini-2.5-flash-lite");
+    try {
+      const fallbackModel = genAI.getGenerativeModel({
+        model: "gemini-2.5-flash-lite",
+      });
+      const result = await fallbackModel.generateContent(prompt);
+      return result.response.text().trim();
+    } catch (fallbackErr) {
+      console.error("Gemini brief generation error:", fallbackErr);
+      // Fallback: use the first headline title
+      return headlines[0].title;
+    }
   }
 }
 

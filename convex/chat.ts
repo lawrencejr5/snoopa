@@ -239,8 +239,6 @@ async function _detectIntent(
 
   try {
     const gen_ai = new GoogleGenerativeAI(api_key);
-    const model = gen_ai.getGenerativeModel({ model: "gemini-2.0-flash-lite" });
-
     const prompt = `Analyze this user message and classify the intent.
       ${history ? `RECENT HISTORY:\n${history}\n` : ""}
       USER MESSAGE: "${content}"
@@ -253,7 +251,19 @@ async function _detectIntent(
 
       Reply with ONLY one word: SEARCH, WATCHLIST, SOURCE, or CHAT.`;
 
-    const result = await model.generateContent(prompt);
+    let result;
+    try {
+      const model = gen_ai.getGenerativeModel({
+        model: "gemini-2.0-flash-lite",
+      });
+      result = await model.generateContent(prompt);
+    } catch (e) {
+      console.warn("Primary model failed, falling back to gemini-2.5-flash-lite");
+      const fallbackModel = gen_ai.getGenerativeModel({
+        model: "gemini-2.5-flash-lite",
+      });
+      result = await fallbackModel.generateContent(prompt);
+    }
     const text = result.response.text().trim().toUpperCase();
     console.log(`🔍 Intent: "${content.substring(0, 50)}" → ${text}`);
 
@@ -276,8 +286,6 @@ async function _determineSourceWeight(
 
   try {
     const gen_ai = new GoogleGenerativeAI(api_key);
-    const model = gen_ai.getGenerativeModel({ model: "gemini-2.0-flash-lite" });
-
     const prompt = `Analyze this user's request to track a specific URL for their watchlist.
       WATCHLIST CONDITION: "${condition}"
       USER MESSAGE: "${content}"
@@ -288,7 +296,19 @@ async function _determineSourceWeight(
 
       Reply with ONLY one word: primary or secondary.`;
 
-    const result = await model.generateContent(prompt);
+    let result;
+    try {
+      const model = gen_ai.getGenerativeModel({
+        model: "gemini-2.0-flash-lite",
+      });
+      result = await model.generateContent(prompt);
+    } catch (e) {
+      console.warn("Primary model failed, falling back to gemini-2.5-flash-lite");
+      const fallbackModel = gen_ai.getGenerativeModel({
+        model: "gemini-2.5-flash-lite",
+      });
+      result = await fallbackModel.generateContent(prompt);
+    }
     const text = result.response.text().trim().toLowerCase();
     return text.includes("primary") ? "primary" : "secondary";
   } catch (err) {
@@ -307,8 +327,6 @@ async function _generateSourceBrief(
 
   try {
     const gen_ai = new GoogleGenerativeAI(api_key);
-    const model = gen_ai.getGenerativeModel({ model: "gemini-2.0-flash" });
-
     const prompt = `You are Snoopa, a proactive AI agent (Greyhound mascot). 
       The user just added a source URL to their watchlist. 
       WATCHLIST CONDITION: "${condition}"
@@ -320,7 +338,17 @@ async function _generateSourceBrief(
       Then conclude by saying you'll keep tracking it for updates.
       Reply with ONLY the response text.`;
 
-    const result = await model.generateContent(prompt);
+    let result;
+    try {
+      const model = gen_ai.getGenerativeModel({ model: "gemini-2.0-flash" });
+      result = await model.generateContent(prompt);
+    } catch (e) {
+      console.warn("Primary model failed, falling back to gemini-2.5-flash-lite");
+      const fallbackModel = gen_ai.getGenerativeModel({
+        model: "gemini-2.5-flash-lite",
+      });
+      result = await fallbackModel.generateContent(prompt);
+    }
     return result.response.text().trim();
   } catch (err) {
     console.warn("Source brief generation failed:", err);
