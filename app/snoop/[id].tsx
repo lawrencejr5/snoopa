@@ -838,7 +838,7 @@ export default function SnoopDetailsScreen() {
     id ? { watchlist_id: id as Id<"watchlist"> } : "skip",
   );
   const monitoredSources = useQuery(
-    api.chat.get_monitored_sources,
+    api.monitored_sources.get_monitored_sources,
     id ? { watchlist_id: id as Id<"watchlist"> } : "skip",
   );
 

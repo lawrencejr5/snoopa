@@ -331,7 +331,7 @@ export const run_firehose = internalAction({
 
     // Save hash updates and process satisfied hits
     for (const update of sourceUpdates) {
-      await ctx.runMutation(internal.chat.update_monitored_source_hash, {
+      await ctx.runMutation(internal.monitored_sources.update_monitored_source_hash, {
         monitored_source_id: update.source._id,
         last_hash: update.newHash,
         last_snapshot: update.newSnapshot,
