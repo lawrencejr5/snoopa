@@ -1,5 +1,6 @@
+import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
-import { internalMutation, query } from "./_generated/server";
+import { internalMutation, mutation, query } from "./_generated/server";
 
 export const save_monitored_source_and_link = internalMutation({
   args: {
@@ -78,6 +79,45 @@ export const update_monitored_source_hash = internalMutation({
     await ctx.db.patch(args.monitored_source_id, {
       last_snapshot: args.last_snapshot,
       last_hash: args.last_hash,
+    });
+  },
+});
+
+export const delete_monitored_source = mutation({
+  args: { monitored_source_id: v.id("monitored_sources") },
+  handler: async (ctx, args) => {
+    const user_id = await getAuthUserId(ctx);
+    if (!user_id) throw new Error("Not authenticated");
+
+    const source = await ctx.db.get(args.monitored_source_id);
+    if (!source) throw new Error("Source not found");
+
+    const watchlist = await ctx.db.get(source.watchlist_id);
+    if (!watchlist || watchlist.user_id !== user_id) {
+      throw new Error("Unauthorized");
+    }
+
+    // 1. Remove from watchlist.sources array
+    const updatedSources = (watchlist.sources || []).filter(
+      (id) => id !== (args.monitored_source_id as string),
+    );
+    await ctx.db.patch(source.watchlist_id, { sources: updatedSources });
+
+    // 2. Delete the source record
+    await ctx.db.delete(args.monitored_source_id);
+
+    // 3. Log the deletion
+    let hostname = "Source";
+    try {
+      hostname = new URL(source.url).hostname;
+    } catch {}
+
+    await ctx.db.insert("logs", {
+      watchlist_id: source.watchlist_id,
+      timestamp: Date.now(),
+      action: `Source deleted: ${hostname}`,
+      seen: true,
+      type: "system",
     });
   },
 });

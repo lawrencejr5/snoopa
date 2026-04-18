@@ -624,7 +624,8 @@ export const send_message = action({
       const urlMatch = args.content.match(urlRegex);
 
       if (!urlMatch) {
-        const response_text = "Please provide a valid URL for me to track.";
+        const response_text =
+          "What's the source URL you'd like me to track? Just send the link and I'll start monitoring it.";
         await ctx.runMutation(internal.chat.save_message, {
           watchlist_id: args.watchlist_id,
           role: "snoopa",
@@ -632,6 +633,31 @@ export const send_message = action({
           type: "source",
         });
         return { response: response_text };
+      }
+
+      // Check for 1 source limit if watchlist_id is provided
+      if (args.watchlist_id) {
+        const existingSources = await ctx.runQuery(
+          api.monitored_sources.get_monitored_sources,
+          { watchlist_id: args.watchlist_id },
+        );
+        if (existingSources.length > 0) {
+          await ctx.runMutation(internal.log.insert_log, {
+            watchlist_id: args.watchlist_id,
+            action: "Source already exists",
+            type: "error",
+          });
+
+          const response_text =
+            "You can only add 1 source to a watchlist. If you want to change the source, please delete the previous source first from the details page.";
+          await ctx.runMutation(internal.chat.save_message, {
+            watchlist_id: args.watchlist_id,
+            role: "snoopa",
+            content: response_text,
+            type: "source",
+          });
+          return { response: response_text };
+        }
       }
 
       let url = urlMatch[0];

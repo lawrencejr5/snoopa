@@ -835,7 +835,9 @@ export default function SnoopDetailsScreen() {
   const [showSources, setShowSources] = useState(false);
   const [selectedSources, setSelectedSources] = useState<any[]>([]);
   // commandMode: null | "source" | "edit"
-  const [commandMode, setCommandMode] = useState<"source" | "edit" | null>(null);
+  const [commandMode, setCommandMode] = useState<"source" | "edit" | null>(
+    null,
+  );
   const [isFocused, setIsFocused] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
 
@@ -853,7 +855,6 @@ export default function SnoopDetailsScreen() {
     id ? { watchlist_id: id as Id<"watchlist"> } : "skip",
   );
 
-
   const chatSources = useQuery(
     api.chat.get_session_sources,
     id ? { watchlist_id: id as Id<"watchlist"> } : "skip",
@@ -869,6 +870,9 @@ export default function SnoopDetailsScreen() {
   const markLogsSeen = useMutation(api.log.mark_logs_seen);
   const markChatsSeen = useMutation(api.chat.mark_chats_seen);
   const submitFeedback = useMutation(api.chat.submit_feedback);
+  const deleteMonitoredSource = useMutation(
+    api.monitored_sources.delete_monitored_source,
+  );
   const sendMessage = useAction(api.chat.send_message);
 
   useEffect(() => {
@@ -1402,31 +1406,27 @@ export default function SnoopDetailsScreen() {
                       >
                         {ms.url}
                       </Text>
-                      <View
+                      <Pressable
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          deleteMonitoredSource({
+                            monitored_source_id: ms._id,
+                          }).catch((err) => console.error(err));
+                        }}
                         style={{
-                          backgroundColor:
-                            ms.source_weight === "primary"
-                              ? Colors[theme].primary + "20"
-                              : Colors[theme].border,
-                          paddingHorizontal: 8,
-                          paddingVertical: 2,
+                          padding: 8,
                           borderRadius: 8,
+                          backgroundColor: Colors[theme].text + "15",
+                          borderWidth: 1,
+                          borderColor: Colors[theme].text + "30",
                         }}
                       >
-                        <Text
-                          style={{
-                            color:
-                              ms.source_weight === "primary"
-                                ? Colors[theme].primary
-                                : Colors[theme].text_secondary,
-                            fontSize: 10,
-                            fontFamily: "FontBold",
-                            textTransform: "uppercase",
-                          }}
-                        >
-                          {ms.source_weight}
-                        </Text>
-                      </View>
+                        <Octicons
+                          name="trash"
+                          size={14}
+                          color={Colors[theme].text}
+                        />
+                      </Pressable>
                     </Pressable>
                   ))}
                 </View>
@@ -1481,15 +1481,15 @@ export default function SnoopDetailsScreen() {
                         gap: 6,
                       }}
                     >
-                    <Text
-                      style={{
-                        fontFamily: "FontMedium",
-                        fontSize: 12,
-                        color: Colors[theme].text_secondary,
-                      }}
-                    >
-                      {currentDateStr}
-                    </Text>
+                      <Text
+                        style={{
+                          fontFamily: "FontMedium",
+                          fontSize: 12,
+                          color: Colors[theme].text_secondary,
+                        }}
+                      >
+                        {currentDateStr}
+                      </Text>
                     </View>
                   </View>
                 )}
