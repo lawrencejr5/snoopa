@@ -868,6 +868,7 @@ export default function SnoopDetailsScreen() {
   const deleteWatchlist = useMutation(api.watchlist.delete_watchlist_item);
   const markLogsSeen = useMutation(api.log.mark_logs_seen);
   const markChatsSeen = useMutation(api.chat.mark_chats_seen);
+  const submitFeedback = useMutation(api.chat.submit_feedback);
   const sendMessage = useAction(api.chat.send_message);
 
   useEffect(() => {
@@ -885,6 +886,7 @@ export default function SnoopDetailsScreen() {
       content: string;
       timestamp: number;
       logType?: "success" | "error";
+      feedback?: "like" | "dislike";
     }> = [];
 
     // Add logs
@@ -915,6 +917,7 @@ export default function SnoopDetailsScreen() {
           type: msg.role === "user" ? "user" : "snoopa",
           content: cleanContent,
           timestamp: msg._creationTime,
+          feedback: (msg as any).feedback,
         });
       }
     }
@@ -1589,61 +1592,148 @@ export default function SnoopDetailsScreen() {
                   ) : (
                     <View style={{ width: "100%" }}>
                       <FormatText>{entry.content}</FormatText>
-                      {entrySources.length > 0 && (
-                        <Pressable
-                          onPress={() => {
-                            setSelectedSources(entrySources);
-                            setShowSources(true);
-                          }}
-                          style={{
-                            marginTop: 12,
-                            flexDirection: "row",
-                            alignItems: "center",
-                            gap: 6,
-                            backgroundColor: Colors[theme].border,
-                            alignSelf: "flex-start",
-                            paddingHorizontal: 12,
-                            paddingVertical: 6,
-                            borderRadius: 8,
-                          }}
-                        >
-                          <View
+
+                      {/* Sources pill + feedback buttons on the same row */}
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          marginTop: 12,
+                        }}
+                      >
+                        {/* Sources pill — left side */}
+                        {entrySources.length > 0 ? (
+                          <Pressable
+                            onPress={() => {
+                              setSelectedSources(entrySources);
+                              setShowSources(true);
+                            }}
                             style={{
                               flexDirection: "row",
                               alignItems: "center",
+                              gap: 6,
+                              backgroundColor: Colors[theme].border,
+                              paddingHorizontal: 12,
+                              paddingVertical: 6,
+                              borderRadius: 8,
                             }}
                           >
-                            {entrySources.slice(0, 3).map((s, i) => {
-                              const fav = getFaviconUrl(s.url);
-                              return fav ? (
-                                <Image
-                                  key={i}
-                                  source={{ uri: fav }}
-                                  style={{
-                                    width: 14,
-                                    height: 14,
-                                    borderRadius: 7,
-                                    marginLeft: i > 0 ? -4 : 0,
-                                    borderWidth: 1,
-                                    borderColor: Colors[theme].text,
-                                    backgroundColor: Colors[theme].surface,
-                                  }}
-                                />
-                              ) : null;
-                            })}
-                          </View>
-                          <Text
+                            <View
+                              style={{
+                                flexDirection: "row",
+                                alignItems: "center",
+                              }}
+                            >
+                              {entrySources.slice(0, 3).map((s, i) => {
+                                const fav = getFaviconUrl(s.url);
+                                return fav ? (
+                                  <Image
+                                    key={i}
+                                    source={{ uri: fav }}
+                                    style={{
+                                      width: 14,
+                                      height: 14,
+                                      borderRadius: 7,
+                                      marginLeft: i > 0 ? -4 : 0,
+                                      borderWidth: 1,
+                                      borderColor: Colors[theme].text,
+                                      backgroundColor: Colors[theme].surface,
+                                    }}
+                                  />
+                                ) : null;
+                              })}
+                            </View>
+                            <Text
+                              style={{
+                                color: Colors[theme].text,
+                                fontFamily: "FontMedium",
+                                fontSize: 13,
+                                marginLeft: 4,
+                              }}
+                            >
+                              Sources
+                            </Text>
+                          </Pressable>
+                        ) : (
+                          <View />
+                        )}
+
+                        {/* Feedback buttons — right side */}
+                        <View
+                          style={{
+                            flexDirection: "row",
+                            gap: 6,
+                            alignItems: "center",
+                          }}
+                        >
+                          <Pressable
+                            onPress={() =>
+                              submitFeedback({
+                                chat_id: entry.id as Id<"chats">,
+                                feedback: "like",
+                              }).catch(() => {})
+                            }
                             style={{
-                              color: Colors[theme].text,
-                              fontFamily: "FontMedium",
-                              fontSize: 13,
-                              marginLeft: 4,
+                              paddingHorizontal: 10,
+                              paddingVertical: 5,
+                              borderRadius: 8,
+                              borderWidth: 1,
+                              borderColor:
+                                entry.feedback === "like"
+                                  ? Colors[theme].text
+                                  : Colors[theme].border,
+                              backgroundColor:
+                                entry.feedback === "like"
+                                  ? Colors[theme].text + "18"
+                                  : "transparent",
                             }}
                           >
-                            Sources
-                          </Text>
-                        </Pressable>
-                      )}
+                            <Octicons
+                              name="thumbsup"
+                              size={12}
+                              color={
+                                entry.feedback === "like"
+                                  ? Colors[theme].text
+                                  : Colors[theme].text_secondary
+                              }
+                            />
+                          </Pressable>
+
+                          <Pressable
+                            onPress={() =>
+                              submitFeedback({
+                                chat_id: entry.id as Id<"chats">,
+                                feedback: "dislike",
+                              }).catch(() => {})
+                            }
+                            style={{
+                              paddingHorizontal: 10,
+                              paddingVertical: 5,
+                              borderRadius: 8,
+                              borderWidth: 1,
+                              borderColor:
+                                entry.feedback === "dislike"
+                                  ? Colors[theme].text
+                                  : Colors[theme].border,
+                              backgroundColor:
+                                entry.feedback === "dislike"
+                                  ? Colors[theme].text + "18"
+                                  : "transparent",
+                            }}
+                          >
+                            <Octicons
+                              name="thumbsdown"
+                              size={12}
+                              color={
+                                entry.feedback === "dislike"
+                                  ? Colors[theme].text
+                                  : Colors[theme].text_secondary
+                              }
+                            />
+                          </Pressable>
+                        </View>
+                      </View>
                     </View>
                   )}
                 </Animated.View>

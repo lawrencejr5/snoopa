@@ -39,6 +39,7 @@ const schema = defineSchema({
         v.literal("source"),
       ),
     ),
+    feedback: v.optional(v.union(v.literal("like"), v.literal("dislike"))),
   }).index("by_watchlist", ["watchlist_id"]),
 
   watchlist: defineTable({

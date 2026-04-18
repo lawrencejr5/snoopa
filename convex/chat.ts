@@ -150,6 +150,29 @@ export const save_message = internalMutation({
 });
 
 /**
+ * Submit feedback (like/dislike) on a snoopa message.
+ */
+export const submit_feedback = mutation({
+  args: {
+    chat_id: v.id("chats"),
+    feedback: v.union(v.literal("like"), v.literal("dislike")),
+  },
+  handler: async (ctx, args) => {
+    const user_id = await getAuthUserId(ctx);
+    if (!user_id) throw new Error("Not authenticated");
+
+    const chat = await ctx.db.get(args.chat_id);
+    if (!chat || chat.role !== "snoopa") {
+      throw new Error("Message not found or not a snoopa message");
+    }
+
+    // Toggle: if same feedback is submitted again, remove it
+    const new_feedback = chat.feedback === args.feedback ? undefined : args.feedback;
+    await ctx.db.patch(args.chat_id, { feedback: new_feedback });
+  },
+});
+
+/**
  * Get sources for all chats in a watchlist (and legacy session).
  */
 export const get_session_sources = query({
