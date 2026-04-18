@@ -833,6 +833,10 @@ export default function SnoopDetailsScreen() {
     api.chat.get_messages,
     id ? { watchlist_id: id as Id<"watchlist"> } : "skip",
   );
+  const chatMessagesUnreadCount = useMemo(() => {
+    return chatMessages?.filter((m) => m.role === "snoopa" && !m.seen).length || 0;
+  }, [chatMessages]);
+
   const chatSources = useQuery(
     api.chat.get_session_sources,
     id ? { watchlist_id: id as Id<"watchlist"> } : "skip",
@@ -854,15 +858,12 @@ export default function SnoopDetailsScreen() {
   // Mark seen on mount
   useEffect(() => {
     if (id) {
-      markLogsSeen({ watchlist_id: id as Id<"watchlist"> }).catch(() => {});
-      markChatsSeen({ watchlist_id: id as Id<"watchlist"> }).catch(() => {});
+      setTimeout(() => {
+        markLogsSeen({ watchlist_id: id as Id<"watchlist"> }).catch(() => {});
+        markChatsSeen({ watchlist_id: id as Id<"watchlist"> }).catch(() => {});
+      }, 3000); // 3 second delay to let user see unread state
     }
   }, [id]);
-
-  // Auto-scroll to bottom
-  useEffect(() => {
-    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 300);
-  }, [logs, chatMessages]);
 
   // Merge logs + chat into a unified timeline
   const timeline = useMemo(() => {
@@ -872,6 +873,7 @@ export default function SnoopDetailsScreen() {
       content: string;
       timestamp: number;
       logType?: "success" | "error";
+      seen: boolean;
     }> = [];
 
     // Add logs
@@ -883,6 +885,7 @@ export default function SnoopDetailsScreen() {
           content: log.action,
           timestamp: log.timestamp,
           logType: log.type as "success" | "error",
+          seen: log.seen ?? true,
         });
       }
     }
@@ -902,6 +905,7 @@ export default function SnoopDetailsScreen() {
           type: msg.role === "user" ? "user" : "snoopa",
           content: cleanContent,
           timestamp: msg._creationTime,
+          seen: msg.seen ?? true,
         });
       }
     }
@@ -910,6 +914,36 @@ export default function SnoopDetailsScreen() {
     entries.sort((a, b) => a.timestamp - b.timestamp);
     return entries;
   }, [logs, chatMessages]);
+
+  // Auto-scroll to bottom or first unread
+  const [hasScrolled, setHasScrolled] = useState(false);
+  const itemLayouts = useRef<Record<string, number>>({});
+
+  useEffect(() => {
+    if (!timeline.length || hasScrolled) return;
+
+    // Check if we have unread messages
+    const firstUnread = timeline.find((e) => e.seen === false && e.type !== "user");
+    if (firstUnread) {
+      const y = itemLayouts.current[firstUnread.id];
+      if (y !== undefined) {
+        scrollRef.current?.scrollTo({ y: Math.max(0, y - 20), animated: true });
+        setHasScrolled(true);
+      }
+    } else {
+      // Default auto-scroll to bottom
+      setTimeout(() => {
+        scrollRef.current?.scrollToEnd({ animated: true });
+        setHasScrolled(true);
+      }, 300);
+    }
+  }, [timeline, hasScrolled]);
+
+  useEffect(() => {
+    if (sending) {
+      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
+    }
+  }, [sending]);
 
   // Format Date Header
   const getOrdinalSuffix = (i: number) => {
@@ -1413,15 +1447,30 @@ export default function SnoopDetailsScreen() {
               <React.Fragment key={entry.id}>
                 {showDateHeader && (
                   <View style={{ marginVertical: 16, alignItems: "center" }}>
-                    <Text
-                      style={{
-                        fontFamily: "FontMedium",
-                        fontSize: 12,
-                        color: Colors[theme].text_secondary,
-                      }}
-                    >
-                      {currentDateStr}
-                    </Text>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                      <Text
+                        style={{
+                          fontFamily: "FontMedium",
+                          fontSize: 12,
+                          color: Colors[theme].text_secondary,
+                        }}
+                      >
+                        {currentDateStr}
+                      </Text>
+                      {entry.seen === false && entry.type !== "user" && (
+                        <Text
+                          style={{
+                            color: Colors[theme].primary,
+                            fontFamily: "FontBold",
+                            fontSize: 10,
+                            textTransform: "uppercase",
+                            letterSpacing: 0.5,
+                          }}
+                        >
+                          (unread)
+                        </Text>
+                      )}
+                    </View>
                   </View>
                 )}
                 {index > 0 && !showDateHeader && (
@@ -1438,6 +1487,9 @@ export default function SnoopDetailsScreen() {
                   entering={FadeInDown.delay(
                     Math.min(index * 30, 300),
                   ).duration(300)}
+                  onLayout={(e) => {
+                    itemLayouts.current[entry.id] = e.nativeEvent.layout.y;
+                  }}
                   style={styles.termEntry}
                 >
                   <View
