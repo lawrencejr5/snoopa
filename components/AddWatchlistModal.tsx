@@ -41,6 +41,64 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
   // Directly initialize native watchlist instead of parsing text client-side
   const initializeWatchlist = useAction(api.chat.initialize_watchlist);
 
+  // Typewriter Placeholder Logic
+  const EXAMPLES = useMemo(
+    () =>
+      [
+        "Track price drops on https://apple.com/iphone-15",
+        "Monitor https://news.ycombinator.com for ai news",
+        "Tell me when NVIDIA hits $1000 on https://bloomberg.com",
+        "Keep me updated on Real Madrid injury news",
+        "Watch https://tesla.com for Cybertruck updates",
+        "Notify me when Bitcoin hits $100k",
+        "Watch for job openings at https://google.com/careers",
+        "Track PS5 Pro availability on https://bestbuy.com",
+        "Follow news about the next OpenAI release",
+        "Snoop on music festivals at https://coachella.com",
+        "Alert me when Chelsea FC wins a match",
+        "Track flight prices on https://skyscanner.com",
+        "Monitor https://techcrunch.com for startup news",
+      ].sort(() => Math.random() - 0.5),
+    [],
+  );
+
+  const [placeholder, setPlaceholder] = useState("");
+  const [exampleIndex, setExampleIndex] = useState(0);
+  const [charIndex, setCharIndex] = useState(0);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  useEffect(() => {
+    if (!visible) {
+      setPlaceholder("");
+      setCharIndex(0);
+      setIsDeleting(false);
+      return;
+    }
+
+    const currentExample = EXAMPLES[exampleIndex];
+    const typingSpeed = isDeleting ? 1 : 1;
+    const pauseTime = 4000;
+
+    const timeout = setTimeout(() => {
+      if (!isDeleting && charIndex < currentExample.length) {
+        const nextIndex = Math.min(charIndex + 3, currentExample.length);
+        setPlaceholder(currentExample.substring(0, nextIndex));
+        setCharIndex(nextIndex);
+      } else if (isDeleting && charIndex > 0) {
+        const nextIndex = Math.max(charIndex - 8, 0);
+        setPlaceholder(currentExample.substring(0, nextIndex));
+        setCharIndex(nextIndex);
+      } else if (!isDeleting && charIndex === currentExample.length) {
+        setTimeout(() => setIsDeleting(true), pauseTime);
+      } else if (isDeleting && charIndex === 0) {
+        setIsDeleting(false);
+        setExampleIndex((prev) => (prev + 1) % EXAMPLES.length);
+      }
+    }, typingSpeed);
+
+    return () => clearTimeout(timeout);
+  }, [charIndex, isDeleting, exampleIndex, visible, EXAMPLES]);
+
   // Sync visibility with modal state
   useEffect(() => {
     if (visible) {
@@ -201,7 +259,7 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
             }}
             multiline
             maxLength={500}
-            placeholder='e.g. "Track the price of this product from https://example.com/product"'
+            placeholder={`e.g. "${placeholder}"`}
             placeholderTextColor={Colors[theme].text_secondary + "80"}
             editable={!isProcessing}
             style={[
