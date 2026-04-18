@@ -555,7 +555,7 @@ export default function HomeScreen() {
           </Animated.View>
         )}
         {/* Briefing Section */}
-        {latestBriefings.length > 0 && (
+        {activeSnoops.length > 0 && (
           <Animated.View
             key={`briefing-${animationKey}`}
             entering={FadeInDown.delay(200).duration(500)}
@@ -571,7 +571,7 @@ export default function HomeScreen() {
                     { color: Colors[theme].text_secondary },
                   ]}
                 >
-                  RECENT BRIEFINGS
+                  RECENT BRIEFING(S)
                 </Text>
               </View>
               <Pressable onPress={() => router.push("/notifications" as any)}>
@@ -603,16 +603,49 @@ export default function HomeScreen() {
               style={{ marginHorizontal: -20 }}
               contentContainerStyle={{ paddingHorizontal: 20 }}
             >
-              {latestBriefings.map((item, index) => (
+              {latestBriefings.length > 0 ? (
+                latestBriefings.map((item, index) => (
+                  <View
+                    key={item._id}
+                    style={{
+                      marginRight: index === latestBriefings.length - 1 ? 0 : 12,
+                    }}
+                  >
+                    <BriefingCardSwipe item={item} width={width} />
+                  </View>
+                ))
+              ) : (
                 <View
-                  key={item._id}
-                  style={{
-                    marginRight: index === latestBriefings.length - 1 ? 0 : 12,
-                  }}
+                  style={[
+                    styles.briefingCardSwipe,
+                    {
+                      width: width - 40,
+                      backgroundColor: Colors[theme].surface,
+                      borderColor: Colors[theme].border,
+                      justifyContent: "center",
+                      alignItems: "center",
+                      gap: 12,
+                    },
+                  ]}
                 >
-                  <BriefingCardSwipe item={item} width={width} />
+                  <Octicons
+                    name="info"
+                    size={20}
+                    color={Colors[theme].text_secondary}
+                  />
+                  <Text
+                    style={{
+                      color: Colors[theme].text_secondary,
+                      fontFamily: "FontMedium",
+                      fontSize: 11,
+                      textTransform: "uppercase",
+                      letterSpacing: 1,
+                    }}
+                  >
+                    No briefings for you yet
+                  </Text>
                 </View>
-              ))}
+              )}
             </ScrollView>
 
             {/* Pagination Dots */}
@@ -660,7 +693,7 @@ export default function HomeScreen() {
                   { color: Colors[theme].text_secondary },
                 ]}
               >
-                ACTIVE SNOOPS
+                ACTIVE SNOOP(S)
               </Text>
             </View>
             {activeSnoops.length > 0 && (
