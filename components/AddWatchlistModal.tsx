@@ -63,51 +63,19 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
   );
 
   const [placeholder, setPlaceholder] = useState("");
-  const [exampleIndex, setExampleIndex] = useState(0);
-  const [charIndex, setCharIndex] = useState(0);
-  const [isDeleting, setIsDeleting] = useState(false);
 
-  useEffect(() => {
-    if (!visible) {
-      setPlaceholder("");
-      setCharIndex(0);
-      setIsDeleting(false);
-      return;
-    }
-
-    const currentExample = EXAMPLES[exampleIndex];
-    const typingSpeed = isDeleting ? 1 : 1;
-    const pauseTime = 4000;
-
-    const timeout = setTimeout(() => {
-      if (!isDeleting && charIndex < currentExample.length) {
-        const nextIndex = Math.min(charIndex + 3, currentExample.length);
-        setPlaceholder(currentExample.substring(0, nextIndex));
-        setCharIndex(nextIndex);
-      } else if (isDeleting && charIndex > 0) {
-        const nextIndex = Math.max(charIndex - 8, 0);
-        setPlaceholder(currentExample.substring(0, nextIndex));
-        setCharIndex(nextIndex);
-      } else if (!isDeleting && charIndex === currentExample.length) {
-        setTimeout(() => setIsDeleting(true), pauseTime);
-      } else if (isDeleting && charIndex === 0) {
-        setIsDeleting(false);
-        setExampleIndex((prev) => (prev + 1) % EXAMPLES.length);
-      }
-    }, typingSpeed);
-
-    return () => clearTimeout(timeout);
-  }, [charIndex, isDeleting, exampleIndex, visible, EXAMPLES]);
-
-  // Sync visibility with modal state
+  // Sync visibility with modal state and pick a random placeholder
   useEffect(() => {
     if (visible) {
       bottomSheetRef.current?.snapToIndex(0);
+      const randomExample =
+        EXAMPLES[Math.floor(Math.random() * EXAMPLES.length)];
+      setPlaceholder(randomExample);
     } else {
       bottomSheetRef.current?.snapToIndex(-1);
       setPrompt("");
     }
-  }, [visible]);
+  }, [visible, EXAMPLES]);
 
   const handleSheetChanges = useCallback(
     (index: number) => {
