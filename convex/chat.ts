@@ -167,7 +167,8 @@ export const submit_feedback = mutation({
     }
 
     // Toggle: if same feedback is submitted again, remove it
-    const new_feedback = chat.feedback === args.feedback ? undefined : args.feedback;
+    const new_feedback =
+      chat.feedback === args.feedback ? undefined : args.feedback;
     await ctx.db.patch(args.chat_id, { feedback: new_feedback });
   },
 });
@@ -252,7 +253,14 @@ function getCurrentDateTime() {
 }
 
 // Function to detect intention
-type Intent = "SEARCH" | "WATCHLIST" | "CHAT" | "SOURCE" | "PAUSE" | "RESUME" | "EDIT_CONDITION";
+type Intent =
+  | "SEARCH"
+  | "WATCHLIST"
+  | "CHAT"
+  | "SOURCE"
+  | "PAUSE"
+  | "RESUME"
+  | "EDIT_CONDITION";
 async function _detectIntent(
   content: string,
   history?: string,
@@ -284,7 +292,9 @@ async function _detectIntent(
       });
       result = await model.generateContent(prompt);
     } catch (e) {
-      console.warn("Primary model failed, falling back to gemini-2.5-flash-lite");
+      console.warn(
+        "Primary model failed, falling back to gemini-2.5-flash-lite",
+      );
       const fallbackModel = gen_ai.getGenerativeModel({
         model: "gemini-2.5-flash-lite",
       });
@@ -334,10 +344,14 @@ async function _extractConditionFromMessage(
 
     let result;
     try {
-      const model = gen_ai.getGenerativeModel({ model: "gemini-2.0-flash-lite" });
+      const model = gen_ai.getGenerativeModel({
+        model: "gemini-2.0-flash-lite",
+      });
       result = await model.generateContent(prompt);
     } catch (e) {
-      const fallback = gen_ai.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
+      const fallback = gen_ai.getGenerativeModel({
+        model: "gemini-2.5-flash-lite",
+      });
       result = await fallback.generateContent(prompt);
     }
     return result.response.text().trim();
@@ -373,7 +387,9 @@ async function _determineSourceWeight(
       });
       result = await model.generateContent(prompt);
     } catch (e) {
-      console.warn("Primary model failed, falling back to gemini-2.5-flash-lite");
+      console.warn(
+        "Primary model failed, falling back to gemini-2.5-flash-lite",
+      );
       const fallbackModel = gen_ai.getGenerativeModel({
         model: "gemini-2.5-flash-lite",
       });
@@ -418,7 +434,9 @@ async function _generateSourceBrief(
       const model = gen_ai.getGenerativeModel({ model: "gemini-2.0-flash" });
       result = await model.generateContent(prompt);
     } catch (e) {
-      console.warn("Primary model failed, falling back to gemini-2.5-flash-lite");
+      console.warn(
+        "Primary model failed, falling back to gemini-2.5-flash-lite",
+      );
       const fallbackModel = gen_ai.getGenerativeModel({
         model: "gemini-2.5-flash-lite",
       });
@@ -428,6 +446,51 @@ async function _generateSourceBrief(
   } catch (err) {
     console.warn("Source brief generation failed:", err);
     return "Source saved successfully! I'll keep a close eye on it.";
+  }
+}
+
+async function _generateInitialBrief(
+  searchResults: string,
+  condition: string,
+): Promise<string> {
+  const api_key = process.env.GOOGLE_GEMINI_API_KEY;
+  if (!api_key) return "";
+
+  try {
+    const gen_ai = new GoogleGenerativeAI(api_key);
+    const prompt = `You are Snoopa, a proactive AI agent (Greyhound mascot). 
+      The user just created a new watchlist to monitor for: "${condition}"
+      
+      INITIAL INTELLIGENCE GATHERING (SEARCH RESULTS):
+      "${searchResults.substring(0, 20000)}"
+
+      Provide a high-tempo 2-sentence brief.
+      1. Immediate intel: Summarize the most relevant current state based on the search results, keep it very brief.
+      2. Operational status: Confirm you are now monitoring for changes.
+      
+      STRICT RULES:
+      - JUMP STRAIGHT TO INTEL. No "On it", "Alright", "I've checked", or polite fillers.
+      - SEPARATE the two sentences with a double newline (\n\n) so the status appears in a new paragraph.
+      - If search results don't contain enough info, state that broadly and confirm tracking.
+      - Reply with ONLY the response text.`;
+
+    let result;
+    try {
+      const model = gen_ai.getGenerativeModel({ model: "gemini-2.0-flash" });
+      result = await model.generateContent(prompt);
+    } catch (e) {
+      console.warn(
+        "Primary model failed, falling back to gemini-2.5-flash-lite",
+      );
+      const fallbackModel = gen_ai.getGenerativeModel({
+        model: "gemini-2.5-flash-lite",
+      });
+      result = await fallbackModel.generateContent(prompt);
+    }
+    return result.response.text().trim();
+  } catch (err) {
+    console.warn("Initial brief generation failed:", err);
+    return "";
   }
 }
 
@@ -556,7 +619,8 @@ export const send_message = action({
           watchlist_id: args.watchlist_id,
         });
       }
-      const pause_text = "Tracking paused. I'll stand down until you say the word.";
+      const pause_text =
+        "Tracking paused. I'll stand down until you say the word.";
       await ctx.runMutation(internal.chat.save_message, {
         watchlist_id: args.watchlist_id,
         role: "snoopa",
@@ -1073,6 +1137,7 @@ export const initialize_watchlist = action({
       const urlMatch = args.prompt.match(urlRegex);
       let sourceInfoText = "";
       let extractionFailed = false;
+      let tavilySources: Array<{ title?: string; url: string }> = [];
 
       if (urlMatch && wl_id) {
         let url = urlMatch[0];
@@ -1139,6 +1204,28 @@ export const initialize_watchlist = action({
           }
           sourceInfoText = `I encountered an issue trying to process the link you provided (${url}). You might want to try adding it again once we're inside the snoop dashboard.`;
         }
+      } else if (wl_id) {
+        // No explicit URL provided, do a quick intel search
+        try {
+          const searchQuery =
+            payload.canonical_topic || payload.title || args.prompt;
+          const searchResult = await ctx.runAction(internal.tavily.search, {
+            query: searchQuery,
+          });
+
+          if (searchResult && searchResult.leanNews) {
+            const brief = await _generateInitialBrief(
+              searchResult.leanNews,
+              payload.condition,
+            );
+            if (brief) {
+              sourceInfoText = `\n\n${brief}`;
+              tavilySources = searchResult.sources || [];
+            }
+          }
+        } catch (err) {
+          console.error("Failed to generate initial search brief:", err);
+        }
       }
 
       const resultMsgId = await ctx.runMutation(internal.chat.save_message, {
@@ -1165,6 +1252,21 @@ export const initialize_watchlist = action({
               url,
             },
           ],
+        });
+      } else if (tavilySources.length > 0 && wl_id) {
+        await ctx.runMutation(internal.chat.batch_insert_sources, {
+          entries: tavilySources.map((s) => {
+            let hostname = s.title || "Tavily Source";
+            try {
+              hostname = new URL(s.url).hostname || hostname;
+            } catch {}
+            return {
+              watchlist_id: wl_id as Id<"watchlist">,
+              chat_id: resultMsgId,
+              title: s.title || hostname,
+              url: s.url,
+            };
+          }),
         });
       }
 
