@@ -101,6 +101,54 @@ export const deleteUser = mutation({
     const user = await ctx.db.get(user_id);
     if (!user) throw new Error("User not found");
 
+    // 1. Delete all watchlists and their associated data
+    const watchlists = await ctx.db
+      .query("watchlist")
+      .withIndex("by_user", (q) => q.eq("user_id", user_id))
+      .collect();
+
+    for (const wl of watchlists) {
+      // For each watchlist, find all related data
+      const [logs, chats, sources, monitoredSources, notifications, processedHeadlines] = await Promise.all([
+        ctx.db.query("logs").withIndex("by_watchlist", (q) => q.eq("watchlist_id", wl._id)).collect(),
+        ctx.db.query("chats").withIndex("by_watchlist", (q) => q.eq("watchlist_id", wl._id)).collect(),
+        ctx.db.query("sources").withIndex("by_watchlist", (q) => q.eq("watchlist_id", wl._id)).collect(),
+        ctx.db.query("monitored_sources").withIndex("by_watchlist", (q) => q.eq("watchlist_id", wl._id)).collect(),
+        ctx.db.query("notifications").withIndex("by_watchlist", (q) => q.eq("watchlist_id", wl._id)).collect(),
+        ctx.db.query("processed_headlines").withIndex("by_watchlist", (q) => q.eq("watchlist_id", wl._id)).collect(),
+      ]);
+
+      await Promise.all([
+        ...logs.map((log) => ctx.db.delete(log._id)),
+        ...chats.map((chat) => ctx.db.delete(chat._id)),
+        ...sources.map((s) => ctx.db.delete(s._id)),
+        ...monitoredSources.map((ms) => ctx.db.delete(ms._id)),
+        ...notifications.map((n) => ctx.db.delete(n._id)),
+        ...processedHeadlines.map((ph) => ctx.db.delete(ph._id)),
+      ]);
+      await ctx.db.delete(wl._id);
+    }
+
+    // 2. Delete user-level data (sessions and general notifications)
+    const [sessions, userNotifications] = await Promise.all([
+      ctx.db.query("sessions").withIndex("by_user", (q) => q.eq("user_id", user_id)).collect(),
+      ctx.db.query("notifications").withIndex("by_user", (q) => q.eq("user_id", user_id)).collect(),
+    ]);
+
+    await Promise.all([
+      ...sessions.map((s) => ctx.db.delete(s._id)),
+      ...userNotifications.map((n) => ctx.db.delete(n._id)),
+    ]);
+
+    // 2.5 Delete auth accounts
+    const authAccounts = await ctx.db
+      .query("authAccounts")
+      .withIndex("userIdAndProvider", (q) => q.eq("userId", user_id))
+      .collect();
+
+    await Promise.all(authAccounts.map((a) => ctx.db.delete(a._id)));
+
+    // 3. Delete the user record itself
     await ctx.db.delete(user_id);
   },
 });

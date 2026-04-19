@@ -9,7 +9,7 @@ import { useUser } from "@/context/UserContext";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { Octicons } from "@expo/vector-icons";
-import { useIsFocused, useNavigation } from "@react-navigation/native";
+import { useNavigation } from "@react-navigation/native";
 import { useConvexAuth, useQuery } from "convex/react";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
@@ -20,6 +20,7 @@ import {
   StyleSheet,
   Text,
   View,
+  useWindowDimensions,
 } from "react-native";
 import Animated, {
   Easing,
@@ -310,16 +311,93 @@ function SnoopCard({
 }
 
 // ---------------------------------------------------------------------------
+// Briefing Card Swipe
+// ---------------------------------------------------------------------------
+function BriefingCardSwipe({ item, width }: { item: any; width: number }) {
+  const { theme } = useTheme();
+  const router = useRouter();
+
+  return (
+    <Pressable
+      onPress={() => {
+        if (item.watchlist_id) {
+          router.push({
+            pathname: "/snoop/[id]",
+            params: { id: item.watchlist_id },
+          });
+        }
+      }}
+      style={[
+        styles.briefingCardSwipe,
+        {
+          width: width - 40,
+          backgroundColor: Colors[theme].surface,
+          borderColor: Colors[theme].border,
+        },
+      ]}
+    >
+      <View style={styles.briefHeader}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+          <Octicons name="sparkle-fill" size={14} color={Colors[theme].text} />
+          <Text
+            style={[
+              styles.sectionLabel,
+              { color: Colors[theme].text, marginBottom: 0, fontSize: 11 },
+            ]}
+          >
+            Briefing
+          </Text>
+        </View>
+        <Text
+          style={{
+            color: Colors[theme].text_secondary,
+            fontFamily: "FontMedium",
+            fontSize: 10,
+          }}
+        >
+          {formatTimeAgo(item._creationTime)}
+        </Text>
+      </View>
+
+      <Text
+        style={{
+          color: Colors[theme].text,
+          fontFamily: "FontBold",
+          fontSize: 16,
+          marginBottom: 6,
+        }}
+        numberOfLines={1}
+      >
+        {item.title}
+      </Text>
+      <Text
+        style={{
+          color: Colors[theme].text_secondary,
+          fontFamily: "FontRegular",
+          fontSize: 13,
+          lineHeight: 20,
+        }}
+        numberOfLines={3}
+      >
+        {item.message}
+      </Text>
+    </Pressable>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Home Dashboard
 // ---------------------------------------------------------------------------
 export default function HomeScreen() {
   const { theme } = useTheme();
   const router = useRouter();
+  const { width } = useWindowDimensions();
   const { isLoading } = useConvexAuth();
   const { appLoading } = useLoadingContext();
   const { signedIn } = useUser();
   const navigation = useNavigation();
   const [animationKey, setAnimationKey] = useState(0);
+  const [activeBriefIndex, setActiveBriefIndex] = useState(0);
 
   useEffect(() => {
     const unsubscribe = navigation.addListener("tabPress" as any, (e: any) => {
@@ -343,7 +421,7 @@ export default function HomeScreen() {
   const allSnoops = watchlistData;
 
   const notifications = useQuery(api.notifications.get_notifications) || [];
-  const latestBriefings = notifications.slice(0, 3);
+  const latestBriefings = notifications.slice(0, 5); // Show up to 5 briefs in swiper
 
   if (isLoading || !signedIn || appLoading) return <Loading />;
 
@@ -476,141 +554,128 @@ export default function HomeScreen() {
             </ScrollView>
           </Animated.View>
         )}
-
         {/* Briefing Section */}
-        <Animated.View
-          key={`briefing-${animationKey}`}
-          entering={FadeInDown.delay(200).duration(500)}
-          style={styles.section}
-        >
-          <View
-            style={[
-              styles.singleBriefingCard,
-              {
-                backgroundColor: Colors[theme].surface,
-                borderColor: Colors[theme].border,
-              },
-            ]}
+        {activeSnoops.length > 0 && (
+          <Animated.View
+            key={`briefing-${animationKey}`}
+            entering={FadeInDown.delay(200).duration(500)}
+            style={styles.section}
           >
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                gap: 8,
-                marginBottom: 16,
-              }}
-            >
-              <Octicons
-                name="sparkle-fill"
-                size={16}
-                color={Colors[theme].text}
-              />
-              <Text
-                style={[
-                  styles.sectionLabel,
-                  { color: Colors[theme].text, marginBottom: 0 },
-                ]}
+            <View style={styles.sectionHeader}>
+              <View
+                style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
               >
-                Briefings
-              </Text>
-            </View>
-
-            <View style={{ gap: 16 }}>
-              {latestBriefings.length > 0 ? (
-                latestBriefings.map((item) => (
-                  <Pressable
-                    key={item._id}
-                    onPress={() => {
-                      if (item.watchlist_id) {
-                        router.push({
-                          pathname: "/snoop/[id]",
-                          params: { id: item.watchlist_id },
-                        });
-                      }
-                    }}
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "flex-start",
-                      gap: 10,
-                    }}
-                  >
-                    <View
-                      style={{
-                        width: 4,
-                        height: 4,
-                        borderRadius: 2,
-                        backgroundColor: Colors[theme].text_secondary,
-                        marginTop: 8,
-                      }}
-                    />
-                    <View style={{ flex: 1 }}>
-                      <Text
-                        style={{
-                          color: Colors[theme].text,
-                          fontFamily: "FontBold",
-                          fontSize: 13,
-                          marginBottom: 4,
-                        }}
-                        numberOfLines={1}
-                      >
-                        {item.title}
-                      </Text>
-                      <Text
-                        style={{
-                          color: Colors[theme].text_secondary,
-                          fontFamily: "FontRegular",
-                          fontSize: 13,
-                          lineHeight: 18,
-                        }}
-                        numberOfLines={2}
-                      >
-                        {item.message}
-                      </Text>
-                    </View>
-                    <Text
-                      style={{
-                        color: Colors[theme].text_secondary,
-                        fontFamily: "FontMedium",
-                        fontSize: 11,
-                      }}
-                    >
-                      {formatTimeAgo(item._creationTime)}
-                    </Text>
-                  </Pressable>
-                ))
-              ) : (
-                <View style={{ paddingVertical: 10 }}>
-                  <Text
-                    style={{
-                      color: Colors[theme].text_secondary,
-                      fontFamily: "FontRegular",
-                      fontSize: 13,
-                    }}
-                  >
-                    There are no briefings for you for now
-                  </Text>
-                </View>
-              )}
-            </View>
-
-            {latestBriefings.length > 0 && (
-              <Pressable
-                onPress={() => router.push("/notifications" as any)}
-                style={{ alignSelf: "flex-end", marginTop: 16 }}
-              >
+                <Text
+                  style={[
+                    styles.sectionLabel,
+                    { color: Colors[theme].text_secondary },
+                  ]}
+                >
+                  RECENT BRIEFING(S)
+                </Text>
+              </View>
+              <Pressable onPress={() => router.push("/notifications" as any)}>
                 <Text
                   style={{
                     color: Colors[theme].primary,
                     fontFamily: "FontBold",
-                    fontSize: 12,
+                    fontSize: 11,
                   }}
                 >
-                  See more
+                  SEE ALL
                 </Text>
               </Pressable>
+            </View>
+
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              onScroll={(e) => {
+                const x = e.nativeEvent.contentOffset.x;
+                const snapWidth = width - 40 + 12; // Card width + gap
+                const index = Math.round(x / snapWidth);
+                if (index !== activeBriefIndex) setActiveBriefIndex(index);
+              }}
+              scrollEventThrottle={16}
+              snapToInterval={width - 40 + 12} // width - 40 (card) + 12 (gap)
+              decelerationRate="fast"
+              snapToAlignment="start"
+              style={{ marginHorizontal: -20 }}
+              contentContainerStyle={{ paddingHorizontal: 20 }}
+            >
+              {latestBriefings.length > 0 ? (
+                latestBriefings.map((item, index) => (
+                  <View
+                    key={item._id}
+                    style={{
+                      marginRight: index === latestBriefings.length - 1 ? 0 : 12,
+                    }}
+                  >
+                    <BriefingCardSwipe item={item} width={width} />
+                  </View>
+                ))
+              ) : (
+                <View
+                  style={[
+                    styles.briefingCardSwipe,
+                    {
+                      width: width - 40,
+                      backgroundColor: Colors[theme].surface,
+                      borderColor: Colors[theme].border,
+                      justifyContent: "center",
+                      alignItems: "center",
+                      gap: 12,
+                    },
+                  ]}
+                >
+                  <Octicons
+                    name="info"
+                    size={20}
+                    color={Colors[theme].text_secondary}
+                  />
+                  <Text
+                    style={{
+                      color: Colors[theme].text_secondary,
+                      fontFamily: "FontMedium",
+                      fontSize: 11,
+                      textTransform: "uppercase",
+                      letterSpacing: 1,
+                    }}
+                  >
+                    No briefings for you yet
+                  </Text>
+                </View>
+              )}
+            </ScrollView>
+
+            {/* Pagination Dots */}
+            {latestBriefings.length > 1 && (
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "center",
+                  gap: 6,
+                  marginTop: 14,
+                }}
+              >
+                {latestBriefings.map((_, i) => (
+                  <View
+                    key={i}
+                    style={{
+                      width: activeBriefIndex === i ? 16 : 6,
+                      height: 6,
+                      borderRadius: 3,
+                      backgroundColor:
+                        activeBriefIndex === i
+                          ? Colors[theme].primary
+                          : Colors[theme].text_secondary + "40",
+                    }}
+                  />
+                ))}
+              </View>
             )}
-          </View>
-        </Animated.View>
+          </Animated.View>
+        )}
 
         {/* Active Snoops List */}
         <Animated.View
@@ -628,7 +693,7 @@ export default function HomeScreen() {
                   { color: Colors[theme].text_secondary },
                 ]}
               >
-                ACTIVE SNOOPS
+                ACTIVE SNOOP(S)
               </Text>
             </View>
             {activeSnoops.length > 0 && (
@@ -806,10 +871,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 5,
   },
-  singleBriefingCard: {
-    padding: 18,
-    borderRadius: 16,
+  briefingCardSwipe: {
+    padding: 20,
+    borderRadius: 20,
     borderWidth: 1,
+    height: 170,
+  },
+  briefHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 14,
   },
   snoopCard: {
     borderRadius: 14,

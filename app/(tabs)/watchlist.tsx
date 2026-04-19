@@ -1,3 +1,4 @@
+import AddWatchlistModal from "@/components/AddWatchlistModal";
 import Container from "@/components/Container";
 import Loading from "@/components/Loading";
 import Colors from "@/constants/Colors";
@@ -217,6 +218,7 @@ export default function WatchlistScreen() {
   const { signedIn } = useUser();
   const navigation = useNavigation();
   const [animationKey, setAnimationKey] = useState(0);
+  const [showAddModal, setShowAddModal] = useState(false);
 
   useEffect(() => {
     const unsubscribe = navigation.addListener("tabPress" as any, (e: any) => {
@@ -324,7 +326,7 @@ export default function WatchlistScreen() {
                 anything you want to keep an eye on.
               </Text>
               <Pressable
-                onPress={() => router.push("/(tabs)")}
+                onPress={() => setShowAddModal(true)}
                 style={{
                   backgroundColor: Colors[theme].primary,
                   paddingVertical: 14,
@@ -506,6 +508,33 @@ export default function WatchlistScreen() {
           </>
         )}
       </ScrollView>
+
+      {/* Floating Action Button */}
+      <Pressable
+        onPress={() => setShowAddModal(true)}
+        style={[
+          styles.fab,
+          {
+            backgroundColor: Colors[theme].primary,
+          },
+        ]}
+      >
+        <Text
+          style={{
+            fontSize: 28,
+            color: Colors[theme].background,
+            fontFamily: "FontLight",
+            marginTop: -2,
+          }}
+        >
+          +
+        </Text>
+      </Pressable>
+
+      <AddWatchlistModal
+        visible={showAddModal}
+        onClose={() => setShowAddModal(false)}
+      />
     </Container>
   );
 }
@@ -597,5 +626,20 @@ const styles = StyleSheet.create({
     marginTop: 12,
     paddingTop: 12,
     borderTopWidth: 1,
+  },
+  fab: {
+    position: "absolute",
+    bottom: 30,
+    right: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: "center",
+    alignItems: "center",
+    elevation: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
   },
 });

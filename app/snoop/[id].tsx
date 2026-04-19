@@ -37,6 +37,8 @@ import { KeyboardStickyView } from "react-native-keyboard-controller";
 import Animated, {
   FadeIn,
   FadeInDown,
+  FadeOut,
+  LinearTransition,
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
@@ -82,6 +84,7 @@ function CommandsModal({
   onPauseResume,
   onRename,
   onEdit,
+  onAddSource,
   isProcessing,
 }: {
   visible: boolean;
@@ -91,11 +94,19 @@ function CommandsModal({
   onPauseResume: () => void;
   onRename: () => void;
   onEdit: () => void;
+  onAddSource: () => void;
   isProcessing: boolean;
 }) {
   const { theme } = useTheme();
 
   const options = [
+    {
+      id: "add_source",
+      label: "Add source URL",
+      icon: "link",
+      action: onAddSource,
+      color: Colors[theme].text,
+    },
     {
       id: "pause_resume",
       label: snoop.status === "inactive" ? "Resume tracking" : "Pause tracking",
@@ -225,23 +236,32 @@ function CommandsModal({
                 {o.label}
               </Text>
             </View>
-            <Image
-              source={
-                o.icon === "play"
-                  ? require("@/assets/icons/play.png")
-                  : o.icon === "pause"
-                    ? require("@/assets/icons/pause.png")
-                    : o.icon === "document"
-                      ? require("@/assets/icons/document.png")
-                      : require("@/assets/icons/times.png")
-              }
-              style={{
-                width: 16,
-                height: 16,
-                tintColor: o.color,
-                opacity: 0.7,
-              }}
-            />
+            {o.icon === "link" ? (
+              <Octicons
+                name="link"
+                size={16}
+                color={o.color}
+                style={{ opacity: 0.7 }}
+              />
+            ) : (
+              <Image
+                source={
+                  o.icon === "play"
+                    ? require("@/assets/icons/play.png")
+                    : o.icon === "pause"
+                      ? require("@/assets/icons/pause.png")
+                      : o.icon === "document"
+                        ? require("@/assets/icons/document.png")
+                        : require("@/assets/icons/times.png")
+                }
+                style={{
+                  width: 16,
+                  height: 16,
+                  tintColor: o.color,
+                  opacity: 0.7,
+                }}
+              />
+            )}
           </Pressable>
         ))}
       </BottomSheetView>
@@ -503,6 +523,131 @@ function EditModal({
 }
 
 // ---------------------------------------------------------------------------
+// Confirmation Modal
+// ---------------------------------------------------------------------------
+function ConfirmationModal({
+  visible,
+  onClose,
+  onConfirm,
+  title,
+  message,
+  isProcessing,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  title: string;
+  message: string;
+  isProcessing: boolean;
+}) {
+  const { theme } = useTheme();
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+    >
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: "rgba(0,0,0,0.8)",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: 24,
+        }}
+      >
+        <Animated.View
+          entering={FadeInDown}
+          style={{
+            width: "100%",
+            backgroundColor: Colors[theme].card,
+            borderRadius: 24,
+            padding: 24,
+            borderWidth: 1,
+            borderColor: Colors[theme].border,
+          }}
+        >
+          <Text
+            style={{
+              color: Colors[theme].text,
+              fontFamily: "FontBold",
+              fontSize: 20,
+              marginBottom: 12,
+            }}
+          >
+            {title}
+          </Text>
+          <Text
+            style={{
+              color: Colors[theme].text_secondary,
+              fontFamily: "FontRegular",
+              fontSize: 15,
+              lineHeight: 22,
+              marginBottom: 32,
+            }}
+          >
+            {message}
+          </Text>
+
+          <View style={{ flexDirection: "row", gap: 12 }}>
+            <Pressable
+              onPress={onClose}
+              disabled={isProcessing}
+              style={{
+                flex: 1,
+                paddingVertical: 14,
+                borderRadius: 14,
+                backgroundColor: Colors[theme].surface,
+                alignItems: "center",
+                borderWidth: 1,
+                borderColor: Colors[theme].border,
+              }}
+            >
+              <Text
+                style={{
+                  color: Colors[theme].text,
+                  fontFamily: "FontBold",
+                  fontSize: 15,
+                }}
+              >
+                No, Keep it
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={onConfirm}
+              disabled={isProcessing}
+              style={{
+                flex: 1,
+                paddingVertical: 14,
+                borderRadius: 14,
+                backgroundColor: Colors[theme].danger,
+                alignItems: "center",
+              }}
+            >
+              {isProcessing ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <Text
+                  style={{
+                    color: "#fff",
+                    fontFamily: "FontBold",
+                    fontSize: 15,
+                  }}
+                >
+                  Yes, Delete
+                </Text>
+              )}
+            </Pressable>
+          </View>
+        </Animated.View>
+      </View>
+    </Modal>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 const getFaviconUrl = (url?: string) => {
@@ -684,12 +829,18 @@ export default function SnoopDetailsScreen() {
   const [input, setInput] = useState("");
   const [showCommands, setShowCommands] = useState(false);
   const [showRename, setShowRename] = useState(false);
-  const [showEdit, setShowEdit] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [sending, setSending] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [showSources, setShowSources] = useState(false);
   const [selectedSources, setSelectedSources] = useState<any[]>([]);
+  // commandMode: null | "source" | "edit"
+  const [commandMode, setCommandMode] = useState<"source" | "edit" | null>(
+    null,
+  );
+  const [isFocused, setIsFocused] = useState(false);
+  const [showConfirmation, setShowConfirmation] = useState(false);
+  const [loadingStatus, setLoadingStatus] = useState("...");
 
   // Data
   const snoop = useQuery(
@@ -704,21 +855,28 @@ export default function SnoopDetailsScreen() {
     api.chat.get_messages,
     id ? { watchlist_id: id as Id<"watchlist"> } : "skip",
   );
+
   const chatSources = useQuery(
     api.chat.get_session_sources,
     id ? { watchlist_id: id as Id<"watchlist"> } : "skip",
   );
+  const monitoredSources = useQuery(
+    api.monitored_sources.get_monitored_sources,
+    id ? { watchlist_id: id as Id<"watchlist"> } : "skip",
+  );
 
   // Mutations
-  const deactivateWatchlist = useMutation(api.watchlist.deactivate_watchlist);
-  const reactivateWatchlist = useMutation(api.watchlist.reactivate_watchlist);
   const updateWatchlist = useMutation(api.watchlist.update_watchlist_item);
   const deleteWatchlist = useMutation(api.watchlist.delete_watchlist_item);
   const markLogsSeen = useMutation(api.log.mark_logs_seen);
   const markChatsSeen = useMutation(api.chat.mark_chats_seen);
+  const submitFeedback = useMutation(api.chat.submit_feedback);
+  const deleteMonitoredSource = useMutation(
+    api.monitored_sources.delete_monitored_source,
+  );
+  const detectIntent = useAction(api.chat.detect_intent);
   const sendMessage = useAction(api.chat.send_message);
 
-  // Mark seen on mount
   useEffect(() => {
     if (id) {
       markLogsSeen({ watchlist_id: id as Id<"watchlist"> }).catch(() => {});
@@ -726,33 +884,26 @@ export default function SnoopDetailsScreen() {
     }
   }, [id]);
 
-  // Auto-scroll to bottom
-  useEffect(() => {
-    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 300);
-  }, [logs, chatMessages]);
-
   // Merge logs + chat into a unified timeline
   const timeline = useMemo(() => {
     const entries: Array<{
       id: string;
-      type: "log" | "user" | "snoopa" | "system";
+      type: "log" | "user" | "snoopa";
       content: string;
       timestamp: number;
-      verified?: boolean;
-      url?: string;
+      logType?: "success" | "error";
+      feedback?: "like" | "dislike";
     }> = [];
 
     // Add logs
     if (logs) {
       for (const log of logs) {
-        if (log.type === "source") continue;
         entries.push({
           id: log._id,
           type: "log",
           content: log.action,
           timestamp: log.timestamp,
-          verified: log.verified,
-          url: log.url,
+          logType: log.type as "success" | "error",
         });
       }
     }
@@ -772,6 +923,7 @@ export default function SnoopDetailsScreen() {
           type: msg.role === "user" ? "user" : "snoopa",
           content: cleanContent,
           timestamp: msg._creationTime,
+          feedback: (msg as any).feedback,
         });
       }
     }
@@ -780,6 +932,18 @@ export default function SnoopDetailsScreen() {
     entries.sort((a, b) => a.timestamp - b.timestamp);
     return entries;
   }, [logs, chatMessages]);
+
+  // Auto-scroll to bottom when new messages/logs arrive
+  useEffect(() => {
+    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 300);
+  }, [logs, chatMessages]);
+
+  // Also scroll immediately when sending starts so the status label is visible
+  useEffect(() => {
+    if (sending) {
+      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 50);
+    }
+  }, [sending]);
 
   // Format Date Header
   const getOrdinalSuffix = (i: number) => {
@@ -810,27 +974,70 @@ export default function SnoopDetailsScreen() {
     return `${hours}:${d.getMinutes().toString().padStart(2, "0")}${ampm}`;
   };
 
+  // Intent → friendly loading label
+  const getStatusLabel = (intent: string) => {
+    switch (intent) {
+      case "SEARCH":         return "Snooping the web...";
+      case "WATCHLIST":      return "Setting up watchlist...";
+      case "SOURCE":         return "Tracking source...";
+      case "PAUSE":          return "Pausing watchlist...";
+      case "RESUME":         return "Resuming watchlist...";
+      case "EDIT_CONDITION": return "Updating condition...";
+      case "CHAT":           return "Thinking...";
+      default:               return "Working on it...";
+    }
+  };
+
   // Handle send
   const handleSend = async () => {
     if (!input.trim() || sending || !id) return;
     const content = input.trim();
     setInput("");
     setSending(true);
+    setLoadingStatus("...");
+    const current_mode = commandMode;
 
     try {
+      // If commandMode pre-determines intent, set status immediately
+      if (current_mode === "source") {
+        setLoadingStatus("Tracking source...");
+      } else if (current_mode === "edit") {
+        setLoadingStatus("Updating condition...");
+      } else {
+        // Detect intent concurrently so loading text updates ASAP
+        detectIntent({ content }).then((intent) => {
+          setLoadingStatus(getStatusLabel(intent));
+        }).catch(() => {});
+      }
+
       await sendMessage({
         watchlist_id: id as Id<"watchlist">,
         content,
+        intent:
+          current_mode === "source"
+            ? "SOURCE"
+            : current_mode === "edit"
+              ? "EDIT_CONDITION"
+              : undefined,
       });
+      if (current_mode) {
+        setCommandMode(null);
+      }
     } catch (e) {
       console.error("Failed to send:", e);
     } finally {
       setSending(false);
+      setLoadingStatus("...");
     }
   };
 
   // Command handlers
-  const handleTerminate = async () => {
+  const handleTerminate = () => {
+    setShowCommands(false);
+    setTimeout(() => setShowConfirmation(true), 300);
+  };
+
+  const confirmTerminate = async () => {
     if (!id || isProcessing) return;
     setIsProcessing(true);
     try {
@@ -840,22 +1047,26 @@ export default function SnoopDetailsScreen() {
       console.error("Terminate failed:", e);
     } finally {
       setIsProcessing(false);
+      setShowConfirmation(false);
     }
   };
 
+  // Pause/Resume now routes through chat so timeline gets a log
   const handlePauseResume = async () => {
-    if (!id || isProcessing) return;
-    setIsProcessing(true);
+    if (!id || sending) return;
+    const is_paused = snoop?.status === "inactive";
+    const content = is_paused ? "Resume tracking" : "Pause tracking";
+    setSending(true);
     try {
-      if (snoop?.status === "inactive") {
-        await reactivateWatchlist({ watchlist_id: id as Id<"watchlist"> });
-      } else {
-        await deactivateWatchlist({ watchlist_id: id as Id<"watchlist"> });
-      }
+      await sendMessage({
+        watchlist_id: id as Id<"watchlist">,
+        content,
+        intent: is_paused ? "RESUME" : "PAUSE",
+      });
     } catch (e) {
-      console.error("Pause/resume failed:", e);
+      console.error("Pause/resume via chat failed:", e);
     } finally {
-      setIsProcessing(false);
+      setSending(false);
     }
   };
 
@@ -870,22 +1081,6 @@ export default function SnoopDetailsScreen() {
       setShowRename(false);
     } catch (e) {
       console.error("Rename failed:", e);
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const handleEdit = async (newCondition: string) => {
-    if (!id || isProcessing || !newCondition) return;
-    setIsProcessing(true);
-    try {
-      await updateWatchlist({
-        watchlist_id: id as Id<"watchlist">,
-        condition: newCondition,
-      });
-      setShowEdit(false);
-    } catch (e) {
-      console.error("Edit failed:", e);
     } finally {
       setIsProcessing(false);
     }
@@ -913,6 +1108,120 @@ export default function SnoopDetailsScreen() {
   const statusColor = isActive
     ? Colors[theme].success
     : Colors[theme].text_secondary;
+
+  const leftIconElement =
+    commandMode === "source" ? (
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 6,
+          opacity: sending ? 0.5 : 1,
+        }}
+      >
+        <Octicons name="link" size={18} color={Colors[theme].text} />
+        <Text
+          style={{
+            color: Colors[theme].text,
+            fontFamily: "FontMedium",
+            fontSize: 13,
+            marginLeft: 2,
+          }}
+        >
+          source
+        </Text>
+        <Pressable disabled={sending} onPress={() => setCommandMode(null)}>
+          <Octicons
+            name="x"
+            size={16}
+            color={Colors[theme].text_secondary}
+            style={{ padding: 4 }}
+          />
+        </Pressable>
+        <View
+          style={{
+            width: 1,
+            height: 20,
+            backgroundColor: Colors[theme].border,
+            marginHorizontal: 4,
+          }}
+        />
+      </View>
+    ) : commandMode === "edit" ? (
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 6,
+          opacity: sending ? 0.5 : 1,
+        }}
+      >
+        <Image
+          source={require("@/assets/icons/document.png")}
+          style={{
+            width: 18,
+            height: 18,
+            tintColor: Colors[theme].text,
+          }}
+        />
+        <Text
+          style={{
+            color: Colors[theme].text,
+            fontFamily: "FontMedium",
+            fontSize: 13,
+            marginLeft: 2,
+          }}
+        >
+          condition
+        </Text>
+        <Pressable disabled={sending} onPress={() => setCommandMode(null)}>
+          <Octicons
+            name="x"
+            size={16}
+            color={Colors[theme].text_secondary}
+            style={{ padding: 4 }}
+          />
+        </Pressable>
+        <View
+          style={{
+            width: 1,
+            height: 20,
+            backgroundColor: Colors[theme].border,
+            marginHorizontal: 4,
+          }}
+        />
+      </View>
+    ) : (
+      <Pressable onPress={() => setShowCommands(true)}>
+        <Octicons
+          name="command-palette"
+          size={18}
+          color={Colors[theme].text_secondary}
+        />
+      </Pressable>
+    );
+
+  const rightIconElement = (
+    <Pressable
+      onPress={handleSend}
+      disabled={sending || !input.trim()}
+      style={{
+        padding: 6,
+        backgroundColor: Colors[theme].primary,
+        borderRadius: 8,
+        opacity: input.trim() && !sending ? 1 : 0.3,
+      }}
+    >
+      <Image
+        source={require("@/assets/icons/arrow-up.png")}
+        style={{
+          width: 15,
+          height: 15,
+          tintColor: Colors[theme].background,
+        }}
+      />
+    </Pressable>
+  );
 
   return (
     <Container>
@@ -1084,6 +1393,82 @@ export default function SnoopDetailsScreen() {
                 </View>
               </>
             )}
+
+            {monitoredSources && monitoredSources.length > 0 && (
+              <>
+                <Text
+                  style={{
+                    fontFamily: "FontMedium",
+                    fontSize: 12,
+                    color: Colors[theme].text_secondary,
+                    marginBottom: 8,
+                    marginTop:
+                      snoop.keywords && snoop.keywords.length > 0 ? 16 : 0,
+                  }}
+                >
+                  Monitored Sources
+                </Text>
+                <View style={{ gap: 8 }}>
+                  {monitoredSources.map((ms: any) => (
+                    <Pressable
+                      key={ms._id}
+                      onPress={async () => {
+                        if (ms.url)
+                          await WebBrowser.openAuthSessionAsync(ms.url);
+                      }}
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 8,
+                        backgroundColor: Colors[theme].card,
+                        padding: 12,
+                        borderRadius: 12,
+                        borderWidth: 1,
+                        borderColor: Colors[theme].border,
+                      }}
+                    >
+                      <Octicons
+                        name="link"
+                        size={14}
+                        color={Colors[theme].primary}
+                      />
+                      <Text
+                        style={{
+                          flex: 1,
+                          fontFamily: "FontRegular",
+                          fontSize: 13,
+                          color: Colors[theme].text,
+                        }}
+                        numberOfLines={1}
+                      >
+                        {ms.url}
+                      </Text>
+                      <Pressable
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          deleteMonitoredSource({
+                            monitored_source_id: ms._id,
+                          }).catch((err) => console.error(err));
+                        }}
+                        style={{
+                          padding: 8,
+                          borderRadius: 8,
+                          backgroundColor: Colors[theme].text + "15",
+                          borderWidth: 1,
+                          borderColor: Colors[theme].text + "30",
+                        }}
+                      >
+                        <Octicons
+                          name="trash"
+                          size={14}
+                          color={Colors[theme].text}
+                        />
+                      </Pressable>
+                    </Pressable>
+                  ))}
+                </View>
+              </>
+            )}
           </View>
         )}
       </Animated.View>
@@ -1114,32 +1499,35 @@ export default function SnoopDetailsScreen() {
                 : null;
             const showDateHeader = currentDateStr !== previousDateStr;
 
-            const lgSources =
-              logs?.filter(
-                (l: any) => l.type === "source" && l.chat_id === entry.id,
-              ) || [];
-            const chSources =
+            const entrySources =
               chatSources
                 ?.filter((s: any) => s.chat_id === entry.id)
                 .map((s: any) => ({
                   action: s.title,
                   url: s.url,
                 })) || [];
-            const entrySources = [...lgSources, ...chSources];
 
             return (
               <React.Fragment key={entry.id}>
                 {showDateHeader && (
                   <View style={{ marginVertical: 16, alignItems: "center" }}>
-                    <Text
+                    <View
                       style={{
-                        fontFamily: "FontMedium",
-                        fontSize: 12,
-                        color: Colors[theme].text_secondary,
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 6,
                       }}
                     >
-                      {currentDateStr}
-                    </Text>
+                      <Text
+                        style={{
+                          fontFamily: "FontMedium",
+                          fontSize: 12,
+                          color: Colors[theme].text_secondary,
+                        }}
+                      >
+                        {currentDateStr}
+                      </Text>
+                    </View>
                   </View>
                 )}
                 {index > 0 && !showDateHeader && (
@@ -1169,7 +1557,9 @@ export default function SnoopDetailsScreen() {
                       style={{
                         color:
                           entry.type === "log"
-                            ? Colors[theme].success
+                            ? entry.logType === "error"
+                              ? Colors[theme].danger
+                              : Colors[theme].success
                             : entry.type === "user"
                               ? Colors[theme].warning
                               : "#fff",
@@ -1210,22 +1600,21 @@ export default function SnoopDetailsScreen() {
                   </View>
 
                   {entry.type === "log" ? (
-                    <Pressable
-                      onPress={async () => {
-                        if (entry.url)
-                          await WebBrowser.openAuthSessionAsync(entry.url);
-                      }}
-                      style={{ width: "100%" }}
-                    >
+                    <View style={{ width: "100%" }}>
                       <Text
                         style={[
                           styles.termContent,
-                          { color: Colors[theme].lightgreen },
+                          {
+                            color:
+                              entry.logType === "error"
+                                ? Colors[theme].lightred
+                                : Colors[theme].lightgreen,
+                          },
                         ]}
                       >
                         {entry.content}
                       </Text>
-                    </Pressable>
+                    </View>
                   ) : entry.type === "user" ? (
                     <View style={{ width: "100%" }}>
                       <Text
@@ -1240,61 +1629,148 @@ export default function SnoopDetailsScreen() {
                   ) : (
                     <View style={{ width: "100%" }}>
                       <FormatText>{entry.content}</FormatText>
-                      {entrySources.length > 0 && (
-                        <Pressable
-                          onPress={() => {
-                            setSelectedSources(entrySources);
-                            setShowSources(true);
-                          }}
-                          style={{
-                            marginTop: 12,
-                            flexDirection: "row",
-                            alignItems: "center",
-                            gap: 6,
-                            backgroundColor: Colors[theme].border,
-                            alignSelf: "flex-start",
-                            paddingHorizontal: 12,
-                            paddingVertical: 6,
-                            borderRadius: 8,
-                          }}
-                        >
-                          <View
+
+                      {/* Sources pill + feedback buttons on the same row */}
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          marginTop: 12,
+                        }}
+                      >
+                        {/* Sources pill — left side */}
+                        {entrySources.length > 0 ? (
+                          <Pressable
+                            onPress={() => {
+                              setSelectedSources(entrySources);
+                              setShowSources(true);
+                            }}
                             style={{
                               flexDirection: "row",
                               alignItems: "center",
+                              gap: 6,
+                              backgroundColor: Colors[theme].border,
+                              paddingHorizontal: 12,
+                              paddingVertical: 6,
+                              borderRadius: 8,
                             }}
                           >
-                            {entrySources.slice(0, 3).map((s, i) => {
-                              const fav = getFaviconUrl(s.url);
-                              return fav ? (
-                                <Image
-                                  key={i}
-                                  source={{ uri: fav }}
-                                  style={{
-                                    width: 14,
-                                    height: 14,
-                                    borderRadius: 7,
-                                    marginLeft: i > 0 ? -4 : 0,
-                                    borderWidth: 1,
-                                    borderColor: Colors[theme].text,
-                                    backgroundColor: Colors[theme].surface,
-                                  }}
-                                />
-                              ) : null;
-                            })}
-                          </View>
-                          <Text
+                            <View
+                              style={{
+                                flexDirection: "row",
+                                alignItems: "center",
+                              }}
+                            >
+                              {entrySources.slice(0, 3).map((s, i) => {
+                                const fav = getFaviconUrl(s.url);
+                                return fav ? (
+                                  <Image
+                                    key={i}
+                                    source={{ uri: fav }}
+                                    style={{
+                                      width: 14,
+                                      height: 14,
+                                      borderRadius: 7,
+                                      marginLeft: i > 0 ? -4 : 0,
+                                      borderWidth: 1,
+                                      borderColor: Colors[theme].text,
+                                      backgroundColor: Colors[theme].surface,
+                                    }}
+                                  />
+                                ) : null;
+                              })}
+                            </View>
+                            <Text
+                              style={{
+                                color: Colors[theme].text,
+                                fontFamily: "FontMedium",
+                                fontSize: 13,
+                                marginLeft: 4,
+                              }}
+                            >
+                              Sources
+                            </Text>
+                          </Pressable>
+                        ) : (
+                          <View />
+                        )}
+
+                        {/* Feedback buttons — right side */}
+                        <View
+                          style={{
+                            flexDirection: "row",
+                            gap: 6,
+                            alignItems: "center",
+                          }}
+                        >
+                          <Pressable
+                            onPress={() =>
+                              submitFeedback({
+                                chat_id: entry.id as Id<"chats">,
+                                feedback: "like",
+                              }).catch(() => {})
+                            }
                             style={{
-                              color: Colors[theme].text,
-                              fontFamily: "FontMedium",
-                              fontSize: 13,
-                              marginLeft: 4,
+                              paddingHorizontal: 10,
+                              paddingVertical: 5,
+                              borderRadius: 8,
+                              borderWidth: 1,
+                              borderColor:
+                                entry.feedback === "like"
+                                  ? Colors[theme].text
+                                  : Colors[theme].border,
+                              backgroundColor:
+                                entry.feedback === "like"
+                                  ? Colors[theme].text + "18"
+                                  : "transparent",
                             }}
                           >
-                            Sources
-                          </Text>
-                        </Pressable>
-                      )}
+                            <Octicons
+                              name="thumbsup"
+                              size={12}
+                              color={
+                                entry.feedback === "like"
+                                  ? Colors[theme].text
+                                  : Colors[theme].text_secondary
+                              }
+                            />
+                          </Pressable>
+
+                          <Pressable
+                            onPress={() =>
+                              submitFeedback({
+                                chat_id: entry.id as Id<"chats">,
+                                feedback: "dislike",
+                              }).catch(() => {})
+                            }
+                            style={{
+                              paddingHorizontal: 10,
+                              paddingVertical: 5,
+                              borderRadius: 8,
+                              borderWidth: 1,
+                              borderColor:
+                                entry.feedback === "dislike"
+                                  ? Colors[theme].text
+                                  : Colors[theme].border,
+                              backgroundColor:
+                                entry.feedback === "dislike"
+                                  ? Colors[theme].text + "18"
+                                  : "transparent",
+                            }}
+                          >
+                            <Octicons
+                              name="thumbsdown"
+                              size={12}
+                              color={
+                                entry.feedback === "dislike"
+                                  ? Colors[theme].text
+                                  : Colors[theme].text_secondary
+                              }
+                            />
+                          </Pressable>
+                        </View>
+                      </View>
                     </View>
                   )}
                 </Animated.View>
@@ -1316,7 +1792,7 @@ export default function SnoopDetailsScreen() {
                   style={{
                     color: Colors[theme].text,
                     fontFamily: "FontBold",
-                    fontSize: 12,
+                    fontSize: 15,
                   }}
                 >
                   Snoopa
@@ -1337,7 +1813,7 @@ export default function SnoopDetailsScreen() {
                     { color: Colors[theme].text_secondary },
                   ]}
                 >
-                  [...]
+                  {loadingStatus}
                 </Text>
                 <Octicons
                   name="chevron-right"
@@ -1370,20 +1846,24 @@ export default function SnoopDetailsScreen() {
 
       {/* Terminal Input */}
       <KeyboardStickyView offset={{ opened: 10, closed: 0 }}>
-        <View
+        <Animated.View
+          layout={LinearTransition.duration(300)}
           style={[
             styles.inputBar,
             {
               backgroundColor: Colors[theme].card,
               borderColor: Colors[theme].border,
+              flexDirection: isFocused ? "column" : "row",
+              alignItems: isFocused ? "stretch" : "center",
             },
           ]}
         >
-          <Octicons
-            name="command-palette"
-            size={18}
-            color={Colors[theme].text_secondary}
-          />
+          {!isFocused && (
+            <Animated.View entering={FadeIn} exiting={FadeOut}>
+              {leftIconElement}
+            </Animated.View>
+          )}
+
           <TextInput
             value={input}
             onChangeText={setInput}
@@ -1391,37 +1871,45 @@ export default function SnoopDetailsScreen() {
             placeholderTextColor={Colors[theme].text_secondary + "60"}
             editable={!sending}
             maxLength={300}
+            multiline={true}
+            onFocus={() => setIsFocused(true)}
+            onBlur={() => setIsFocused(false)}
             style={{
-              flex: 1,
+              flex: isFocused ? undefined : 1,
               color: Colors[theme].text,
               fontFamily: "FontMedium",
               fontSize: 14,
-              paddingVertical: 0,
-              paddingHorizontal: 10,
+              paddingVertical: isFocused ? 4 : 0,
+              paddingHorizontal: isFocused ? 4 : 10,
+              minHeight: isFocused ? 20 : undefined,
+              maxHeight: 70,
+              textAlignVertical: "top",
             }}
-            onSubmitEditing={handleSend}
-            returnKeyType="send"
           />
-          <Pressable
-            onPress={handleSend}
-            disabled={sending || !input.trim()}
-            style={{
-              padding: 6,
-              backgroundColor: Colors[theme].primary,
-              borderRadius: 8,
-              opacity: input.trim() && !sending ? 1 : 0.3,
-            }}
-          >
-            <Image
-              source={require("@/assets/icons/arrow-up.png")}
+
+          {!isFocused && (
+            <Animated.View entering={FadeIn} exiting={FadeOut}>
+              {rightIconElement}
+            </Animated.View>
+          )}
+
+          {isFocused && (
+            <Animated.View
+              entering={FadeIn.duration(200)}
+              exiting={FadeOut.duration(200)}
               style={{
-                width: 15,
-                height: 15,
-                tintColor: Colors[theme].background,
+                flexDirection: "row",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginTop: 8,
+                paddingHorizontal: 4,
               }}
-            />
-          </Pressable>
-        </View>
+            >
+              {leftIconElement}
+              {rightIconElement}
+            </Animated.View>
+          )}
+        </Animated.View>
       </KeyboardStickyView>
 
       {/* Commands Modal */}
@@ -1430,14 +1918,22 @@ export default function SnoopDetailsScreen() {
         onClose={() => setShowCommands(false)}
         snoop={{ status: snoop.status, title: snoop.title }}
         onTerminate={handleTerminate}
-        onPauseResume={handlePauseResume}
+        onPauseResume={() => {
+          setShowCommands(false);
+          // Short delay to let sheet dismiss before sending
+          setTimeout(() => handlePauseResume(), 300);
+        }}
         onRename={() => {
           setShowCommands(false);
           setTimeout(() => setShowRename(true), 300);
         }}
         onEdit={() => {
           setShowCommands(false);
-          setTimeout(() => setShowEdit(true), 300);
+          setTimeout(() => setCommandMode("edit"), 300);
+        }}
+        onAddSource={() => {
+          setShowCommands(false);
+          setTimeout(() => setCommandMode("source"), 300);
         }}
         isProcessing={isProcessing}
       />
@@ -1451,12 +1947,13 @@ export default function SnoopDetailsScreen() {
         isProcessing={isProcessing}
       />
 
-      {/* Edit Modal */}
-      <EditModal
-        visible={showEdit}
-        onClose={() => setShowEdit(false)}
-        currentCondition={snoop.condition}
-        onSave={handleEdit}
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        visible={showConfirmation}
+        onClose={() => setShowConfirmation(false)}
+        onConfirm={confirmTerminate}
+        title="Delete Watchlist?"
+        message={`Are you sure you want to delete "${snoop.title}"? This will permanently remove all logs, chat history, and sources associated with this snoop.`}
         isProcessing={isProcessing}
       />
 

@@ -147,3 +147,30 @@ export const firehose_search = internalAction({
     }
   },
 });
+
+export const extract_source = internalAction({
+  args: {
+    url: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const tavilyKey = process.env.TAVILY_API_KEY;
+    if (!tavilyKey) throw new Error("TAVILY_API_KEY is not set");
+
+    const tvly = tavily({ apiKey: tavilyKey });
+
+    try {
+      const extractResult = await tvly.extract([args.url]);
+      // Assuming extractResult is an object with a results array containing the extracted data
+      const data = extractResult.results[0];
+      if (!data) return { success: false };
+
+      return {
+        success: true,
+        content: data.rawContent || "No content extracted",
+      };
+    } catch (err: any) {
+      console.error(`Tavily extract error for url "${args.url}":`, err);
+      return { success: false };
+    }
+  },
+});

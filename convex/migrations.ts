@@ -30,71 +30,175 @@ export const migrateWatchlist = internalMutation({
   },
 });
 
-export const migrate_logs = internalMutation({
+export const migrate_logs_to_sources = internalMutation({
   args: {},
   handler: async (ctx) => {
     const logs = await ctx.db.query("logs").collect();
-    let updatedCount = 0;
+    let migratedCount = 0;
 
     for (const log of logs) {
-      if (log.type === undefined) {
-        if (log.url) {
-          // It has an url, brand as source
-          await ctx.db.patch(log._id, { type: "source" });
-        } else {
-          // No url, brand as system
-          await ctx.db.patch(log._id, { type: "system" });
+      const dbLog = log as any;
+      if (dbLog.type === "source" && dbLog.chat_id) {
+        const chat = (await ctx.db.get(dbLog.chat_id)) as any;
+        if (chat && chat.watchlist_id) {
+          await ctx.db.insert("sources", {
+            watchlist_id: chat.watchlist_id,
+            chat_id: dbLog.chat_id,
+            title: log.action,
+            url: dbLog.url,
+          });
+          migratedCount++;
         }
-        updatedCount++;
       }
     }
 
-    return `Migrated ${updatedCount} logs`;
+    return `Migrated ${migratedCount} source logs to sources table`;
   },
 });
 
-export const migrate_logs_chat_id = internalMutation({
+export const clean_up_logs = internalMutation({
   args: {},
   handler: async (ctx) => {
-    const logs = await ctx.db
-      .query("logs")
-      .filter((q) => q.eq(q.field("type"), "source"))
-      .collect();
-
-    let updatedCount = 0;
+    const logs = await ctx.db.query("logs").collect();
+    let deletedCount = 0;
+    let convertedCount = 0;
 
     for (const log of logs) {
-      if (!log.chat_id) {
-        // Fetch watchlist to get session_id
-        const item = await ctx.db.get(log.watchlist_id);
-        if (!item || !item.session_id) continue;
+      if ((log as any).type === "source") {
+        // We moved them to the sources table in the previous step
+        await ctx.db.delete(log._id);
+        deletedCount++;
+      } else {
+        // It's a system log or unspecified, convert to success/error
+        const isError = log.action.toLowerCase().includes("failed");
+        const newType = isError ? "error" : "success";
 
-        // Fetch chats for this session
+        await ctx.db.patch(log._id, {
+          type: newType,
+          url: undefined,
+          verified: undefined,
+          session_id: undefined,
+          chat_id: undefined,
+        } as any);
+
+        convertedCount++;
+      }
+    }
+
+    return `Cleaned up logs: deleted ${deletedCount} sources, converted ${convertedCount} to success/error.`;
+  },
+});
+
+export const remove_watchlist_id_from_sources = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const sources = await ctx.db.query("sources").collect();
+    let count = 0;
+    for (const source of sources) {
+      if ((source as any).watchlist_id !== undefined) {
+        await ctx.db.patch(source._id, { watchlist_id: undefined } as any);
+        count++;
+      }
+    }
+    return `Cleared watchlist_id from ${count} sources.`;
+  },
+});
+
+export const migrate_chat_types = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const chats = await ctx.db.query("chats").collect();
+    let count = 0;
+    for (const chat of chats) {
+      if (chat.type === undefined) {
+        await ctx.db.patch(chat._id, { type: "chat" });
+        count++;
+      }
+    }
+    return `Migrated ${count} chats to type 'chat'.`;
+  },
+});
+
+export const migrate_chats_session_to_watchlist = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const watchlists = await ctx.db.query("watchlist").collect();
+    let chatUpdateCount = 0;
+    let sessionClearCount = 0;
+
+    // 1. Map chats with session_id to their watchlist_id
+    for (const watchlist of watchlists) {
+      const dbWl = watchlist as any;
+      if (dbWl.session_id) {
         const chats = await ctx.db
           .query("chats")
-          .withIndex("by_session", (q) => q.eq("session_id", item.session_id!))
-          .filter((q) => q.eq(q.field("role"), "snoopa"))
           .collect();
+        const filteredChats = chats.filter((c: any) => c.session_id === dbWl.session_id);
 
-        // Find the closest chat in time (within ~60 seconds)
-        let closestChatId = null;
-        let minDiff = 60000; // 60 seconds max
-
-        for (const chat of chats) {
-          const diff = Math.abs(chat._creationTime - log.timestamp);
-          if (diff < minDiff) {
-            minDiff = diff;
-            closestChatId = chat._id;
+        for (const chat of filteredChats) {
+          if (!chat.watchlist_id) {
+            await ctx.db.patch(chat._id, { watchlist_id: watchlist._id });
+            chatUpdateCount++;
           }
-        }
-
-        if (closestChatId) {
-          await ctx.db.patch(log._id, { chat_id: closestChatId });
-          updatedCount++;
         }
       }
     }
 
-    return `Migrated ${updatedCount} source logs with chat IDs`;
+    // 2. Clear all session_id from all chats
+    const allChats = await ctx.db.query("chats").collect();
+    for (const chat of allChats) {
+      if ((chat as any).session_id !== undefined) {
+        await ctx.db.patch(chat._id, { session_id: undefined } as any);
+        sessionClearCount++;
+      }
+    }
+
+    // 3. Delete every chat where watchlist_id is empty
+    const finalChats = await ctx.db.query("chats").collect();
+    let deleteCount = 0;
+    for (const chat of finalChats) {
+      if (!chat.watchlist_id) {
+        await ctx.db.delete(chat._id);
+        deleteCount++;
+      }
+    }
+
+    return `Updated ${chatUpdateCount} chats with watchlist IDs, cleared ${sessionClearCount} session IDs, and deleted ${deleteCount} orphaned chats.`;
+  },
+});
+
+export const wipe_watchlist_ids = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const items = await ctx.db.query("watchlist").collect();
+    let count = 0;
+    for (const item of items) {
+      if ((item as any).message_id !== undefined || (item as any).session_id !== undefined) {
+        await ctx.db.patch(item._id, {
+          message_id: undefined,
+          session_id: undefined,
+        } as any);
+        count++;
+      }
+    }
+    return `Wiped IDs from ${count} watchlist items.`;
+  },
+});
+
+export const backfill_watchlist_id_to_sources = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const sources = await ctx.db.query("sources").collect();
+    let count = 0;
+    for (const source of sources) {
+      if (!(source as any).watchlist_id) {
+        const chat = await ctx.db.get(source.chat_id);
+        if (chat && chat.watchlist_id) {
+          await ctx.db.patch(source._id, { watchlist_id: chat.watchlist_id });
+          count++;
+        }
+      }
+    }
+    return `Backfilled watchlist_id for ${count} sources.`;
   },
 });

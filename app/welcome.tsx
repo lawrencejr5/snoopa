@@ -100,7 +100,7 @@ const WelcomePage = () => {
           >
             <Image
               source={require("@/assets/images/splash-icon.png")}
-              style={{ width: 100, height: 100, borderRadius: 50 }}
+              style={{ width: 150, height: 150, borderRadius: 50 }}
             />
           </View>
           <Text style={[styles.appName, { color: Colors[theme].text }]}>

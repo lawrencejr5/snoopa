@@ -26,7 +26,6 @@ const schema = defineSchema({
     .index("by_user_updated", ["user_id", "last_updated"]),
 
   chats: defineTable({
-    session_id: v.optional(v.id("sessions")),
     watchlist_id: v.optional(v.id("watchlist")),
     role: v.union(v.literal("user"), v.literal("snoopa")),
     content: v.string(),
@@ -37,12 +36,11 @@ const schema = defineSchema({
         v.literal("watchlist"),
         v.literal("chat"),
         v.literal("search"),
+        v.literal("source"),
       ),
     ),
-    sources: v.optional(v.array(v.string())),
-  })
-    .index("by_session", ["session_id"])
-    .index("by_watchlist", ["watchlist_id"]),
+    feedback: v.optional(v.union(v.literal("like"), v.literal("dislike"))),
+  }).index("by_watchlist", ["watchlist_id"]),
 
   watchlist: defineTable({
     user_id: v.id("users"),
@@ -60,11 +58,7 @@ const schema = defineSchema({
     time_range: v.optional(v.union(v.literal("day"), v.literal("any_time"))),
     last_checked: v.number(),
     sources: v.array(v.string()),
-    message_id: v.optional(v.id("chats")),
-    session_id: v.optional(v.id("sessions")),
-  })
-    .index("by_user", ["user_id"])
-    .index("by_session", ["session_id"]),
+  }).index("by_user", ["user_id"]),
 
   processed_headlines: defineTable({
     urlHash: v.string(),
@@ -78,15 +72,17 @@ const schema = defineSchema({
     watchlist_id: v.id("watchlist"),
     timestamp: v.number(),
     action: v.string(),
-    verified: v.boolean(),
     seen: v.optional(v.boolean()),
-    url: v.optional(v.string()),
-    session_id: v.optional(v.id("sessions")),
-    type: v.optional(v.union(v.literal("system"), v.literal("source"))),
-    chat_id: v.optional(v.id("chats")),
+    type: v.optional(
+      v.union(
+        v.literal("success"),
+        v.literal("error"),
+        v.literal("source"),
+        v.literal("system"),
+      ),
+    ),
   })
     .index("by_watchlist", ["watchlist_id"])
-    .index("by_session", ["session_id"])
     .index("by_watchlist_time", ["watchlist_id", "timestamp"]),
 
   notifications: defineTable({
@@ -97,7 +93,9 @@ const schema = defineSchema({
     seen: v.boolean(),
     read: v.boolean(),
     watchlist_id: v.optional(v.id("watchlist")),
-  }).index("by_user", ["user_id"]),
+  })
+    .index("by_user", ["user_id"])
+    .index("by_watchlist", ["watchlist_id"]),
 
   waitlist: defineTable({
     email: v.string(),
@@ -107,10 +105,21 @@ const schema = defineSchema({
   }).index("by_email", ["email"]),
 
   sources: defineTable({
+    watchlist_id: v.optional(v.id("watchlist")),
     chat_id: v.id("chats"),
     title: v.string(),
-    url: v.optional(v.string()), // The original schema says url can be string or omitted from tavily sometimes, so let's make it optional just in case. Wait, if we want strict url, we keep it v.string() but let's use optional as well to be safe
-  }).index("by_chat", ["chat_id"]),
+    url: v.optional(v.string()),
+  })
+    .index("by_watchlist", ["watchlist_id"])
+    .index("by_chat", ["chat_id"]),
+
+  monitored_sources: defineTable({
+    watchlist_id: v.id("watchlist"),
+    url: v.string(),
+    last_hash: v.string(),
+    last_snapshot: v.string(),
+    source_weight: v.union(v.literal("primary"), v.literal("secondary")),
+  }).index("by_watchlist", ["watchlist_id"]),
 });
 
 export default schema;

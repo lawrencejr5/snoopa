@@ -63,8 +63,8 @@ export const get_watchlist_logs = query({
  * Used to show which messages have already been saved.
  */
 export const get_saved_message_ids = query({
-  args: { session_id: v.id("sessions") },
-  handler: async (ctx, args) => {
+  args: {},
+  handler: async (ctx) => {
     const user_id = await getAuthUserId(ctx);
     if (!user_id) return [];
 
@@ -73,19 +73,9 @@ export const get_saved_message_ids = query({
       .withIndex("by_user", (q) => q.eq("user_id", user_id))
       .collect();
 
-    // Filter for items that have message_id and belong to this session
-    const messageIds: string[] = [];
-    for (const item of watchlistItems) {
-      if (item.message_id) {
-        // Verify the message belongs to this session
-        const message = await ctx.db.get(item.message_id);
-        if (message && message.session_id === args.session_id) {
-          messageIds.push(item.message_id);
-        }
-      }
-    }
-
-    return messageIds;
+    // Filter for items that have a message_id (Wait, we removed it, so this whole logic is likely deprecated)
+    // For now we'll just return an empty array if the user is asking for saved message IDs via session
+    return [];
   },
 });
 
@@ -128,8 +118,6 @@ export const add_watchlist_item = mutation({
       v.union(v.literal("day"), v.literal("any_time")),
     ),
     sources: v.optional(v.array(v.string())),
-    message_id: v.optional(v.id("chats")),
-    session_id: v.optional(v.id("sessions")),
   },
   handler: async (ctx, args) => {
     const user_id = await getAuthUserId(ctx);
@@ -147,8 +135,6 @@ export const add_watchlist_item = mutation({
       status: "active",
       last_checked: Date.now(),
       sources: args.sources ?? [],
-      message_id: args.message_id,
-      session_id: args.session_id,
     });
 
     // Create an initial log entry
@@ -156,10 +142,8 @@ export const add_watchlist_item = mutation({
       watchlist_id: id,
       timestamp: Date.now(),
       action: "Watchlist item created",
-      verified: true,
       seen: true,
-      session_id: args.session_id,
-      type: "system",
+      type: "success",
     });
 
     return id;
@@ -193,6 +177,17 @@ export const update_watchlist_item = mutation({
     if (args.condition !== undefined) updates.condition = args.condition;
 
     await ctx.db.patch(args.watchlist_id, updates);
+
+    // If condition was updated, add a log entry
+    if (args.condition !== undefined) {
+      await ctx.db.insert("logs", {
+        watchlist_id: args.watchlist_id,
+        timestamp: Date.now(),
+        action: "Condition updated",
+        seen: true,
+        type: "success",
+      });
+    }
   },
 });
 
@@ -224,9 +219,8 @@ export const toggle_watchlist_status = mutation({
       watchlist_id: args.watchlist_id,
       timestamp: Date.now(),
       action: `Status changed to ${newStatus}`,
-      verified: true,
       seen: true,
-      type: "system",
+      type: "success",
     });
   },
 });
@@ -257,9 +251,8 @@ export const deactivate_watchlist = mutation({
       watchlist_id: args.watchlist_id,
       timestamp: Date.now(),
       action: "Tracking stopped (Inactive)",
-      verified: true,
       seen: true,
-      type: "system",
+      type: "error",
     });
   },
 });
@@ -290,9 +283,8 @@ export const reactivate_watchlist = mutation({
       watchlist_id: args.watchlist_id,
       timestamp: Date.now(),
       action: "Tracking resumed (Active)",
-      verified: true,
       seen: true,
-      type: "system",
+      type: "success",
     });
   },
 });
@@ -346,23 +338,26 @@ export const delete_watchlist_item = mutation({
       throw new Error("Watchlist item not found or unauthorized");
     }
 
-    // Delete associated logs first
-    const logs = await ctx.db
-      .query("logs")
-      .withIndex("by_watchlist", (q) => q.eq("watchlist_id", args.watchlist_id))
-      .collect();
+    // 1. Gather all related data IDs
+    const [logs, chats, sources, monitoredSources, notifications, processedHeadlines] = await Promise.all([
+      ctx.db.query("logs").withIndex("by_watchlist", (q) => q.eq("watchlist_id", args.watchlist_id)).collect(),
+      ctx.db.query("chats").withIndex("by_watchlist", (q) => q.eq("watchlist_id", args.watchlist_id)).collect(),
+      ctx.db.query("sources").withIndex("by_watchlist", (q) => q.eq("watchlist_id", args.watchlist_id)).collect(),
+      ctx.db.query("monitored_sources").withIndex("by_watchlist", (q) => q.eq("watchlist_id", args.watchlist_id)).collect(),
+      ctx.db.query("notifications").withIndex("by_watchlist", (q) => q.eq("watchlist_id", args.watchlist_id)).collect(),
+      ctx.db.query("processed_headlines").withIndex("by_watchlist", (q) => q.eq("watchlist_id", args.watchlist_id)).collect(),
+    ]);
 
-    await Promise.all(logs.map((log) => ctx.db.delete(log._id)));
-
-    // Delete associated chats
-    const chats = await ctx.db
-      .query("chats")
-      .withIndex("by_watchlist", (q) => q.eq("watchlist_id", args.watchlist_id))
-      .collect();
-
-    await Promise.all(chats.map((chat) => ctx.db.delete(chat._id)));
-
-    // Delete the watchlist item
-    await ctx.db.delete(args.watchlist_id);
+    // 2. Delete everything in parallel groups to avoid large single transaction if possible
+    // (Though Convex handles this as one transaction anyway)
+    await Promise.all([
+      ...logs.map((log) => ctx.db.delete(log._id)),
+      ...chats.map((chat) => ctx.db.delete(chat._id)),
+      ...sources.map((s) => ctx.db.delete(s._id)),
+      ...monitoredSources.map((ms) => ctx.db.delete(ms._id)),
+      ...notifications.map((n) => ctx.db.delete(n._id)),
+      ...processedHeadlines.map((ph) => ctx.db.delete(ph._id)),
+      ctx.db.delete(args.watchlist_id),
+    ]);
   },
 });

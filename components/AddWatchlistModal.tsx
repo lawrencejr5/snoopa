@@ -41,15 +41,41 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
   // Directly initialize native watchlist instead of parsing text client-side
   const initializeWatchlist = useAction(api.chat.initialize_watchlist);
 
-  // Sync visibility with modal state
+  // Typewriter Placeholder Logic
+  const EXAMPLES = useMemo(
+    () =>
+      [
+        "Track price drops on https://apple.com/iphone-15",
+        "Monitor https://news.ycombinator.com for ai news",
+        "Tell me when NVIDIA hits $1000 on https://bloomberg.com",
+        "Keep me updated on Real Madrid injury news",
+        "Watch https://tesla.com for Cybertruck updates",
+        "Notify me when Bitcoin hits $100k",
+        "Watch for job openings at https://google.com/careers",
+        "Track PS5 Pro availability on https://bestbuy.com",
+        "Follow news about the next OpenAI release",
+        "Snoop on music festivals at https://coachella.com",
+        "Alert me when Chelsea FC wins a match",
+        "Track flight prices on https://skyscanner.com",
+        "Monitor https://techcrunch.com for startup news",
+      ].sort(() => Math.random() - 0.5),
+    [],
+  );
+
+  const [placeholder, setPlaceholder] = useState("");
+
+  // Sync visibility with modal state and pick a random placeholder
   useEffect(() => {
     if (visible) {
       bottomSheetRef.current?.snapToIndex(0);
+      const randomExample =
+        EXAMPLES[Math.floor(Math.random() * EXAMPLES.length)];
+      setPlaceholder(randomExample);
     } else {
       bottomSheetRef.current?.snapToIndex(-1);
       setPrompt("");
     }
-  }, [visible]);
+  }, [visible, EXAMPLES]);
 
   const handleSheetChanges = useCallback(
     (index: number) => {
@@ -105,6 +131,20 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
   const handleClose = () => {
     bottomSheetRef.current?.close();
     onClose();
+  };
+
+  const handleInputChange = (text: string) => {
+    const urlRegex =
+      /(?:https?:\/\/)?([a-zA-Z0-9][-a-zA-Z0-9]*\.[a-zA-Z][-a-zA-Z0-9.]*[a-zA-Z]{2,}(?:\/[^\s]*)?)/g;
+
+    const cleanedText = text.replace(urlRegex, (match) => {
+      if (match.length > 200 && match.includes("?")) {
+        return match.split("?")[0];
+      }
+      return match;
+    });
+
+    setPrompt(cleanedText);
   };
 
   return (
@@ -176,7 +216,7 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
         <View style={{ width: "100%" }}>
           <TextInput
             value={prompt}
-            onChangeText={setPrompt}
+            onChangeText={handleInputChange}
             onFocus={() => {
               setIsFocused(true);
               bottomSheetRef.current?.snapToIndex(1);
@@ -187,7 +227,7 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
             }}
             multiline
             maxLength={500}
-            placeholder='e.g. "Let me know when Eder Militão returns to training"'
+            placeholder={`e.g. "${placeholder}"`}
             placeholderTextColor={Colors[theme].text_secondary + "80"}
             editable={!isProcessing}
             style={[
@@ -304,7 +344,7 @@ const styles = StyleSheet.create({
     fontFamily: "FontRegular",
     fontSize: 14,
     lineHeight: 20,
-    minHeight: 100,
+    height: 100,
     textAlignVertical: "top",
     marginBottom: 10,
   },
