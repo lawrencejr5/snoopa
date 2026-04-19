@@ -92,6 +92,8 @@ export const insert_log = internalMutation({
     verified: v.boolean(),
     url: v.optional(v.string()),
     session_id: v.optional(v.id("sessions")),
+    type: v.optional(v.union(v.literal("system"), v.literal("source"))),
+    chat_id: v.optional(v.id("chats")),
   },
   handler: async (ctx, args) => {
     return await ctx.db.insert("logs", {
@@ -102,6 +104,8 @@ export const insert_log = internalMutation({
       seen: false,
       url: args.url,
       session_id: args.session_id,
+      type: args.type,
+      chat_id: args.chat_id,
     });
   },
 });
@@ -257,6 +261,8 @@ export const batch_insert_logs = internalMutation({
         action: v.string(),
         url: v.optional(v.string()),
         session_id: v.optional(v.id("sessions")),
+        type: v.optional(v.union(v.literal("system"), v.literal("source"))),
+        chat_id: v.optional(v.id("chats")),
       }),
     ),
   },
@@ -272,6 +278,8 @@ export const batch_insert_logs = internalMutation({
           seen: false,
           url: e.url,
           session_id: e.session_id,
+          type: e.type,
+          chat_id: e.chat_id,
         }),
       ),
     );

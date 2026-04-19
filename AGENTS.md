@@ -7,7 +7,7 @@ Now Snoopa is like a private investigator agent. This is just an app that you ca
 
 So for example, I want to know how real madrid's injury list looks like, I ask snoopa and snoopa says that bellingham just went into injury, eder militao is recorvering faster, and then I'll be like, alright then, when eder militao is back in training, please let me know and then it saves a watchlist and when he returns, snoopa sends you a push notification.
 
-Now where does snoopa get it's intel from? I actually use serper.dev to query and scrape the front page of google, so my intel is actually from google at the moment.
+Now where does snoopa get it's intel from? I actually use tavily to query and scrape the front page of google, so my intel is actually from google at the moment.
 
 ## Tech Stack
 

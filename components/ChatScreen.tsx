@@ -272,8 +272,8 @@ export default function ChatScreen() {
       condition: string;
       canonical_topic?: string;
       tier?: number;
-      serper_type?: "search" | "news";
-      serper_date_range?: "day" | "any_time";
+      search_type?: "general" | "news";
+      time_range?: "day" | "any_time";
     },
     sessionId: Id<"sessions">,
   ) => {
@@ -287,14 +287,13 @@ export default function ChatScreen() {
 
     try {
       await addWatchlist({
-        user_id: signedIn._id,
         title: watchlistData.title,
         keywords: watchlistData.keywords,
         condition: watchlistData.condition,
         canonical_topic: watchlistData.canonical_topic,
         tier: watchlistData.tier,
-        serper_type: watchlistData.serper_type,
-        serper_date_range: watchlistData.serper_date_range,
+        search_type: watchlistData.search_type,
+        time_range: watchlistData.time_range,
         message_id: msgId,
         session_id: sessionId,
       });

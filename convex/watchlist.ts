@@ -1,6 +1,6 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { internalMutation, mutation, query } from "./_generated/server";
 
 // --- Queries ---
 
@@ -114,18 +114,17 @@ export const get_recent_canonical_topics = query({
 });
 
 /**
- * Internal mutation to add a watchlist item (called from chat action).
+ * Mutation to add a watchlist item (now secures user_id internally).
  */
 export const add_watchlist_item = mutation({
   args: {
-    user_id: v.id("users"),
     title: v.string(),
     keywords: v.array(v.string()),
     condition: v.string(),
     canonical_topic: v.optional(v.string()),
     tier: v.optional(v.number()),
-    serper_type: v.optional(v.union(v.literal("search"), v.literal("news"))),
-    serper_date_range: v.optional(
+    search_type: v.optional(v.union(v.literal("general"), v.literal("news"))),
+    time_range: v.optional(
       v.union(v.literal("day"), v.literal("any_time")),
     ),
     sources: v.optional(v.array(v.string())),
@@ -133,15 +132,18 @@ export const add_watchlist_item = mutation({
     session_id: v.optional(v.id("sessions")),
   },
   handler: async (ctx, args) => {
+    const user_id = await getAuthUserId(ctx);
+    if (!user_id) throw new Error("Not authenticated");
+
     const id = await ctx.db.insert("watchlist", {
-      user_id: args.user_id,
+      user_id,
       title: args.title,
       keywords: args.keywords,
       condition: args.condition,
       canonical_topic: args.canonical_topic,
       tier: args.tier ?? 3,
-      serper_type: args.serper_type ?? "search",
-      serper_date_range: args.serper_date_range ?? "day",
+      search_type: args.search_type ?? "general",
+      time_range: args.time_range ?? "day",
       status: "active",
       last_checked: Date.now(),
       sources: args.sources ?? [],
@@ -157,6 +159,7 @@ export const add_watchlist_item = mutation({
       verified: true,
       seen: true,
       session_id: args.session_id,
+      type: "system",
     });
 
     return id;
@@ -223,6 +226,7 @@ export const toggle_watchlist_status = mutation({
       action: `Status changed to ${newStatus}`,
       verified: true,
       seen: true,
+      type: "system",
     });
   },
 });
@@ -255,6 +259,7 @@ export const deactivate_watchlist = mutation({
       action: "Tracking stopped (Inactive)",
       verified: true,
       seen: true,
+      type: "system",
     });
   },
 });
@@ -287,7 +292,43 @@ export const reactivate_watchlist = mutation({
       action: "Tracking resumed (Active)",
       verified: true,
       seen: true,
+      type: "system",
     });
+  },
+});
+
+/**
+ * Get trending topics across all users with tracker counts.
+ * Returns the top 15 canonical topics sorted by number of active trackers.
+ */
+export const get_trending_topics = query({
+  args: {},
+  handler: async (ctx) => {
+    const active_items = await ctx.db
+      .query("watchlist")
+      .filter((q) => q.eq(q.field("status"), "active"))
+      .collect();
+
+    // Count unique users per canonical_topic
+    const topic_map = new Map<string, Set<string>>();
+    for (const item of active_items) {
+      if (!item.canonical_topic) continue;
+      if (!topic_map.has(item.canonical_topic)) {
+        topic_map.set(item.canonical_topic, new Set());
+      }
+      topic_map.get(item.canonical_topic)!.add(item.user_id);
+    }
+
+    // Convert to array, sort by count, take top 15
+    const trending = [...topic_map.entries()]
+      .map(([topic, users]) => ({
+        topic,
+        tracker_count: users.size,
+      }))
+      .sort((a, b) => b.tracker_count - a.tracker_count)
+      .slice(0, 15);
+
+    return trending;
   },
 });
 
@@ -312,6 +353,14 @@ export const delete_watchlist_item = mutation({
       .collect();
 
     await Promise.all(logs.map((log) => ctx.db.delete(log._id)));
+
+    // Delete associated chats
+    const chats = await ctx.db
+      .query("chats")
+      .withIndex("by_watchlist", (q) => q.eq("watchlist_id", args.watchlist_id))
+      .collect();
+
+    await Promise.all(chats.map((chat) => ctx.db.delete(chat._id)));
 
     // Delete the watchlist item
     await ctx.db.delete(args.watchlist_id);

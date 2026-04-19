@@ -26,7 +26,8 @@ const schema = defineSchema({
     .index("by_user_updated", ["user_id", "last_updated"]),
 
   chats: defineTable({
-    session_id: v.id("sessions"),
+    session_id: v.optional(v.id("sessions")),
+    watchlist_id: v.optional(v.id("watchlist")),
     role: v.union(v.literal("user"), v.literal("snoopa")),
     content: v.string(),
     seen: v.optional(v.boolean()),
@@ -39,7 +40,9 @@ const schema = defineSchema({
       ),
     ),
     sources: v.optional(v.array(v.string())),
-  }).index("by_session", ["session_id"]),
+  })
+    .index("by_session", ["session_id"])
+    .index("by_watchlist", ["watchlist_id"]),
 
   watchlist: defineTable({
     user_id: v.id("users"),
@@ -53,10 +56,8 @@ const schema = defineSchema({
       v.literal("inactive"),
     ),
     tier: v.optional(v.number()),
-    serper_type: v.optional(v.union(v.literal("search"), v.literal("news"))),
-    serper_date_range: v.optional(
-      v.union(v.literal("day"), v.literal("any_time")),
-    ),
+    search_type: v.optional(v.union(v.literal("general"), v.literal("news"))),
+    time_range: v.optional(v.union(v.literal("day"), v.literal("any_time"))),
     last_checked: v.number(),
     sources: v.array(v.string()),
     message_id: v.optional(v.id("chats")),
@@ -81,6 +82,8 @@ const schema = defineSchema({
     seen: v.optional(v.boolean()),
     url: v.optional(v.string()),
     session_id: v.optional(v.id("sessions")),
+    type: v.optional(v.union(v.literal("system"), v.literal("source"))),
+    chat_id: v.optional(v.id("chats")),
   })
     .index("by_watchlist", ["watchlist_id"])
     .index("by_session", ["session_id"])
@@ -102,6 +105,12 @@ const schema = defineSchema({
     notified: v.boolean(),
     position: v.number(),
   }).index("by_email", ["email"]),
+
+  sources: defineTable({
+    chat_id: v.id("chats"),
+    title: v.string(),
+    url: v.optional(v.string()), // The original schema says url can be string or omitted from tavily sometimes, so let's make it optional just in case. Wait, if we want strict url, we keep it v.string() but let's use optional as well to be safe
+  }).index("by_chat", ["chat_id"]),
 });
 
 export default schema;

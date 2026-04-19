@@ -162,17 +162,36 @@ export default function ProfileScreen() {
             textAlignVertical="top"
             value={memory}
             onChangeText={setMemory}
+            maxLength={300}
           />
-          <Text
+          <View
             style={{
-              fontSize: 12,
-              color: Colors[theme].text_secondary,
+              flexDirection: "row",
+              justifyContent: "space-between",
               marginTop: 5,
-              fontStyle: "italic",
             }}
           >
-            This information is used to personalize your agent's responses.
-          </Text>
+            <Text
+              style={{
+                fontSize: 12,
+                color: Colors[theme].text_secondary,
+                fontStyle: "italic",
+                flex: 1,
+              }}
+            >
+              This information is used to personalize your agent's responses.
+            </Text>
+            <Text
+              style={{
+                fontSize: 12,
+                fontFamily: "FontMedium",
+                color: Colors[theme].text_secondary + "80",
+                marginLeft: 10,
+              }}
+            >
+              {memory.length}/300
+            </Text>
+          </View>
         </View>
 
         {/* Delete Account */}

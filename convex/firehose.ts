@@ -31,56 +31,15 @@ function headlineMatchesKeywords(
 }
 
 // ---------------------------------------------------------------------------
-// Serper fetch
+// Tavily fetch
 // ---------------------------------------------------------------------------
 
-interface SerperNewsResult {
+interface TavilySearchResult {
   title: string;
-  link: string;
-  snippet?: string;
-  source?: string;
-  date?: string;
-}
-
-async function fetchHeadlines(
-  query: string,
-  apiKey: string,
-  serperType: "search" | "news" = "search",
-  dateRange: "day" | "any_time" = "day",
-): Promise<SerperNewsResult[]> {
-  const endpoint =
-    serperType === "news"
-      ? "https://google.serper.dev/news"
-      : "https://google.serper.dev/search";
-
-  const body: Record<string, string> = { q: query };
-  if (dateRange === "day") body.tbs = "qdr:d";
-
-  const res = await fetch(endpoint, {
-    method: "POST",
-    headers: {
-      "X-API-KEY": apiKey,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  });
-
-  if (!res.ok) {
-    console.error(
-      `Serper error for query "${query}": ${res.status} ${res.statusText}`,
-    );
-    return [];
-  }
-
-  const data = await res.json();
-  // News endpoint returns results under 'news', search under 'organic'
-  const results = (
-    serperType === "news" ? (data.news ?? []) : (data.organic ?? [])
-  ) as SerperNewsResult[];
-  console.log(
-    `Serper [${serperType}/${dateRange}]: "${query}" → ${results.length} results`,
-  );
-  return results;
+  url: string;
+  content: string;
+  score?: number;
+  publishedDate?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -141,11 +100,7 @@ async function generateBrief(
     .join("\n");
 
   const prompt = `You are Snoopa, a sharp AI intelligence agent. Given these verified news headlines about "${watchlistTitle}" (tracking condition: "${condition}"), write a 1-2 sentence casual briefing that captures the key takeaway.
-    Sound natural, like you're briefing a friend. Examples:
-    - "Heads up — Dangote's refinery just cracked 650k barrels/day. IPO chatter is heating up."
-    - "Militão is finally back in training, touched the ball today for the first time since November."
-    - "Bitcoin slipped below $82k overnight. Might want to keep an eye on it."
-
+    Sound natural, like you're briefing a friend. Be a bit detailed if you need to be.
     Headlines:
     ${headlineList}
 
@@ -199,7 +154,7 @@ export const is_headline_processed = internalQuery({
 
 /**
  * Extract unique canonical topics from active watchlist items.
- * These become the Serper search queries for the firehose run.
+ * These become the Tavily search queries for the firehose run.
  */
 export const get_unique_canonical_topics = internalQuery({
   args: {},
@@ -226,11 +181,10 @@ export const get_unique_canonical_topics = internalQuery({
 export const run_firehose = internalAction({
   args: { tier: v.number() },
   handler: async (ctx, args) => {
-    const serperKey = process.env.SERPER_API_KEY;
     const geminiKey = process.env.GOOGLE_GEMINI_API_KEY;
 
-    if (!serperKey || !geminiKey) {
-      console.error("Missing SERPER_API_KEY or GOOGLE_GEMINI_API_KEY");
+    if (!geminiKey) {
+      console.error("Missing GOOGLE_GEMINI_API_KEY");
       return;
     }
 
@@ -268,55 +222,59 @@ export const run_firehose = internalAction({
     );
     const processedSet = new Set<string>(processedKeys);
 
-    // 3. Build unique Serper queries grouped by (topic, serper_type, serper_date_range)
-    interface SerperQuery {
+    // 3. Build unique Tavily queries grouped by (topic, search_type, time_range)
+    interface TavilyQuery {
       topic: string;
-      serperType: "search" | "news";
-      dateRange: "day" | "any_time";
+      searchType: "general" | "news";
+      timeRange: "day" | "any_time";
     }
-    const queryMap = new Map<string, SerperQuery>();
+    const queryMap = new Map<string, TavilyQuery>();
     for (const item of activeItems) {
       if (!item.canonical_topic) continue;
-      const type = item.serper_type ?? "search";
-      const range = item.serper_date_range ?? "day";
+      const type = item.search_type ?? "general";
+      const range = item.time_range ?? "day";
       const key = `${item.canonical_topic}::${type}::${range}`;
       if (!queryMap.has(key)) {
         queryMap.set(key, {
           topic: item.canonical_topic,
-          serperType: type,
-          dateRange: range,
+          searchType: type,
+          timeRange: range,
         });
       }
     }
 
-    const serperQueries = [...queryMap.values()];
+    const tavilyQueries = [...queryMap.values()];
 
     // Fallback: if no items have canonical_topic yet, run nothing
-    if (serperQueries.length === 0) {
+    if (tavilyQueries.length === 0) {
       console.log(
-        "Firehose: no canonical topics found, skipping Serper fetch.",
+        "Firehose: no canonical topics found, skipping Tavily fetch.",
       );
       return;
     }
 
     // Fetch headlines for each unique query config in parallel
     const headlineArrays = await Promise.all(
-      serperQueries.map((sq) =>
-        fetchHeadlines(sq.topic, serperKey, sq.serperType, sq.dateRange),
+      tavilyQueries.map((tq) =>
+        ctx.runAction(internal.tavily.firehose_search, {
+          query: tq.topic,
+          searchType: tq.searchType,
+          timeRange: tq.timeRange,
+        }),
       ),
     );
     const allHeadlines = headlineArrays.flat();
 
     console.log(
-      `Firehose: fetched ${allHeadlines.length} headlines across ${serperQueries.length} queries.`,
+      `Firehose: fetched ${allHeadlines.length} headlines across ${tavilyQueries.length} queries.`,
     );
 
     // 4. Within-run dedup — in-memory only, zero DB cost
     const seen = new Set<string>();
-    const uniqueHeadlines: Array<SerperNewsResult & { hash: string }> = [];
+    const uniqueHeadlines: Array<TavilySearchResult & { hash: string }> = [];
 
     for (const h of allHeadlines) {
-      const hash = await hashString(h.link);
+      const hash = await hashString(h.url);
       if (seen.has(hash)) continue;
       seen.add(hash);
       uniqueHeadlines.push({ ...h, hash });
@@ -351,14 +309,14 @@ export const run_firehose = internalAction({
         // In-memory check — zero DB cost
         if (processedSet.has(compositeKey)) continue;
 
-        const headlineText = `${headline.title} ${headline.snippet ?? ""}`;
+        const headlineText = `${headline.title} ${headline.content ?? ""}`;
         if (!headlineMatchesKeywords(headlineText, item.keywords)) continue;
 
         keywordMatches++;
 
         const satisfied = await verifyHeadlineWithGemini(
           headline.title,
-          headline.snippet ?? "",
+          headline.content ?? "",
           item.condition,
           geminiKey,
         );
@@ -380,9 +338,9 @@ export const run_firehose = internalAction({
           }
           verifiedByItem.get(item._id)!.headlines.push({
             title: headline.title,
-            snippet: headline.snippet ?? "",
-            url: headline.link,
-            source: headline.source,
+            snippet: headline.content ?? "",
+            url: headline.url,
+            source: headline.url ? new URL(headline.url).hostname : undefined,
             hash: headline.hash,
           });
 
@@ -416,11 +374,24 @@ export const run_firehose = internalAction({
 
       console.log(`Firehose: brief for "${item.title}" → "${brief}"`);
 
-      // Build log entries: individual headlines only (brief goes to notifications + chat)
+      // 1. Send the brief as a chat message if the watchlist has a linked session
+      let chatId: Id<"chats"> | undefined;
+      if (item.session_id) {
+        chatId = await ctx.runMutation(internal.chat.save_message, {
+          session_id: item.session_id,
+          role: "snoopa",
+          content: brief,
+          type: "snoop",
+        });
+      }
+
+      // 2. Build log entries: individual headlines as sources
       const logEntries: Array<{
         watchlist_id: (typeof activeItems)[0]["_id"];
         action: string;
         url?: string;
+        type: "source";
+        chat_id?: Id<"chats">;
       }> = [];
 
       for (const h of headlines) {
@@ -428,6 +399,8 @@ export const run_firehose = internalAction({
           watchlist_id: item._id,
           action: `${h.title}${h.source ? ` — ${h.source}` : ""}`,
           url: h.url,
+          type: "source",
+          chat_id: chatId,
         });
       }
 
@@ -437,7 +410,7 @@ export const run_firehose = internalAction({
       });
       totalAlerts += logEntries.length;
 
-      // Save notification with the brief
+      // 3. Save notification with the brief
       await ctx.runMutation(internal.notifications.save_notification, {
         user_id: item.user_id,
         title: item.title,
@@ -446,17 +419,7 @@ export const run_firehose = internalAction({
         watchlist_id: item._id,
       });
 
-      // Send the brief as a chat message if the watchlist has a linked session
-      if (item.session_id) {
-        await ctx.runMutation(internal.chat.save_message, {
-          session_id: item.session_id,
-          role: "snoopa",
-          content: brief,
-          type: "snoop",
-        });
-      }
-
-      // Push notification with randomized prefix
+      // 4. Push notification with randomized prefix
       const prefixes = [
         "New intel on",
         "Found something new regarding",
@@ -531,12 +494,25 @@ export const run_simulated_firehose = internalAction({
 
     console.log(`Simulated Firehose: triggering for "${item.title}"`);
 
+    // Send the brief as a chat message if the watchlist has a linked session
+    let chatId: Id<"chats"> | undefined;
+    if (item.session_id) {
+      chatId = await ctx.runMutation(internal.chat.save_message, {
+        session_id: item.session_id,
+        role: "snoopa",
+        content: args.briefing,
+        type: "snoop",
+      });
+    }
+
     // Build log entries
     const logEntries = [
       {
         watchlist_id: item._id,
         action: `${args.fake_headline.title}${args.fake_headline.source ? ` — ${args.fake_headline.source}` : ""}`,
         url: args.fake_headline.url,
+        type: "source" as const,
+        chat_id: chatId,
       },
     ];
 
@@ -553,16 +529,6 @@ export const run_simulated_firehose = internalAction({
       type: "alert",
       watchlist_id: item._id,
     });
-
-    // Send the brief as a chat message if the watchlist has a linked session
-    if (item.session_id) {
-      await ctx.runMutation(internal.chat.save_message, {
-        session_id: item.session_id,
-        role: "snoopa",
-        content: args.briefing,
-        type: "snoop",
-      });
-    }
 
     // Push notification with a prefix
     const pushTitle = `New intel on ${item.title}`;

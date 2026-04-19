@@ -3,61 +3,88 @@ import React from "react";
 
 import Colors from "@/constants/Colors";
 import { useTheme } from "@/context/ThemeContext";
-import { Image } from "react-native";
+import { Image, View } from "react-native";
 
 export default function TabLayout() {
   const { theme } = useTheme();
 
   return (
-    <Tabs
-      screenOptions={{
-        tabBarActiveTintColor: Colors[theme].text_secondary,
-        headerShown: false,
-        tabBarStyle: {
-          elevation: 0,
-          borderTopWidth: 0,
-          backgroundColor: Colors[theme].background,
-        },
-      }}
-    >
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: "Agent",
-          tabBarIcon: ({ focused }) => (
-            <Image
-              source={require("../../assets/icons/ai-assistant.png")}
-              style={{
-                height: 27,
-                width: 27,
-                tintColor: focused
-                  ? Colors[theme].primary
-                  : Colors[theme].text_secondary,
-              }}
-              resizeMode="contain"
-            />
-          ),
+    <View style={{ flex: 1, backgroundColor: Colors[theme].background }}>
+      <Tabs
+        screenOptions={{
+          tabBarActiveTintColor: Colors[theme].text,
+          tabBarInactiveTintColor: Colors[theme].text_secondary,
+          headerShown: false,
+          tabBarStyle: {
+            elevation: 0,
+            borderTopWidth: 0,
+            backgroundColor: Colors[theme].background,
+          },
+          tabBarLabelStyle: {
+            fontFamily: "FontMedium",
+            fontSize: 11,
+            letterSpacing: 0.3,
+          },
         }}
-      />
-      <Tabs.Screen
-        name="watchlist"
-        options={{
-          title: "Watchlist",
-          tabBarIcon: ({ focused }) => (
-            <Image
-              source={require("../../assets/icons/eyes.png")}
-              style={{
-                height: 24,
-                width: 24,
-                tintColor: focused
-                  ? Colors[theme].primary
-                  : Colors[theme].text_secondary,
-              }}
-              resizeMode="contain"
-            />
-          ),
-        }}
-      />
-    </Tabs>
+      >
+        <Tabs.Screen
+          name="index"
+          options={{
+            title: "Home",
+            tabBarIcon: ({ focused }) => (
+              <Image
+                source={require("../../assets/icons/home.png")}
+                style={{
+                  height: 24,
+                  width: 24,
+                  tintColor: focused
+                    ? Colors[theme].primary
+                    : Colors[theme].text_secondary,
+                }}
+                resizeMode="contain"
+              />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="watchlist"
+          options={{
+            title: "Watchlist",
+            tabBarIcon: ({ focused }) => (
+              <Image
+                source={require("../../assets/icons/watchlist.png")}
+                style={{
+                  height: 22,
+                  width: 22,
+                  tintColor: focused
+                    ? Colors[theme].primary
+                    : Colors[theme].text_secondary,
+                }}
+                resizeMode="contain"
+              />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="profile"
+          options={{
+            title: "Profile",
+            tabBarIcon: ({ focused }) => (
+              <Image
+                source={require("../../assets/icons/user.png")}
+                style={{
+                  height: 22,
+                  width: 22,
+                  tintColor: focused
+                    ? Colors[theme].primary
+                    : Colors[theme].text_secondary,
+                }}
+                resizeMode="contain"
+              />
+            ),
+          }}
+        />
+      </Tabs>
+    </View>
   );
 }
