@@ -83,6 +83,15 @@ const WithinContext = ({ loaded }: { loaded: boolean }) => {
   const segments = useSegments();
   const { isAuthenticated, isLoading } = useConvexAuth();
   const [showSplash, setShowSplash] = useState<boolean>(true);
+  const [isFirstLaunch, setIsFirstLaunch] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    const isFirstTime = async () => {
+      const value = await AsyncStorage.getItem("hasSeenOnboarding");
+      setIsFirstLaunch(value === null);
+    };
+    isFirstTime();
+  }, []);
 
   useEffect(() => {
     if (loaded) {
@@ -95,18 +104,22 @@ const WithinContext = ({ loaded }: { loaded: boolean }) => {
   }, [loaded]);
 
   useEffect(() => {
-    if (!loaded || isLoading) return;
+    if (!loaded || isLoading || isFirstLaunch === null) return;
 
-    const inAuthGroup = segments[0] === "welcome";
+    const inAuthGroup = segments[0] === "welcome" || segments[0] === "onboarding";
 
     if (!isAuthenticated && !inAuthGroup) {
-      router.replace("/welcome");
+      if (isFirstLaunch) {
+        router.replace("/onboarding");
+      } else {
+        router.replace("/welcome");
+      }
     } else if (isAuthenticated && inAuthGroup) {
       router.replace("/(tabs)");
     }
-  }, [isAuthenticated, isLoading, loaded, segments]);
+  }, [isAuthenticated, isLoading, loaded, segments, isFirstLaunch]);
 
-  if (!loaded || showSplash) {
+  if (!loaded || showSplash || isFirstLaunch === null) {
     return <CustomSplash />;
   }
 
@@ -120,6 +133,7 @@ const WithinContext = ({ loaded }: { loaded: boolean }) => {
           animation: "ios_from_right",
         }}
       >
+        <Stack.Screen name="onboarding" dangerouslySingular />
         <Stack.Screen name="welcome" dangerouslySingular />
       </Stack>
     </>
