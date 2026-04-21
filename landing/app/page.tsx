@@ -9,20 +9,19 @@ export default function Home() {
       {/* ── Navbar ──────────────────────────── */}
       <nav className={styles.navbar}>
         <div className={styles.navBrand}>
-          <img
-            src="/images/favicon.png"
+          {/* <img
+            src="/images/icon-nobg.png"
             alt="Snoopa logo"
             className={styles.navLogo}
-          />
+          /> */}
           <span className={styles.navName}>Snoopa</span>
+          <span className={styles.navSubName}>by Lawjun Labs</span>
         </div>
         <div className={styles.navLinks}>
           <a href="#features" className={styles.navLink}>
             Features
           </a>
-          <a href="#demo" className={styles.navLink}>
-            Demo
-          </a>
+
           <a href="#waitlist" className={styles.navCta}>
             Join Waitlist
           </a>
@@ -85,131 +84,86 @@ export default function Home() {
           </div>
         </section>
 
-        {/* ─ DEMO CARD (screen record) ─ */}
-        <section className={styles.cardDemo} id="demo">
-          <div className={styles.demoPhoneFrame}>
-            <div className={styles.demoScreen}>
-              <video
-                src="/video/screen-record-2.mp4"
-                autoPlay
-                muted
-                loop
-                playsInline
-                className={styles.demoVideo}
-              />
-            </div>
-            <div className={styles.demoHomeBar} />
-          </div>
-          <p className={styles.demoLabel}>See Snoopa in action</p>
-        </section>
+        {/* ─ FEATURES HEADER ─ */}
+        <div className={styles.featuresSectionTitle}>
+          <h2>Features...</h2>
+        </div>
 
         {/* ─ FEATURE CARDS (3 bento tiles) ─ */}
         <section className={styles.cardFeature} id="features">
           <div className={styles.featureIcon}>
-            <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-              <circle
-                cx="12"
-                cy="12"
-                r="9"
-                stroke="currentColor"
-                strokeWidth="1.5"
-              />
-              <path
-                d="M19 19L25 25"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-              />
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M12 2v20M2 12h20M4.93 4.93l14.14 14.14M4.93 19.07L19.07 4.93" />
+              <circle cx="12" cy="12" r="10" />
             </svg>
           </div>
-          <h3 className={styles.featureTitle}>Real-time Intel</h3>
+          <h3 className={styles.featureTitle}>Autonomous Mission Deployment</h3>
           <p className={styles.featureDesc}>
-            Ask anything that&apos;s happening right now. Snoopa queries the
-            front page of the web and delivers verified, sourced answers.
+            Deploy a global intelligence scout with a single natural language
+            prompt. Simply tell Snoopa what you want to follow, and our AI
+            automatically configures the tracking parameters to monitor the web
+            for you 24/7.
           </p>
         </section>
 
         <section className={styles.cardFeature}>
           <div className={styles.featureIcon}>
-            <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-              <path
-                d="M14 4v10l6 4"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <circle
-                cx="14"
-                cy="14"
-                r="11"
-                stroke="currentColor"
-                strokeWidth="1.5"
-              />
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <circle cx="12" cy="12" r="3" />
+              <path d="M3 12h4m10 0h4M12 3v4m0 10v4" />
+              <circle cx="12" cy="12" r="9" />
             </svg>
           </div>
-          <h3 className={styles.featureTitle}>Watchlists</h3>
+          <h3 className={styles.featureTitle}>Precision Source Targeting</h3>
           <p className={styles.featureDesc}>
-            Tell Snoopa what to track. When your condition is met — a player
-            returns, a stock dips — you get a push notification instantly.
+            Lock on to specific URLs for deep, pinpoint monitoring of the data
+            you value most. Assign Snoopa to "Snip" specific websites, tracking
+            price drops, stock availability, or official updates directly from
+            the source of truth.
           </p>
         </section>
 
         <section className={styles.cardFeature}>
           <div className={styles.featureIcon}>
-            <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-              <path
-                d="M6 18l4-8 4 5 4-10 4 13"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+              <path d="M8 9h8M8 13h6" />
             </svg>
           </div>
-          <h3 className={styles.featureTitle}>Greyhound Speed</h3>
+          <h3 className={styles.featureTitle}>Proactive Intel Briefings</h3>
           <p className={styles.featureDesc}>
-            Every feature in Snoopa is speed-optimized. Fast queries, instant
-            responses, and a UI designed for zero friction.
+            Receive refined, noise-free intelligence delivered straight to your
+            command center. Snoopa filters the chaos into high-signal briefings
+            and real-time push alerts that matter, summarized by AI and backed
+            by verified sources.
           </p>
-        </section>
-
-        {/* ─ SCREENSHOTS CARD ─ */}
-        <section className={styles.cardScreenshots}>
-          <div className={styles.screenshotStrip}>
-            {[
-              {
-                src: "/images/screenshots/Screenshot_20260227-040025_Snoopa.jpg",
-                alt: "Snoopa home screen",
-              },
-              {
-                src: "/images/screenshots/Screenshot_20260227-040050_Snoopa.jpg",
-                alt: "Snoopa watchlist",
-              },
-              {
-                src: "/images/screenshots/Screenshot_20260227-040041_Snoopa.jpg",
-                alt: "Snoopa conversation",
-              },
-              {
-                src: "/images/screenshots/Screenshot_20260227-040134_Snoopa.jpg",
-                alt: "Snoopa notifications",
-              },
-              {
-                src: "/images/screenshots/Screenshot_20260227-040104_Snoopa.jpg",
-                alt: "Snoopa tracking",
-              },
-            ].map((shot, idx) => (
-              <div key={idx} className={styles.screenshotPhoneFrame}>
-                <div className={styles.demoScreen}>
-                  <img
-                    src={shot.src}
-                    alt={shot.alt}
-                    className={styles.demoVideo}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
         </section>
 
         {/* ─ WAITLIST CARD ─ */}
@@ -276,7 +230,7 @@ export default function Home() {
       {/* ── Footer ──────────────────────────── */}
       <footer className={styles.footer}>
         <p className={styles.footerText}>
-          © {new Date().getFullYear()} Snoopa. By Lawjun Technologies.
+          © {new Date().getFullYear()} Snoopa. By Lawjun Labs.
         </p>
       </footer>
 
