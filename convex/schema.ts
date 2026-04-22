@@ -40,7 +40,6 @@ const schema = defineSchema({
       ),
     ),
     feedback: v.optional(v.union(v.literal("like"), v.literal("dislike"))),
-    session_id: v.optional(v.string()),
   }).index("by_watchlist", ["watchlist_id"]),
 
   watchlist: defineTable({
@@ -59,8 +58,6 @@ const schema = defineSchema({
     time_range: v.optional(v.union(v.literal("day"), v.literal("any_time"))),
     last_checked: v.number(),
     sources: v.array(v.string()),
-    session_id: v.optional(v.string()),
-    message_id: v.optional(v.string()),
   }).index("by_user", ["user_id"]),
 
   processed_headlines: defineTable({
@@ -84,10 +81,6 @@ const schema = defineSchema({
         v.literal("system"),
       ),
     ),
-    session_id: v.optional(v.string()),
-    chat_id: v.optional(v.string()),
-    verified: v.optional(v.boolean()),
-    url: v.optional(v.string()),
   })
     .index("by_watchlist", ["watchlist_id"])
     .index("by_watchlist_time", ["watchlist_id", "timestamp"]),
