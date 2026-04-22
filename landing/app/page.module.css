@@ -7,7 +7,7 @@
 .page {
   position: relative;
   min-height: 100vh;
-  background-color: #050505;
+  background-color: #141414;
 }
 
 /* ── Noise ───────────────────────────────────── */
@@ -138,6 +138,15 @@
     display: flex;
   }
 }
+@media (max-width: 640px) {
+  .navName {
+    font-size: 1.5rem;
+  }
+  .navSubName {
+    font-size: 10px;
+    margin-bottom: 4px;
+  }
+}
 
 /* ── Bento Grid ─────────────────────────────── */
 .bento {
@@ -201,7 +210,7 @@
   .cardHero {
     grid-column: span 1;
     flex-direction: column;
-    padding: 32px 24px;
+    padding: 32px 10px;
     gap: 28px;
     min-height: auto;
   }
@@ -479,7 +488,7 @@
   display: flex;
   flex-direction: column;
   gap: 20px;
-  background: #0d0d0d;
+  background: #111111;
   border: 1px solid rgba(235, 235, 223, 0.05);
   border-radius: var(--radius-lg);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
