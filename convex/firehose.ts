@@ -397,7 +397,8 @@ export const run_firehose = internalAction({
     );
 
     // -----------------------------------------------------------------------
-    // NEW Phase 3B: Build unique Tavily queries for items needing General Search
+    // Phase 3B: Build unique Tavily queries using item titles (more specific
+    // than canonical_topic) — items with the same title share one query.
     // -----------------------------------------------------------------------
     interface TavilyQuery {
       topic: string;
@@ -406,13 +407,13 @@ export const run_firehose = internalAction({
     }
     const queryMap = new Map<string, TavilyQuery>();
     for (const item of itemsForGeneralSearch) {
-      if (!item.canonical_topic) continue;
       const type = item.search_type ?? "general";
       const range = item.time_range ?? "day";
-      const key = `${item.canonical_topic}::${type}::${range}`;
+      // Use title as the search query — it is far more descriptive and targeted
+      const key = `${item.title}::${type}::${range}`;
       if (!queryMap.has(key)) {
         queryMap.set(key, {
-          topic: item.canonical_topic,
+          topic: item.title,
           searchType: type,
           timeRange: range,
         });
@@ -421,10 +422,9 @@ export const run_firehose = internalAction({
 
     const tavilyQueries = [...queryMap.values()];
 
-    // Fallback: if no items have canonical_topic yet, run nothing
     if (tavilyQueries.length === 0) {
       console.log(
-        "Firehose: no canonical topics found, skipping Tavily fetch.",
+        "Firehose: no items for general search, skipping Tavily fetch.",
       );
       return;
     }
