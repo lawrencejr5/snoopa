@@ -120,6 +120,13 @@ const schema = defineSchema({
     last_snapshot: v.string(),
     source_weight: v.union(v.literal("primary"), v.literal("secondary")),
   }).index("by_watchlist", ["watchlist_id"]),
+
+  feedbacks: defineTable({
+    user_id: v.id("users"),
+    content: v.string(),
+    images: v.optional(v.array(v.id("_storage"))),
+    timestamp: v.number(),
+  }).index("by_user", ["user_id"]),
 });
 
 export default schema;
