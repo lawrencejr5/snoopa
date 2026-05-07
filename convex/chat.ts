@@ -1058,7 +1058,7 @@ export const initialize_watchlist = action({
 
       Rules:
       - The title should be clear and specific (e.g. "Bitcoin Price Movement", "iPhone 16 Pro Deals")
-      - The keywords array should contain 3-6 targeted search terms relevant to tracking this item
+      - The keywords array should contain 4-6 1-2-worded atomic keywords for this watchlist, the first 2 keywords MUST be the primary subjects, the remaining keywords MUST be 1-2 word status triggers or synonyms that indicate the condition is being met. Avoid long phrases. Focus on words that are likely to appear in a news headline or lead paragraph.
       - The condition should be a precise, actionable rule (e.g. "Alert when Bitcoin price drops below $80,000" or "Notify when a new iPhone 16 Pro deal appears under $900")
       - The canonical_topic must be a short 2-4 word label, most likely the first keyword. Please avoid canonical topics that are too broad, generate canonical topics that when searched would bring out results for that watchlist in the first 10 results. Reuse an existing topic if it fits, otherwise create a new one.${topicsContext}
       - The tier is a priority level (1-4) that determines how frequently Snoopa checks for updates:
@@ -1068,11 +1068,12 @@ export const initialize_watchlist = action({
         * Tier 4 (Low): 1x/3 days — long-term monitoring, legislative changes, slow-moving topics
       - Assign the tier based on how time-sensitive or volatile the topic is. When in doubt, default to tier 3.
       - search_type determines which search endpoint Snoopa uses:
-        * "general": best for prices, product listings, deals, stats, or topics where info is updated on existing pages (e.g. iPhone price on BackMarket, stock prices)
-        * "news": best for breaking events, announcements, developments, or topics that generate new articles (e.g. crypto news, political events)
+        * "general": Best for prices, product listings, deals, stats, movies and series update, gossips or topics where tracking requires updates on existing databases
+        * "news": ONLY use for political events, economic shifts, or global breaking news.
+        * default to "general" if confused.
       - time_range determines the time window for search results:
-        * "day": last 24 hours — use for breaking/time-critical topics, news, events
-        * "any_time": no time filter — use for prices, deals, or slow-moving info that lives on static/updated pages
+        * "day": last 24 hours — Use strictly for high-volatility topics (Politics, Sports, Breaking News) where information becomes obsolete within hours and only the absolute latest update matters.
+        * "any_time": no time filter — Use for entertainment (Movies, TV, Anime), price tracking, legal/policy info, or any topic where the best data lives on databases or static pages that are updated over time (e.g., Wikipedia, IMDb, Next-Episode).
       - The confirmation message should be in Snoopa's voice — sharp, proactive, and cool
       - Do NOT include markdown formatting in the response
     `;
