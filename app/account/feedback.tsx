@@ -8,7 +8,6 @@ import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Image,
   Pressable,
   ScrollView,
@@ -17,6 +16,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { useCustomAlert } from "@/context/CustomAlertContext";
 
 export default function FeedbackScreen() {
   const { theme } = useTheme();
@@ -24,6 +24,7 @@ export default function FeedbackScreen() {
   const user = useQuery(api.users.get_current_user);
   const generateUploadUrl = useAction(api.feedback.generateUploadUrl);
   const submitFeedbackMutation = useMutation(api.feedback.submit_feedback);
+  const { showCustomAlert } = useCustomAlert();
 
   const [images, setImages] = useState<string[]>([]);
   const [feedback, setFeedback] = useState("");
@@ -50,15 +51,12 @@ export default function FeedbackScreen() {
 
   const submitFeedback = async () => {
     if (!feedback.trim()) {
-      Alert.alert(
-        "Empty Feedback",
-        "Please describe your issue or suggestion.",
-      );
+      showCustomAlert("Please describe your issue or suggestion.", "warning");
       return;
     }
 
     if (!user) {
-      Alert.alert("Error", "You must be logged in to send feedback.");
+      showCustomAlert("You must be logged in to send feedback.", "danger");
       return;
     }
 
@@ -93,14 +91,14 @@ export default function FeedbackScreen() {
         images: storageIds.length > 0 ? storageIds : undefined,
       });
 
-      Alert.alert(
-        "Feedback Sent",
+      showCustomAlert(
         "Thank you for your report. We'll look into it.",
+        "success",
       );
       router.back();
     } catch (error) {
       console.error("Feedback submission error:", error);
-      Alert.alert("Error", "Failed to send feedback. Please try again later.");
+      showCustomAlert("Failed to send feedback. Please try again later.", "danger");
     } finally {
       setIsSubmitting(false);
     }

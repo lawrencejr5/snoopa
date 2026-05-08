@@ -33,6 +33,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { useCustomAlert } from "@/context/CustomAlertContext";
 import { KeyboardStickyView } from "react-native-keyboard-controller";
 import Animated, {
   FadeIn,
@@ -822,6 +823,7 @@ function SourcesSheet({
 export default function SnoopDetailsScreen() {
   const { theme } = useTheme();
   const router = useRouter();
+  const { showCustomAlert } = useCustomAlert();
   const { id } = useLocalSearchParams();
   const { signedIn } = useUser();
   const scrollRef = useRef<ScrollView>(null);
@@ -1042,9 +1044,11 @@ export default function SnoopDetailsScreen() {
     setIsProcessing(true);
     try {
       await deleteWatchlist({ watchlist_id: id as Id<"watchlist"> });
+      showCustomAlert("Watchlist deleted successfully", "success");
       router.back();
     } catch (e) {
       console.error("Terminate failed:", e);
+      showCustomAlert("Failed to delete watchlist", "danger");
     } finally {
       setIsProcessing(false);
       setShowConfirmation(false);

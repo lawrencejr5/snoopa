@@ -14,10 +14,11 @@ interface AlertState {
   visible: boolean;
   msg: string;
   theme: AlertTheme;
+  duration?: number;
 }
 
 interface CustomAlertContextType {
-  showCustomAlert: (msg: string, theme: AlertTheme) => void;
+  showCustomAlert: (msg: string, theme: AlertTheme, duration?: number) => void;
   hideAlert: () => void;
   alert: AlertState;
 }
@@ -35,10 +36,13 @@ export const CustomAlertProvider = ({ children }: { children: ReactNode }) => {
 
   const haptics = useHapitcs();
 
-  const showCustomAlert = useCallback((msg: string, theme: AlertTheme) => {
-    haptics.impact("success");
-    setAlert({ visible: true, msg, theme });
-  }, []);
+  const showCustomAlert = useCallback(
+    (msg: string, theme: AlertTheme, duration?: number) => {
+      haptics.impact("success");
+      setAlert({ visible: true, msg, theme, duration });
+    },
+    [],
+  );
 
   const hideAlert = useCallback(() => {
     setAlert((prev) => ({ ...prev, visible: false }));
@@ -52,11 +56,13 @@ export const CustomAlertProvider = ({ children }: { children: ReactNode }) => {
         visible={alert.visible}
         msg={alert.msg}
         theme={alert.theme}
+        duration={alert.duration}
         onHide={hideAlert}
       />
     </CustomAlertContext.Provider>
   );
 };
+
 
 export const useCustomAlert = () => {
   const context = useContext(CustomAlertContext);

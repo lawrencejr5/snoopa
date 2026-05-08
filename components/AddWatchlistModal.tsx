@@ -1,4 +1,5 @@
 import Colors from "@/constants/Colors";
+import { useCustomAlert } from "@/context/CustomAlertContext";
 import { useTheme } from "@/context/ThemeContext";
 import { useUser } from "@/context/UserContext";
 import { api } from "@/convex/_generated/api";
@@ -13,6 +14,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Image,
+  Keyboard,
   Pressable,
   StyleSheet,
   Text,
@@ -29,6 +31,7 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
   const { theme } = useTheme();
   const router = useRouter();
   const { signedIn } = useUser();
+  const { showCustomAlert, hideAlert } = useCustomAlert();
   const bottomSheetRef = useRef<BottomSheet>(null);
 
   const [prompt, setPrompt] = useState("");
@@ -104,7 +107,10 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
   const handleProceed = async () => {
     if (!prompt.trim() || isProcessing || !signedIn?._id) return;
 
+    handleClose();
+
     setIsProcessing(true);
+    showCustomAlert("Generating watchlist, redirecting...", "success", 0);
 
     try {
       const result = await initializeWatchlist({
@@ -120,18 +126,28 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
           pathname: "/snoop/[id]",
           params: { id: result.watchlist_id },
         });
+
+        // Hide the alert after a short delay to ensure the user sees the transition
+        setTimeout(() => {
+          hideAlert();
+        }, 1500);
       }
     } catch (error) {
       console.error("Failed to create watchlist:", error);
+      showCustomAlert(
+        "Failed to create watchlist. Please try again.",
+        "danger",
+      );
     } finally {
       setIsProcessing(false);
     }
   };
 
   const handleClose = () => {
+    Keyboard.dismiss();
     bottomSheetRef.current?.close();
-    onClose();
   };
+
 
   const handleInputChange = (text: string) => {
     const urlRegex =
@@ -223,7 +239,9 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
             }}
             onBlur={() => {
               setIsFocused(false);
-              bottomSheetRef.current?.snapToIndex(0);
+              if (visible && !isProcessing) {
+                bottomSheetRef.current?.snapToIndex(0);
+              }
             }}
             multiline
             maxLength={500}
