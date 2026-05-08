@@ -39,7 +39,8 @@
         "expo-notifications",
         {
           "icon": "./assets/images/notification-icon.png",
-          "color": "#EBEBDF"
+          "color": "#EBEBDF",
+          "sounds": ["./assets/sounds/dog_bark_single.wav"]
         }
       ]
     ],

@@ -155,7 +155,7 @@ export async function sendExpoPush(
       },
       body: JSON.stringify({
         to: pushTokens,
-        sound: "default",
+        sound: "dog_bark_single.wav",
         title,
         body: message,
         data: { type: "alert" },

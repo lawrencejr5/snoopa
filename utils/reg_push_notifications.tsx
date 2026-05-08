@@ -15,7 +15,7 @@ Notifications.setNotificationHandler({
 export async function sendPushNotification(expoPushToken: string) {
   const message = {
     to: expoPushToken,
-    sound: "default",
+    sound: "dog_bark_single.wav",
     title: "Original Title",
     body: "And here is the body!",
     data: { someData: "goes here" },
@@ -44,6 +44,7 @@ export async function registerForPushNotificationsAsync() {
       importance: Notifications.AndroidImportance.MAX,
       vibrationPattern: [0, 250, 250, 250],
       lightColor: "#FF231F7C",
+      sound: "dog_bark_single.wav",
     });
   }
 
