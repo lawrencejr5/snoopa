@@ -238,7 +238,13 @@ export const batch_insert_sources = internalMutation({
 // Helpers
 // ---------------------------------------------------------------------------
 
+const timeout = (ms: number) =>
+  new Promise((_, reject) =>
+    setTimeout(() => reject(new Error("TIMEOUT_ERROR")), ms),
+  );
+
 // Fetching current date and time
+
 function getCurrentDateTime() {
   return new Date().toLocaleString("en-US", {
     weekday: "long",
@@ -919,16 +925,19 @@ export const send_message = action({
       { role: "user", content: userPrompt },
     ];
 
-    // 9. Try DeepSeek first, fall back to Gemini 2.5 flash lite
+    // 9. Try DeepSeek first, fall back to Gemini 2.5 flash
     let response_text = "";
     let lastError: any = null;
 
     // --- Primary: DeepSeek ---
     try {
-      const result = await openai.chat.completions.create({
-        model: "deepseek-chat",
-        messages: openaiMessages,
-      });
+      const result: any = await Promise.race([
+        openai.chat.completions.create({
+          model: "deepseek-chat",
+          messages: openaiMessages,
+        }),
+        timeout(20_000),
+      ]);
       response_text = result.choices[0].message.content ?? "";
       console.log(
         `✅ Success (deepseek-chat) - Input: ${result.usage?.prompt_tokens}, Output: ${result.usage?.completion_tokens}`,
@@ -936,7 +945,7 @@ export const send_message = action({
     } catch (error: any) {
       lastError = error;
       console.warn(
-        `⚠️ DeepSeek failed:`,
+        `⚠️ DeepSeek failed or timed out:`,
         error.message?.split(":")[0] || error.message || "Unknown error",
       );
 
@@ -956,21 +965,23 @@ export const send_message = action({
           history: geminiHistory.slice(0, -1),
         });
 
-        const result = await chat_session.sendMessage(userPrompt);
+        const result: any = await Promise.race([
+          chat_session.sendMessage(userPrompt),
+          timeout(20_000),
+        ]);
         response_text = result.response.text();
         console.log(`✅ Success (gemini-2.5-flash, fallback)`);
       } catch (fallbackError: any) {
-        console.error("All AI models failed. Last error:", fallbackError);
+        console.error("All AI models failed or timed out:", fallbackError);
 
-        const error_message =
-          "Sorry, I hit a snag while snooping. Try again in a bit.";
+        const error_message = "Sorry, I'm having trouble responding to you";
         await ctx.runMutation(internal.chat.save_message, {
           watchlist_id: args.watchlist_id,
           role: "snoopa",
           content: error_message,
         });
 
-        throw new Error("All AI models failed.");
+        throw new Error("All AI models failed or timed out.");
       }
     }
 
@@ -1079,25 +1090,63 @@ export const initialize_watchlist = action({
     `;
 
     try {
+      const gemini_api_key = process.env.GOOGLE_GEMINI_API_KEY;
+
       const deepseek_api_key = process.env.DEEPSEEK_API_KEY;
-      if (!deepseek_api_key) {
-        throw new Error("DEEPSEEK_API_KEY is not set in environment variables");
+
+      if (!deepseek_api_key || !gemini_api_key) {
+        throw new Error(
+          `${!deepseek_api_key ? "DEEPSEEK_API_KEY" : "GEMINI_API_KEY"} is not set in environment variables`,
+        );
       }
 
       const openai = new OpenAI({
         baseURL: "https://api.deepseek.com",
         apiKey: deepseek_api_key,
       });
+      const gen_ai = new GoogleGenerativeAI(gemini_api_key);
 
-      const result = await openai.chat.completions.create({
-        model: "deepseek-chat",
-        messages: [
-          { role: "system", content: instructions },
-          { role: "user", content: args.prompt },
-        ],
-      });
+      let response_text = "";
 
-      const response_text = result.choices[0].message.content ?? "";
+      try {
+        // Primary: DeepSeek
+        const result: any = await Promise.race([
+          openai.chat.completions.create({
+            model: "deepseek-chat",
+            messages: [
+              { role: "system", content: instructions },
+              { role: "user", content: args.prompt },
+            ],
+          }),
+          timeout(20_000),
+        ]);
+        response_text = result.choices[0].message.content ?? "";
+        console.log(`✅ Success (deepseek-chat)`);
+      } catch (error: any) {
+        console.warn(
+          `⚠️ DeepSeek failed or timed out:`,
+          error.message?.split(":")[0] || error.message || "Unknown error",
+        );
+
+        try {
+          // Fallback: Gemini 2.5 Flash
+          const fallbackModel = gen_ai.getGenerativeModel({
+            model: "gemini-2.5-flash",
+            systemInstruction: instructions,
+          });
+
+          const result: any = await Promise.race([
+            fallbackModel.generateContent(args.prompt),
+            timeout(20_000),
+          ]);
+          response_text = result.response.text();
+          console.log(`✅ Success (gemini-2.5-flash, fallback)`);
+        } catch (fallbackError: any) {
+          console.error("All AI models failed or timed out:", fallbackError);
+          throw new Error("Failed generating tracking intelligence.");
+        }
+      }
+
       let wl_id: Id<"watchlist"> | undefined;
       let final_snoop_text = response_text;
       let payload: any;
