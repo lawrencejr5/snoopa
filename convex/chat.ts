@@ -838,56 +838,91 @@ export const send_message = action({
     if (needsSearch) {
       let sourceUrl: string | undefined;
       let sourceWeight: "primary" | "secondary" | undefined;
+      let monitoredSourceId: any;
 
       if (args.watchlist_id) {
         const sources = await ctx.runQuery(
           api.monitored_sources.get_monitored_sources,
-          {
-            watchlist_id: args.watchlist_id,
-          },
+          { watchlist_id: args.watchlist_id },
         );
         if (sources.length > 0) {
           sourceUrl = sources[0].url;
           sourceWeight = sources[0].source_weight;
+          monitoredSourceId = sources[0]._id;
         }
       }
 
-      // If it's a primary source, we scrape it directly for maximum accuracy
-      if (sourceUrl && sourceWeight === "primary") {
+      // Helper: scrape a URL and update snapshot/hash
+      const scrapeAndUpdate = async (url: string) => {
         const extractResult = await ctx.runAction(
           internal.tavily.extract_source,
-          { url: sourceUrl },
+          { url },
         );
         if (extractResult.success) {
-          const content = (extractResult.content as string).substring(0, 25000);
-          leanNews = `PRIMARY SOURCE CONTENT (DIRECT SCRAPE):\nURL: ${sourceUrl}\n\n${content}`;
+          const raw = extractResult.content as string;
+          const new_hash = await hashString(raw);
+          await ctx.runMutation(
+            internal.monitored_sources.update_monitored_source_hash,
+            {
+              monitored_source_id: monitoredSourceId,
+              last_snapshot: raw,
+              last_hash: new_hash,
+            },
+          );
+          return raw.substring(0, 25000);
+        }
+        return null;
+      };
+
+      if (sourceUrl && sourceWeight === "primary") {
+        // Primary: depend only on the scraped page
+        const scraped = await scrapeAndUpdate(sourceUrl);
+        if (scraped) {
+          leanNews = `PRIMARY SOURCE CONTENT (DIRECT SCRAPE):\nURL: ${sourceUrl}\n\n${scraped}`;
           try {
-            const hostname = new URL(sourceUrl).hostname;
-            capturedSources = [{ title: hostname, url: sourceUrl }];
+            capturedSources = [{ title: new URL(sourceUrl).hostname, url: sourceUrl }];
           } catch {
             capturedSources = [{ title: "Primary Source", url: sourceUrl }];
           }
         } else {
-          // Fallback to general search if extraction fails
+          // Extraction failed — fall back to general search
           const searchResult = await ctx.runAction(internal.tavily.search, {
             query: args.content,
             history: mappedHistory,
-            source: sourceUrl,
           });
           leanNews = searchResult.leanNews;
           capturedSources = searchResult.sources;
         }
+      } else if (sourceUrl && sourceWeight === "secondary") {
+        // Secondary: scrape the source AND run a general search, then merge
+        const [scraped, searchResult] = await Promise.all([
+          scrapeAndUpdate(sourceUrl),
+          ctx.runAction(internal.tavily.search, {
+            query: args.content,
+            history: mappedHistory,
+          }),
+        ]);
+
+        const scrapedSection = scraped
+          ? `SECONDARY SOURCE CONTENT (DIRECT SCRAPE):\nURL: ${sourceUrl}\n\n${scraped}\n\n---\n\n`
+          : "";
+        leanNews = `${scrapedSection}WEB SEARCH RESULTS:\n${searchResult.leanNews}`;
+
+        const sourceEntry = scraped
+          ? [{ title: (() => { try { return new URL(sourceUrl).hostname; } catch { return "Source"; } })(), url: sourceUrl }]
+          : [];
+        capturedSources = [...sourceEntry, ...searchResult.sources];
       } else {
-        // For secondary or no source, use general search
+        // No source — standard search
         const searchResult = await ctx.runAction(internal.tavily.search, {
           query: args.content,
           history: mappedHistory,
-          source: sourceUrl,
         });
         leanNews = searchResult.leanNews;
         capturedSources = searchResult.sources;
       }
     }
+
 
     // 7. For WATCHLIST intent, fetch recent canonical topics for context
     let recentTopics: string[] = [];
