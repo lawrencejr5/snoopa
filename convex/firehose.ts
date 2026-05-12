@@ -224,6 +224,272 @@ export const get_monitored_sources_for_items = internalQuery({
 });
 
 // ---------------------------------------------------------------------------
+// run_firehose phase helpers
+// ---------------------------------------------------------------------------
+
+/** Phase 1 — loads active items for the tier and filters out recently-checked ones. */
+async function _loadDueItems(
+  ctx: any,
+  tier: number,
+): Promise<any[]> {
+  const tierInterval = TIER_INTERVALS[tier] ?? TIER_INTERVALS[3];
+  const allTierItems = await ctx.runQuery(
+    internal.firehose.get_active_watchlist_items,
+    { tier },
+  );
+  const now = Date.now();
+  return allTierItems.filter(
+    (item: any) => now - item.last_checked >= tierInterval * 0.9,
+  );
+}
+
+/**
+ * Phase 3A — scrapes all monitored sources in parallel, verifies changed ones with Gemini,
+ * updates their hashes, and accumulates verified hits into verifiedByItem.
+ * Returns { sourceUpdates, sourcesByWatchlistId }.
+ */
+async function _processMonitoredSources(
+  ctx: any,
+  activeItems: any[],
+  verifiedByItem: Map<string, { item: any; headlines: VerifiedHeadline[] }>,
+  geminiKey: string,
+) {
+  const watchlistIds = activeItems.map((i: any) => i._id);
+  const allMonitoredSources = await ctx.runQuery(
+    internal.firehose.get_monitored_sources_for_items,
+    { watchlist_ids: watchlistIds },
+  );
+
+  // Group sources by watchlist id
+  const sourcesByWatchlistId = new Map<any, any[]>();
+  for (const source of allMonitoredSources) {
+    if (!sourcesByWatchlistId.has(source.watchlist_id)) {
+      sourcesByWatchlistId.set(source.watchlist_id, []);
+    }
+    sourcesByWatchlistId.get(source.watchlist_id)!.push(source);
+  }
+
+  const sourceUpdates: Array<{
+    source: any;
+    newHash: string;
+    newSnapshot: string;
+    satisfied: boolean;
+  }> = [];
+
+  // Parallel fetch + verify all sources
+  await Promise.all(
+    allMonitoredSources.map(async (source: any) => {
+      const extractResult = await ctx.runAction(internal.tavily.extract_source, {
+        url: source.url,
+      });
+      if (!extractResult.success) return;
+
+      const snapshot = extractResult.content as string;
+      const newHash = await hashString(snapshot);
+
+      if (newHash === source.last_hash) return; // No change
+
+      const item = activeItems.find((i: any) => i._id === source.watchlist_id);
+      if (!item) return;
+
+      const satisfied = await verifySourceWithGemini(snapshot, item.condition, geminiKey);
+      sourceUpdates.push({ source, newHash, newSnapshot: snapshot, satisfied });
+    }),
+  );
+
+  // Persist hash updates and collect verified hits
+  for (const update of sourceUpdates) {
+    await ctx.runMutation(internal.monitored_sources.update_monitored_source_hash, {
+      monitored_source_id: update.source._id,
+      last_hash: update.newHash,
+      last_snapshot: update.newSnapshot,
+    });
+
+    if (update.satisfied) {
+      const item = activeItems.find((i: any) => i._id === update.source.watchlist_id)!;
+      if (!verifiedByItem.has(item._id)) {
+        verifiedByItem.set(item._id, { item, headlines: [] });
+      }
+      let hostname = "Source";
+      try { hostname = new URL(update.source.url).hostname; } catch {}
+      verifiedByItem.get(item._id)!.headlines.push({
+        title: `Source Update detected on ${hostname}`,
+        snippet: update.newSnapshot.substring(0, 200).replace(/\n/g, " ") + "...",
+        url: update.source.url,
+        source: hostname,
+        hash: update.newHash,
+      });
+      console.log(`Firehose: Monitored Source HIT for "${item.title}"`);
+    }
+  }
+
+  return { sourceUpdates, sourcesByWatchlistId };
+}
+
+/**
+ * Phase 3B+4+5 — builds Tavily queries, fetches + dedupes headlines,
+ * runs keyword + Gemini verification per item, and accumulates verified hits.
+ * Returns toMarkProcessed entries.
+ */
+async function _runGeneralSearch(
+  ctx: any,
+  itemsForGeneralSearch: any[],
+  processedSet: Set<string>,
+  verifiedByItem: Map<string, { item: any; headlines: VerifiedHeadline[] }>,
+  geminiKey: string,
+): Promise<Array<{ urlHash: string; watchlist_id: any }>> {
+  // Build unique Tavily query configs (deduplicated by title+type+range)
+  const queryMap = new Map<string, { topic: string; searchType: "general" | "news"; timeRange: "day" | "any_time" }>();
+  for (const item of itemsForGeneralSearch) {
+    const type = item.search_type ?? "general";
+    const range = item.time_range ?? "day";
+    const key = `${item.title}::${type}::${range}`;
+    if (!queryMap.has(key)) {
+      queryMap.set(key, { topic: item.title, searchType: type, timeRange: range });
+    }
+  }
+  const tavilyQueries = [...queryMap.values()];
+
+  if (tavilyQueries.length === 0) {
+    console.log("Firehose: no items for general search, skipping Tavily fetch.");
+    return [];
+  }
+
+  // Fetch headlines in parallel
+  const headlineArrays = await Promise.all(
+    tavilyQueries.map((tq) =>
+      ctx.runAction(internal.tavily.firehose_search, {
+        query: tq.topic,
+        searchType: tq.searchType,
+        timeRange: tq.timeRange,
+      }),
+    ),
+  );
+  const allHeadlines = headlineArrays.flat();
+  console.log(`Firehose: fetched ${allHeadlines.length} headlines across ${tavilyQueries.length} queries.`);
+
+  // Within-run dedup
+  const seen = new Set<string>();
+  const uniqueHeadlines: Array<TavilySearchResult & { hash: string }> = [];
+  for (const h of allHeadlines) {
+    const hash = await hashString(h.url);
+    if (seen.has(hash)) continue;
+    seen.add(hash);
+    uniqueHeadlines.push({ ...h, hash });
+  }
+  console.log(`Firehose: ${uniqueHeadlines.length} unique headlines to check.`);
+
+  // Keyword match + Gemini verify per item
+  const toMarkProcessed: Array<{ urlHash: string; watchlist_id: any }> = [];
+  for (const item of itemsForGeneralSearch) {
+    let keywordMatches = 0;
+    let verified = 0;
+
+    for (const headline of uniqueHeadlines) {
+      const compositeKey = `${headline.hash}::${item._id}`;
+      if (processedSet.has(compositeKey)) continue;
+
+      const headlineText = `${headline.title} ${headline.content ?? ""}`;
+      if (!headlineMatchesKeywords(headlineText, item.keywords)) continue;
+
+      keywordMatches++;
+      const satisfied = await verifyHeadlineWithGemini(
+        headline.title,
+        headline.content ?? "",
+        item.condition,
+        geminiKey,
+      );
+
+      toMarkProcessed.push({ urlHash: headline.hash, watchlist_id: item._id });
+      processedSet.add(compositeKey);
+
+      if (satisfied) {
+        verified++;
+        if (!verifiedByItem.has(item._id)) {
+          verifiedByItem.set(item._id, { item, headlines: [] });
+        }
+        verifiedByItem.get(item._id)!.headlines.push({
+          title: headline.title,
+          snippet: headline.content ?? "",
+          url: headline.url,
+          source: headline.url ? new URL(headline.url).hostname : undefined,
+          hash: headline.hash,
+        });
+        console.log(`Firehose: ✓ "${item.title}" → "${headline.title}"`);
+      }
+    }
+
+    console.log(`Firehose: "${item.title}" — ${keywordMatches} keyword matches, ${verified} verified.`);
+  }
+
+  return toMarkProcessed;
+}
+
+/**
+ * Phase 7 — generates a brief per verified item, saves chat message + sources +
+ * notification + push notification, and returns the total alert count.
+ */
+async function _dispatchAlerts(
+  ctx: any,
+  verifiedByItem: Map<string, { item: any; headlines: VerifiedHeadline[] }>,
+  geminiKey: string,
+): Promise<number> {
+  const PUSH_PREFIXES = [
+    "New intel on",
+    "Found something new regarding",
+    "Just spotted a change in",
+    "Sharing some new findings on",
+    "Fresh scent on",
+    "Intel drop:",
+    "Something's moving on",
+  ];
+
+  let totalAlerts = 0;
+
+  for (const [, { item, headlines }] of verifiedByItem) {
+    const brief = await generateBrief(item.title, item.condition, headlines, geminiKey);
+    console.log(`Firehose: brief for "${item.title}" → "${brief}"`);
+
+    // 1. Save chat message
+    const chatId = await ctx.runMutation(internal.chat.save_message, {
+      watchlist_id: item._id,
+      role: "snoopa",
+      content: brief,
+      type: "snoop",
+    });
+
+    // 2. Batch-insert headline sources
+    const sourceEntries = headlines.map((h) => ({
+      watchlist_id: item._id,
+      chat_id: chatId,
+      title: `${h.title}${h.source ? ` — ${h.source}` : ""}`,
+      url: h.url,
+    }));
+    await ctx.runMutation(internal.chat.batch_insert_sources, { entries: sourceEntries });
+    totalAlerts += sourceEntries.length;
+
+    // 3. Save in-app notification
+    await ctx.runMutation(internal.notifications.save_notification, {
+      user_id: item.user_id,
+      title: item.title,
+      message: brief,
+      type: "alert",
+      watchlist_id: item._id,
+    });
+
+    // 4. Push notification
+    const prefix = PUSH_PREFIXES[Math.floor(Math.random() * PUSH_PREFIXES.length)];
+    const pushTitle = `${prefix} ${item.title}`;
+    const pushTokens = await ctx.runQuery(internal.users.get_push_tokens, {
+      user_id: item.user_id,
+    });
+    await sendExpoPush(pushTokens, pushTitle, brief);
+  }
+
+  return totalAlerts;
+}
+
+// ---------------------------------------------------------------------------
 // Core internal action — runs the full firehose pipeline
 // ---------------------------------------------------------------------------
 
@@ -231,376 +497,71 @@ export const run_firehose = internalAction({
   args: { tier: v.number() },
   handler: async (ctx, args) => {
     const geminiKey = process.env.GOOGLE_GEMINI_API_KEY;
-
     if (!geminiKey) {
       console.error("Missing GOOGLE_GEMINI_API_KEY");
       return;
     }
 
-    const tierInterval = TIER_INTERVALS[args.tier] ?? TIER_INTERVALS[3];
-
-    // 1. Load active watchlist items for this tier
-    const allTierItems = await ctx.runQuery(
-      internal.firehose.get_active_watchlist_items,
-      { tier: args.tier },
-    );
-
-    // Filter out items that were checked too recently (safety net against double-runs)
-    const now = Date.now();
-    const activeItems = allTierItems.filter(
-      (item) => now - item.last_checked >= tierInterval * 0.9,
-    );
-
+    // 1. Load watchlist items due for this tier
+    const activeItems = await _loadDueItems(ctx, args.tier);
     if (activeItems.length === 0) {
-      console.log(
-        `Firehose (tier ${args.tier}): no items due for check, skipping.`,
-      );
+      console.log(`Firehose (tier ${args.tier}): no items due for check, skipping.`);
       return;
     }
+    console.log(`Firehose (tier ${args.tier}): ${activeItems.length} items due for check.`);
 
-    console.log(
-      `Firehose (tier ${args.tier}): ${activeItems.length} items due for check.`,
-    );
-
-    // 2. Bulk-load all processed hashes for all active items — 1 query
-    //    Builds an in-memory Set of "urlHash::watchlist_id" keys
-    const watchlistIds = activeItems.map((i) => i._id);
+    // 2. Bulk-load processed hashes (single query, in-memory set)
+    const watchlistIds = activeItems.map((i: any) => i._id);
     const processedKeys = await ctx.runQuery(
       internal.log.get_processed_hashes_for_items,
       { watchlist_ids: watchlistIds },
     );
     const processedSet = new Set<string>(processedKeys);
 
-    // Collect verified headlines per watchlist item for brief generation
-    const verifiedByItem = new Map<
-      string,
-      {
-        item: (typeof activeItems)[0];
-        headlines: VerifiedHeadline[];
-      }
-    >();
+    // Accumulator shared across phases
+    const verifiedByItem = new Map<string, { item: any; headlines: VerifiedHeadline[] }>();
 
-    // -----------------------------------------------------------------------
-    // NEW Phase 3A: Process Monitored Sources (The "First Option")
-    // -----------------------------------------------------------------------
-    const allMonitoredSources = await ctx.runQuery(
-      internal.firehose.get_monitored_sources_for_items,
-      { watchlist_ids: watchlistIds },
+    // 3A. Process monitored sources (primary + secondary)
+    const { sourceUpdates, sourcesByWatchlistId } = await _processMonitoredSources(
+      ctx,
+      activeItems,
+      verifiedByItem,
+      geminiKey,
     );
 
-    const sourcesByWatchlistId = new Map<
-      Id<"watchlist">,
-      typeof allMonitoredSources
-    >();
-    for (const source of allMonitoredSources) {
-      if (!sourcesByWatchlistId.has(source.watchlist_id)) {
-        sourcesByWatchlistId.set(source.watchlist_id, []);
-      }
-      sourcesByWatchlistId.get(source.watchlist_id)!.push(source);
-    }
-
-    const sourceUpdates: Array<{
-      source: (typeof allMonitoredSources)[0];
-      newHash: string;
-      newSnapshot: string;
-      satisfied: boolean;
-    }> = [];
-
-    // Parallel fetch and verify all sources
-    await Promise.all(
-      allMonitoredSources.map(async (source) => {
-        const extractResult = await ctx.runAction(
-          internal.tavily.extract_source,
-          { url: source.url },
-        );
-        if (!extractResult.success) return;
-
-        const snapshot = extractResult.content as string;
-        const newHash = await hashString(snapshot);
-
-        // Only process if the content hash has changed
-        if (newHash !== source.last_hash) {
-          const item = activeItems.find((i) => i._id === source.watchlist_id);
-          if (!item) return;
-
-          const satisfied = await verifySourceWithGemini(
-            snapshot,
-            item.condition,
-            geminiKey,
-          );
-
-          sourceUpdates.push({
-            source,
-            newHash,
-            newSnapshot: snapshot,
-            satisfied,
-          });
-        }
-      }),
-    );
-
-    // Save hash updates and process satisfied hits
-    for (const update of sourceUpdates) {
-      await ctx.runMutation(internal.monitored_sources.update_monitored_source_hash, {
-        monitored_source_id: update.source._id,
-        last_hash: update.newHash,
-        last_snapshot: update.newSnapshot,
-      });
-
-      if (update.satisfied) {
-        const item = activeItems.find(
-          (i) => i._id === update.source.watchlist_id,
-        )!;
-        if (!verifiedByItem.has(item._id)) {
-          verifiedByItem.set(item._id, { item, headlines: [] });
-        }
-
-        let hostname = "Source";
-        try {
-          hostname = new URL(update.source.url).hostname;
-        } catch {}
-
-        verifiedByItem.get(item._id)!.headlines.push({
-          title: `Source Update detected on ${hostname}`,
-          snippet:
-            update.newSnapshot.substring(0, 200).replace(/\n/g, " ") + "...",
-          url: update.source.url,
-          source: hostname,
-          hash: update.newHash,
-        });
-
-        console.log(`Firehose: Monitored Source HIT for "${item.title}"`);
-      }
-    }
-
-    // Determine fallback for general search
-    const itemsForGeneralSearch = activeItems.filter((item) => {
+    // 3B. Determine which items still need a general search
+    const itemsForGeneralSearch = activeItems.filter((item: any) => {
       const sources = sourcesByWatchlistId.get(item._id) || [];
-
-      // Exclude if it has a primary source (primary = NO general search)
-      const primarySrc = sources.find((s) => s.source_weight === "primary");
-      if (primarySrc) return false;
-
-      // Exclude if it has a secondary source that got a HIT (skip general search if first option succeeded)
+      if (sources.find((s: any) => s.source_weight === "primary")) return false;
       const secondarySatisfied = sources.some(
-        (s) =>
+        (s: any) =>
           s.source_weight === "secondary" &&
           sourceUpdates.some((su) => su.source._id === s._id && su.satisfied),
       );
-      if (secondarySatisfied) return false;
-
-      return true; // Use general search
+      return !secondarySatisfied;
     });
+    console.log(`Firehose: ${itemsForGeneralSearch.length} items proceeding to General Search.`);
 
-    console.log(
-      `Firehose: ${itemsForGeneralSearch.length} items proceeding to General Search.`,
+    // 4+5. Run general search, dedup, keyword match + Gemini verify
+    const toMarkProcessed = await _runGeneralSearch(
+      ctx,
+      itemsForGeneralSearch,
+      processedSet,
+      verifiedByItem,
+      geminiKey,
     );
 
-    // -----------------------------------------------------------------------
-    // Phase 3B: Build unique Tavily queries using item titles (more specific
-    // than canonical_topic) — items with the same title share one query.
-    // -----------------------------------------------------------------------
-    interface TavilyQuery {
-      topic: string;
-      searchType: "general" | "news";
-      timeRange: "day" | "any_time";
-    }
-    const queryMap = new Map<string, TavilyQuery>();
-    for (const item of itemsForGeneralSearch) {
-      const type = item.search_type ?? "general";
-      const range = item.time_range ?? "day";
-      // Use title as the search query — it is far more descriptive and targeted
-      const key = `${item.title}::${type}::${range}`;
-      if (!queryMap.has(key)) {
-        queryMap.set(key, {
-          topic: item.title,
-          searchType: type,
-          timeRange: range,
-        });
-      }
-    }
-
-    const tavilyQueries = [...queryMap.values()];
-
-    if (tavilyQueries.length === 0) {
-      console.log(
-        "Firehose: no items for general search, skipping Tavily fetch.",
-      );
-      return;
-    }
-
-    // Fetch headlines for each unique query config in parallel
-    const headlineArrays = await Promise.all(
-      tavilyQueries.map((tq) =>
-        ctx.runAction(internal.tavily.firehose_search, {
-          query: tq.topic,
-          searchType: tq.searchType,
-          timeRange: tq.timeRange,
-        }),
-      ),
-    );
-    const allHeadlines = headlineArrays.flat();
-
-    console.log(
-      `Firehose: fetched ${allHeadlines.length} headlines across ${tavilyQueries.length} queries.`,
-    );
-
-    // 4. Within-run dedup — in-memory only, zero DB cost
-    const seen = new Set<string>();
-    const uniqueHeadlines: Array<TavilySearchResult & { hash: string }> = [];
-
-    for (const h of allHeadlines) {
-      const hash = await hashString(h.url);
-      if (seen.has(hash)) continue;
-      seen.add(hash);
-      uniqueHeadlines.push({ ...h, hash });
-    }
-
-    console.log(
-      `Firehose: ${uniqueHeadlines.length} unique headlines to check.`,
-    );
-
-    // 5. Process — all checks are in-memory, accumulate writes
-    const toMarkProcessed: Array<{
-      urlHash: string;
-      watchlist_id: Id<"watchlist">;
-    }> = [];
-
-    for (const item of itemsForGeneralSearch) {
-      let keywordMatches = 0;
-      let verified = 0;
-
-      for (const headline of uniqueHeadlines) {
-        const compositeKey = `${headline.hash}::${item._id}`;
-
-        // In-memory check — zero DB cost
-        if (processedSet.has(compositeKey)) continue;
-
-        const headlineText = `${headline.title} ${headline.content ?? ""}`;
-        if (!headlineMatchesKeywords(headlineText, item.keywords)) continue;
-
-        keywordMatches++;
-
-        const satisfied = await verifyHeadlineWithGemini(
-          headline.title,
-          headline.content ?? "",
-          item.condition,
-          geminiKey,
-        );
-
-        // Stage the processed entry — written in one batch at end
-        toMarkProcessed.push({
-          urlHash: headline.hash,
-          watchlist_id: item._id,
-        });
-        // Add to in-memory set so subsequent items in same run don't re-check
-        processedSet.add(compositeKey);
-
-        if (satisfied) {
-          verified++;
-
-          // Accumulate verified headlines for this watchlist item
-          if (!verifiedByItem.has(item._id)) {
-            verifiedByItem.set(item._id, { item, headlines: [] });
-          }
-          verifiedByItem.get(item._id)!.headlines.push({
-            title: headline.title,
-            snippet: headline.content ?? "",
-            url: headline.url,
-            source: headline.url ? new URL(headline.url).hostname : undefined,
-            hash: headline.hash,
-          });
-
-          console.log(`Firehose: ✓ "${item.title}" → "${headline.title}"`);
-        }
-      }
-
-      console.log(
-        `Firehose: "${item.title}" — ${keywordMatches} keyword matches, ${verified} verified.`,
-      );
-    }
-
-    // 6. Flush processed entries
+    // 6. Flush processed headline entries
     if (toMarkProcessed.length > 0) {
       await ctx.runMutation(internal.log.batch_mark_processed, {
         entries: toMarkProcessed,
       });
     }
 
-    // 7. Generate briefs, save logs + notifications + chat messages
-    let totalAlerts = 0;
+    // 7. Generate briefs + dispatch alerts (chat, notification, push)
+    const totalAlerts = await _dispatchAlerts(ctx, verifiedByItem, geminiKey);
 
-    for (const [, { item, headlines }] of verifiedByItem) {
-      // Generate a contextual brief from all verified headlines
-      const brief = await generateBrief(
-        item.title,
-        item.condition,
-        headlines,
-        geminiKey,
-      );
-
-      console.log(`Firehose: brief for "${item.title}" → "${brief}"`);
-
-      // 1. Send the brief as a chat message mapping directly to the watchlist
-      const chatId = await ctx.runMutation(internal.chat.save_message, {
-        watchlist_id: item._id, // Focus correctly on watchlist mapping
-        role: "snoopa",
-        content: brief,
-        type: "snoop",
-      });
-
-      // 2. Build source entries: individual headlines as sources
-      const sourceEntries: Array<{
-        watchlist_id: Id<"watchlist">;
-        chat_id: Id<"chats">;
-        title: string;
-        url?: string;
-      }> = [];
-
-      for (const h of headlines) {
-        sourceEntries.push({
-          watchlist_id: item._id,
-          chat_id: chatId,
-          title: `${h.title}${h.source ? ` — ${h.source}` : ""}`,
-          url: h.url,
-        });
-      }
-
-      // Batch insert sources
-      await ctx.runMutation(internal.chat.batch_insert_sources, {
-        entries: sourceEntries,
-      });
-      totalAlerts += sourceEntries.length;
-
-      // 3. Save notification with the brief
-      await ctx.runMutation(internal.notifications.save_notification, {
-        user_id: item.user_id,
-        title: item.title,
-        message: brief,
-        type: "alert",
-        watchlist_id: item._id,
-      });
-
-      // 4. Push notification with randomized prefix
-      const prefixes = [
-        "New intel on",
-        "Found something new regarding",
-        "Just spotted a change in",
-        "Sharing some new findings on",
-        "Fresh scent on",
-        "Intel drop:",
-        "Something's moving on",
-      ];
-      const prefix = prefixes[Math.floor(Math.random() * prefixes.length)];
-      const pushTitle = `${prefix} ${item.title}`;
-
-      const pushTokens = await ctx.runQuery(internal.users.get_push_tokens, {
-        user_id: item.user_id,
-      });
-      await sendExpoPush(pushTokens, pushTitle, brief);
-    }
-
-    // 8. Update last_checked for all active items — 1 mutation
+    // 8. Update last_checked for all active items
     await ctx.runMutation(internal.log.batch_update_last_checked, {
       watchlist_ids: watchlistIds,
     });
@@ -610,6 +571,7 @@ export const run_firehose = internalAction({
     );
   },
 });
+
 
 // ---------------------------------------------------------------------------
 // Public action — manually trigger firehose (e.g. for testing)
