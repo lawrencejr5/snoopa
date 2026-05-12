@@ -8,6 +8,7 @@ import { internalAction } from "./_generated/server";
 export const search = internalAction({
   args: {
     query: v.string(),
+    source: v.optional(v.string()),
     history: v.optional(
       v.array(
         v.object({
@@ -52,8 +53,10 @@ export const search = internalAction({
           ${historySummary}
           
           New User Message: ${args.query}
+          ${args.source ? `Target Source/URL: ${args.source}` : ""}
           
-          Based on the following chat history, rewrite the user's latest question into a descriptive standalone search query for a news search engine.
+          Based on the following chat history ${args.source ? `and the target source provided (${args.source})` : ""}, rewrite the user's latest question into a descriptive standalone search query for a news search engine.
+          ${args.source ? "The user wants to specifically find information related to or from this source." : ""}
           Standalone Query (One line only).
         `;
 

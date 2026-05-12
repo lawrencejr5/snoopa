@@ -836,12 +836,57 @@ export const send_message = action({
     let capturedSources: Array<{ title: string; url: string }> = [];
 
     if (needsSearch) {
-      const searchResult = await ctx.runAction(internal.tavily.search, {
-        query: args.content,
-        history: mappedHistory,
-      });
-      leanNews = searchResult.leanNews;
-      capturedSources = searchResult.sources;
+      let sourceUrl: string | undefined;
+      let sourceWeight: "primary" | "secondary" | undefined;
+
+      if (args.watchlist_id) {
+        const sources = await ctx.runQuery(
+          api.monitored_sources.get_monitored_sources,
+          {
+            watchlist_id: args.watchlist_id,
+          },
+        );
+        if (sources.length > 0) {
+          sourceUrl = sources[0].url;
+          sourceWeight = sources[0].source_weight;
+        }
+      }
+
+      // If it's a primary source, we scrape it directly for maximum accuracy
+      if (sourceUrl && sourceWeight === "primary") {
+        const extractResult = await ctx.runAction(
+          internal.tavily.extract_source,
+          { url: sourceUrl },
+        );
+        if (extractResult.success) {
+          const content = (extractResult.content as string).substring(0, 25000);
+          leanNews = `PRIMARY SOURCE CONTENT (DIRECT SCRAPE):\nURL: ${sourceUrl}\n\n${content}`;
+          try {
+            const hostname = new URL(sourceUrl).hostname;
+            capturedSources = [{ title: hostname, url: sourceUrl }];
+          } catch {
+            capturedSources = [{ title: "Primary Source", url: sourceUrl }];
+          }
+        } else {
+          // Fallback to general search if extraction fails
+          const searchResult = await ctx.runAction(internal.tavily.search, {
+            query: args.content,
+            history: mappedHistory,
+            source: sourceUrl,
+          });
+          leanNews = searchResult.leanNews;
+          capturedSources = searchResult.sources;
+        }
+      } else {
+        // For secondary or no source, use general search
+        const searchResult = await ctx.runAction(internal.tavily.search, {
+          query: args.content,
+          history: mappedHistory,
+          source: sourceUrl,
+        });
+        leanNews = searchResult.leanNews;
+        capturedSources = searchResult.sources;
+      }
     }
 
     // 7. For WATCHLIST intent, fetch recent canonical topics for context
@@ -1069,7 +1114,7 @@ export const initialize_watchlist = action({
 
       Rules:
       - The title should be clear and specific (e.g. "Bitcoin Price Movement", "iPhone 16 Pro Deals")
-      - The keywords array should contain 4-6 1-2-worded atomic keywords for this watchlist, the first 2 keywords MUST be the primary subjects, the remaining keywords MUST be 1-2 word status triggers or synonyms that indicate the condition is being met. Avoid long phrases. Focus on words that are likely to appear in a news headline or lead paragraph.
+      - The keywords array should contain 4-6 1-2-worded atomic keywords for this watchlist, the first keywords MUST be the primary subjects, the remaining keywords MUST be 1 word status triggers or synonyms that indicate the condition is being met. Avoid long phrases. Focus on words that are likely to appear in a news headline or lead paragraph.
       - The condition should be a precise, actionable rule (e.g. "Alert when Bitcoin price drops below $80,000" or "Notify when a new iPhone 16 Pro deal appears under $900")
       - The canonical_topic must be a short 2-4 word label, most likely the first keyword. Please avoid canonical topics that are too broad, generate canonical topics that when searched would bring out results for that watchlist in the first 10 results. Reuse an existing topic if it fits, otherwise create a new one.${topicsContext}
       - The tier is a priority level (1-4) that determines how frequently Snoopa checks for updates:
