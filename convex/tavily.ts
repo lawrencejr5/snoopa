@@ -17,6 +17,9 @@ export const search = internalAction({
         }),
       ),
     ),
+    timeRange: v.optional(
+      v.union(v.literal("day"), v.literal("month"), v.literal("any_time")),
+    ),
   },
   handler: async (ctx, args) => {
     const tavilyKey = process.env.TAVILY_API_KEY;
@@ -26,62 +29,94 @@ export const search = internalAction({
     if (!geminiKey) throw new Error("GOOGLE_GEMINI_API_KEY is not set");
 
     let refinedQuery = args.query;
+    let detectedTimeRange: "day" | "month" | "any_time" = "any_time";
 
-    // Use Gemini to synthesize a better search query if history exists
-    if (args.history && args.history.length > 0) {
-      try {
-        const genAI = new GoogleGenerativeAI(geminiKey);
-        const model = genAI.getGenerativeModel({
-          model: "gemini-2.5-flash-lite",
-        });
+    try {
+      const genAI = new GoogleGenerativeAI(geminiKey);
+      const model = genAI.getGenerativeModel({
+        model: "gemini-2.5-flash-lite",
+      });
 
-        let prunedForTavily;
+      let prunedForTavily: any[] = [];
+      if (args.history && args.history.length > 0) {
         if (args.history.length <= 4) {
           prunedForTavily = args.history;
         } else {
-          const head = args.history.slice(0, 1); // Just the very first message
-          const tail = args.history.slice(-3); // The most recent context
+          const head = args.history.slice(0, 1);
+          const tail = args.history.slice(-3);
           prunedForTavily = [...head, ...tail];
         }
-
-        const historySummary = prunedForTavily
-          .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
-          .join("\n");
-
-        const prompt = `
-          Current Conversation:
-          ${historySummary}
-          
-          New User Message: ${args.query}
-          ${args.source ? `Target Source/URL: ${args.source}` : ""}
-          
-          Based on the following chat history ${args.source ? `and the target source provided (${args.source})` : ""}, rewrite the user's latest question into a descriptive standalone search query for a news search engine.
-          ${args.source ? "The user wants to specifically find information related to or from this source." : ""}
-          Standalone Query (One line only).
-        `;
-
-        const result = await model.generateContent(prompt);
-        const text = result.response.text().trim();
-
-        if (result.response.usageMetadata) {
-          console.log(
-            "Tavily Query Refinement - Input: ",
-            result.response.usageMetadata.promptTokenCount,
-            " Output: ",
-            result.response.usageMetadata.candidatesTokenCount,
-          );
-        }
-
-        if (text) {
-          refinedQuery = text;
-          console.log("Synthesized search query:", refinedQuery);
-        }
-      } catch (err) {
-        console.error("Failed to refine query with Gemini:", err);
       }
+
+      const historySummary = prunedForTavily.length > 0
+        ? prunedForTavily
+            .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
+            .join("\n")
+        : "No history. This is the start of the conversation.";
+
+      const prompt = `
+        Current Conversation:
+        ${historySummary}
+        
+        New User Message: ${args.query}
+        ${args.source ? `Target Source/URL: ${args.source}` : ""}
+        
+        Analyze the user's request. You must output exactly two lines:
+        Line 1: A standalone, descriptive search query optimized for a news search engine.
+        Line 2: The classified freshness/time range of the query, which must be exactly one of: "day", "month", or "any_time".
+        
+        Freshness rules:
+        - Use "day" for queries asking for today's news, live/current scores, breaking events, things happening right now, or explicitly mentioning "today", "yesterday", "last 24 hours".
+        - Use "month" for queries asking about recent events, this month's updates, or queries where the most fresh/recent data from the last few weeks is highly preferred (e.g. injury updates, current status of an ongoing event).
+        - Use "any_time" for historical facts, general knowledge, or queries where time is not a major factor.
+        
+        Format the output EXACTLY like this:
+        QUERY: <refined query>
+        TIME_RANGE: <day | month | any_time>
+      `;
+
+      const result = await model.generateContent(prompt);
+      const text = result.response.text().trim();
+
+      if (result.response.usageMetadata) {
+        console.log(
+          "Tavily Query Refinement - Input: ",
+          result.response.usageMetadata.promptTokenCount,
+          " Output: ",
+          result.response.usageMetadata.candidatesTokenCount,
+        );
+      }
+
+      if (text) {
+        const lines = text.split("\n");
+        let parsedQuery = "";
+        for (const line of lines) {
+          if (line.toUpperCase().startsWith("QUERY:")) {
+            parsedQuery = line.substring(6).trim();
+          } else if (line.toUpperCase().startsWith("TIME_RANGE:")) {
+            const tr = line.substring(11).trim().toLowerCase();
+            if (tr === "day" || tr === "month" || tr === "any_time") {
+              detectedTimeRange = tr as "day" | "month" | "any_time";
+            }
+          }
+        }
+        if (parsedQuery) {
+          refinedQuery = parsedQuery;
+        } else {
+          refinedQuery = text;
+        }
+        console.log(
+          `[Tavily] Synthesized search query: "${refinedQuery}" | Detected timeRange: ${detectedTimeRange}`,
+        );
+      }
+    } catch (err) {
+      console.error("Failed to refine query with Gemini:", err);
     }
 
     const tvly = tavily({ apiKey: tavilyKey });
+
+    const finalTimeRange = args.timeRange ?? detectedTimeRange;
+    const tavilyTimeRange = finalTimeRange === "any_time" ? undefined : finalTimeRange;
 
     // Search results from tavily api
     const searchResult = await tvly.search(refinedQuery, {
@@ -89,6 +124,7 @@ export const search = internalAction({
       searchDepth: "advanced",
       includeAnswer: false,
       maxResults: 5,
+      timeRange: tavilyTimeRange,
     });
 
     // Reducing search result tokens

@@ -951,12 +951,24 @@ async function _gatherIntel(
     }
   };
 
+  // Resolve watchlist preferred timeRange if watchlist_id is provided
+  let watchlist_time_range: "day" | "month" | "any_time" | undefined;
+  if (args.watchlist_id) {
+    const watchlist = await ctx.runQuery(api.watchlist.get_watchlist_item, {
+      watchlist_id: args.watchlist_id,
+    });
+    if (watchlist?.time_range) {
+      watchlist_time_range = watchlist.time_range === "any_time" ? "any_time" : "day";
+    }
+  }
+
   // Brave-first web search with Tavily as fallback
-  const webSearch = async () => {
+  const webSearch = async (timeRange?: "day" | "month" | "any_time") => {
     try {
       const braveResult = await ctx.runAction(internal.brave.search, {
         query: args.content,
         history: mappedHistory,
+        timeRange,
       });
       if (braveResult.leanNews && braveResult.sources.length > 0) {
         console.log("[Chat] Web search served by Brave.");
@@ -972,6 +984,7 @@ async function _gatherIntel(
     return ctx.runAction(internal.tavily.search, {
       query: args.content,
       history: mappedHistory,
+      timeRange,
     }) as Promise<{
       leanNews: string;
       sources: { title: string; url: string }[];
@@ -990,7 +1003,7 @@ async function _gatherIntel(
       };
     }
     // Extraction failed — fall back to web search
-    const searchResult = await webSearch();
+    const searchResult = await webSearch(watchlist_time_range);
     return {
       leanNews: searchResult.leanNews,
       capturedSources: searchResult.sources,
@@ -1001,7 +1014,7 @@ async function _gatherIntel(
     // Secondary: scrape + general search in parallel, then merge
     const [scraped, searchResult] = await Promise.all([
       scrapeAndUpdate(sourceUrl),
-      webSearch(),
+      webSearch(watchlist_time_range),
     ]);
     const scrapedSection = scraped
       ? `SECONDARY SOURCE CONTENT (DIRECT SCRAPE):\nURL: ${sourceUrl}\n\n${scraped}\n\n---\n\n`
@@ -1016,7 +1029,7 @@ async function _gatherIntel(
   }
 
   // No source — standard web search
-  const searchResult = await webSearch();
+  const searchResult = await webSearch(watchlist_time_range);
   return {
     leanNews: searchResult.leanNews,
     capturedSources: searchResult.sources,

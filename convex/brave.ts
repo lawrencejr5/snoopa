@@ -113,22 +113,25 @@ export const search = internalAction({
         }),
       ),
     ),
+    timeRange: v.optional(
+      v.union(v.literal("day"), v.literal("month"), v.literal("any_time")),
+    ),
   },
   handler: async (_ctx, args) => {
     const gemini_key = process.env.GOOGLE_GEMINI_API_KEY;
     if (!gemini_key) throw new Error("GOOGLE_GEMINI_API_KEY is not set");
 
     let refined_query = args.query;
+    let detected_time_range: "day" | "month" | "any_time" = "any_time";
 
-    // Use Gemini to synthesize a better search query if history exists
-    if (args.history && args.history.length > 0) {
-      try {
-        const gen_ai = new GoogleGenerativeAI(gemini_key);
-        const model = gen_ai.getGenerativeModel({
-          model: "gemini-2.5-flash-lite",
-        });
+    try {
+      const gen_ai = new GoogleGenerativeAI(gemini_key);
+      const model = gen_ai.getGenerativeModel({
+        model: "gemini-2.5-flash-lite",
+      });
 
-        let pruned_history;
+      let pruned_history: any[] = [];
+      if (args.history && args.history.length > 0) {
         if (args.history.length <= 4) {
           pruned_history = args.history;
         } else {
@@ -136,45 +139,83 @@ export const search = internalAction({
           const tail = args.history.slice(-3);
           pruned_history = [...head, ...tail];
         }
-
-        const history_summary = pruned_history
-          .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
-          .join("\n");
-
-        const prompt = `
-          Current Conversation:
-          ${history_summary}
-          
-          New User Message: ${args.query}
-          ${args.source ? `Target Source/URL: ${args.source}` : ""}
-          
-          Based on the following chat history ${args.source ? `and the target source provided (${args.source})` : ""}, rewrite the user's latest question into a descriptive standalone search query for a news search engine.
-          ${args.source ? "The user wants to specifically find information related to or from this source." : ""}
-          Standalone Query (One line only).
-        `;
-
-        const result = await model.generateContent(prompt);
-        const text = result.response.text().trim();
-
-        if (result.response.usageMetadata) {
-          console.log(
-            "[Brave] Query Refinement - Input:",
-            result.response.usageMetadata.promptTokenCount,
-            "Output:",
-            result.response.usageMetadata.candidatesTokenCount,
-          );
-        }
-
-        if (text) {
-          refined_query = text;
-          console.log("[Brave] Synthesized search query:", refined_query);
-        }
-      } catch (err) {
-        console.error("[Brave] Failed to refine query with Gemini:", err);
       }
+
+      const history_summary = pruned_history.length > 0
+        ? pruned_history
+            .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
+            .join("\n")
+        : "No history. This is the start of the conversation.";
+
+      const prompt = `
+        Current Conversation:
+        ${history_summary}
+        
+        New User Message: ${args.query}
+        ${args.source ? `Target Source/URL: ${args.source}` : ""}
+        
+        Analyze the user's request. You must output exactly two lines:
+        Line 1: A standalone, descriptive search query optimized for a news search engine.
+        Line 2: The classified freshness/time range of the query, which must be exactly one of: "day", "month", or "any_time".
+        
+        Freshness rules:
+        - Use "day" for queries asking for today's news, live/current scores, breaking events, things happening right now, or explicitly mentioning "today", "yesterday", "last 24 hours".
+        - Use "month" for queries asking about recent events, this month's updates, or queries where the most fresh/recent data from the last few weeks is highly preferred (e.g. injury updates, current status of an ongoing event).
+        - Use "any_time" for historical facts, general knowledge, or queries where time is not a major factor.
+        
+        Format the output EXACTLY like this:
+        QUERY: <refined query>
+        TIME_RANGE: <day | month | any_time>
+      `;
+
+      const result = await model.generateContent(prompt);
+      const text = result.response.text().trim();
+
+      if (result.response.usageMetadata) {
+        console.log(
+          "[Brave] Query Refinement - Input:",
+          result.response.usageMetadata.promptTokenCount,
+          "Output:",
+          result.response.usageMetadata.candidatesTokenCount,
+        );
+      }
+
+      if (text) {
+        const lines = text.split("\n");
+        let parsed_query = "";
+        for (const line of lines) {
+          if (line.toUpperCase().startsWith("QUERY:")) {
+            parsed_query = line.substring(6).trim();
+          } else if (line.toUpperCase().startsWith("TIME_RANGE:")) {
+            const tr = line.substring(11).trim().toLowerCase();
+            if (tr === "day" || tr === "month" || tr === "any_time") {
+              detected_time_range = tr as "day" | "month" | "any_time";
+            }
+          }
+        }
+        if (parsed_query) {
+          refined_query = parsed_query;
+        } else {
+          refined_query = text;
+        }
+        console.log(
+          `[Brave] Synthesized search query: "${refined_query}" | Detected timeRange: ${detected_time_range}`,
+        );
+      }
+    } catch (err) {
+      console.error("[Brave] Failed to refine query with Gemini:", err);
+    }
+
+    const final_time_range = args.timeRange ?? detected_time_range;
+    let freshness: string | undefined;
+    if (final_time_range === "day") {
+      freshness = "pd";
+    } else if (final_time_range === "month") {
+      freshness = "pm";
     }
 
     const results = await braveSearch(refined_query, {
+      freshness,
       maximum_number_of_urls: 3,
       maximum_number_of_snippets_per_url: 2,
       maximum_number_of_tokens_per_url: 400,
