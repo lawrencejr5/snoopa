@@ -32,7 +32,7 @@ export const search = internalAction({
       try {
         const genAI = new GoogleGenerativeAI(geminiKey);
         const model = genAI.getGenerativeModel({
-          model: "gemini-2.0-flash-lite",
+          model: "gemini-2.5-flash-lite",
         });
 
         let prunedForTavily;
