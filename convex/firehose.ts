@@ -537,7 +537,14 @@ async function _dispatchAlerts(
     const pushTokens = await ctx.runQuery(internal.users.get_push_tokens, {
       user_id: item.user_id,
     });
-    await sendExpoPush(pushTokens, pushTitle, brief);
+
+    let pushBody = brief;
+    const words = brief.split(/\s+/).filter(Boolean);
+    if (words.length > 15) {
+      pushBody = words.slice(0, 15).join(" ") + "...";
+    }
+
+    await sendExpoPush(pushTokens, pushTitle, pushBody);
   }
 
   return totalAlerts;
