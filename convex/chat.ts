@@ -482,14 +482,14 @@ async function _generateInitialBrief(
 
     let result;
     try {
-      const model = gen_ai.getGenerativeModel({ model: "gemini-2.0-flash" });
+      const model = gen_ai.getGenerativeModel({ model: "gemini-2.5-flash" });
       result = await model.generateContent(prompt);
     } catch (e) {
       console.warn(
         "Primary model failed, falling back to gemini-2.5-flash-lite",
       );
       const fallbackModel = gen_ai.getGenerativeModel({
-        model: "gemini-2.5-flash",
+        model: "gemini-2.5-flash-lite",
       });
       result = await fallbackModel.generateContent(prompt);
     }
@@ -958,7 +958,8 @@ async function _gatherIntel(
       watchlist_id: args.watchlist_id,
     });
     if (watchlist?.time_range) {
-      watchlist_time_range = watchlist.time_range === "any_time" ? "any_time" : "day";
+      watchlist_time_range =
+        watchlist.time_range === "any_time" ? "any_time" : "day";
     }
   }
 

@@ -35,7 +35,10 @@ async function braveSearch(
   if (options.count) params.set("count", String(options.count));
   if (options.freshness) params.set("freshness", options.freshness);
   if (options.maximum_number_of_urls) {
-    params.set("maximum_number_of_urls", String(options.maximum_number_of_urls));
+    params.set(
+      "maximum_number_of_urls",
+      String(options.maximum_number_of_urls),
+    );
   }
   if (options.maximum_number_of_snippets_per_url) {
     params.set(
@@ -75,7 +78,9 @@ async function braveSearch(
   const sources_map: Record<string, any> = raw?.sources ?? {};
 
   return generic.map((item: any) => {
-    const snippets: string[] = Array.isArray(item.snippets) ? item.snippets : [];
+    const snippets: string[] = Array.isArray(item.snippets)
+      ? item.snippets
+      : [];
     // Filter out JSON-LD blobs (start with '{') to keep content readable
     const readable = snippets
       .filter((s) => typeof s === "string" && !s.trimStart().startsWith("{"))
@@ -141,11 +146,12 @@ export const search = internalAction({
         }
       }
 
-      const history_summary = pruned_history.length > 0
-        ? pruned_history
-            .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
-            .join("\n")
-        : "No history. This is the start of the conversation.";
+      const history_summary =
+        pruned_history.length > 0
+          ? pruned_history
+              .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
+              .join("\n")
+          : "No history. This is the start of the conversation.";
 
       const prompt = `
         Current Conversation:
@@ -218,7 +224,7 @@ export const search = internalAction({
       freshness,
       maximum_number_of_urls: 3,
       maximum_number_of_snippets_per_url: 2,
-      maximum_number_of_tokens_per_url: 400,
+      maximum_number_of_tokens_per_url: 512,
     });
 
     const lean_news = results
@@ -257,7 +263,7 @@ export const firehose_search = internalAction({
         freshness,
         maximum_number_of_urls: 3,
         maximum_number_of_snippets_per_url: 3,
-        maximum_number_of_tokens_per_url: 300,
+        maximum_number_of_tokens_per_url: 512,
       });
       console.log(
         `[Brave] firehose_search [${args.timeRange}]: "${args.query}" → ${results.length} results`,
