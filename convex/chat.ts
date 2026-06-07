@@ -220,15 +220,10 @@ export const get_recent_snoop_briefs = internalQuery({
     const limit = args.limit ?? 3;
     const messages = await ctx.db
       .query("chats")
-      .withIndex("by_watchlist", (q) =>
-        q.eq("watchlist_id", args.watchlist_id),
-      )
+      .withIndex("by_watchlist", (q) => q.eq("watchlist_id", args.watchlist_id))
       .order("desc")
       .filter((q) =>
-        q.and(
-          q.eq(q.field("role"), "snoopa"),
-          q.eq(q.field("type"), "snoop"),
-        ),
+        q.and(q.eq(q.field("role"), "snoopa"), q.eq(q.field("type"), "snoop")),
       )
       .take(limit);
     return messages.map((m) => m.content);
@@ -328,10 +323,10 @@ async function _detectIntent(
       result = await model.generateContent(prompt);
     } catch (e) {
       console.warn(
-        "Primary model failed, falling back to gemini-2.5-flash-lite",
+        "Primary model failed, falling back to gemini-3.1-flash-lite",
       );
       const fallbackModel = gen_ai.getGenerativeModel({
-        model: "gemini-2.5-flash",
+        model: "gemini-3.1-flash-lite",
       });
       result = await fallbackModel.generateContent(prompt);
     }
@@ -385,7 +380,7 @@ async function _extractConditionFromMessage(
       result = await model.generateContent(prompt);
     } catch (e) {
       const fallback = gen_ai.getGenerativeModel({
-        model: "gemini-2.5-flash",
+        model: "gemini-3.1-flash-lite",
       });
       result = await fallback.generateContent(prompt);
     }
@@ -423,10 +418,10 @@ async function _determineSourceWeight(
       result = await model.generateContent(prompt);
     } catch (e) {
       console.warn(
-        "Primary model failed, falling back to gemini-2.5-flash-lite",
+        "Primary model failed, falling back to gemini-3.1-flash-lite",
       );
       const fallbackModel = gen_ai.getGenerativeModel({
-        model: "gemini-2.5-flash",
+        model: "gemini-3.1-flash-lite",
       });
       result = await fallbackModel.generateContent(prompt);
     }
@@ -471,9 +466,9 @@ async function _generateSourceBrief(
       });
       result = await model.generateContent(prompt);
     } catch (e) {
-      console.warn("Primary model failed, falling back to gemini-2.5-flash");
+      console.warn("Primary model failed, falling back to gemini-3.1-flash-lite");
       const fallbackModel = gen_ai.getGenerativeModel({
-        model: "gemini-2.5-flash",
+        model: "gemini-3.1-flash-lite",
       });
       result = await fallbackModel.generateContent(prompt);
     }
@@ -511,14 +506,14 @@ async function _generateInitialBrief(
 
     let result;
     try {
-      const model = gen_ai.getGenerativeModel({ model: "gemini-2.5-flash" });
+      const model = gen_ai.getGenerativeModel({
+        model: "gemini-2.5-flash-lite",
+      });
       result = await model.generateContent(prompt);
     } catch (e) {
-      console.warn(
-        "Primary model failed, falling back to gemini-2.5-flash-lite",
-      );
+      console.warn("Primary model failed, falling back to gemini-3.1-flash-lite");
       const fallbackModel = gen_ai.getGenerativeModel({
-        model: "gemini-2.5-flash-lite",
+        model: "gemini-3.1-flash-lite",
       });
       result = await fallbackModel.generateContent(prompt);
     }
@@ -696,10 +691,10 @@ async function _runAI(
     );
   }
 
-  // Fallback: Gemini 2.5 Flash
+  // Fallback: Gemini 3.1 Flash Lite
   try {
     const fallbackModel = gen_ai.getGenerativeModel({
-      model: "gemini-2.5-flash",
+      model: "gemini-3.1-flash-lite",
       systemInstruction: instructions,
     });
     const geminiHistory = messages.map((msg) => ({
@@ -713,7 +708,7 @@ async function _runAI(
       chat_session.sendMessage(userPrompt),
       timeout(20_000),
     ]);
-    console.log(`✅ Success (gemini-2.5-flash, fallback)`);
+    console.log(`✅ Success (gemini-3.1-flash-lite, fallback)`);
     return result.response.text();
   } catch (fallbackError: any) {
     console.error("All AI models failed or timed out:", fallbackError);
@@ -1307,10 +1302,10 @@ async function _parseAndCreateWatchlist(
       `⚠️ DeepSeek failed or timed out:`,
       error.message?.split(":")[0] || error.message || "Unknown error",
     );
-    // Fallback: Gemini 2.5 Flash
+    // Fallback: Gemini 3.1 Flash Lite
     try {
       const fallbackModel = gen_ai.getGenerativeModel({
-        model: "gemini-2.5-flash",
+        model: "gemini-3.1-flash-lite",
         systemInstruction: instructions,
       });
       const result: any = await Promise.race([
@@ -1318,7 +1313,7 @@ async function _parseAndCreateWatchlist(
         timeout(20_000),
       ]);
       response_text = result.response.text();
-      console.log(`✅ Success (gemini-2.5-flash, fallback)`);
+      console.log(`✅ Success (gemini-3.1-flash-lite, fallback)`);
     } catch (fallbackError: any) {
       console.error("All AI models failed or timed out:", fallbackError);
       throw new Error("Failed generating tracking intelligence.");

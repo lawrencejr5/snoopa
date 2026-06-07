@@ -66,8 +66,18 @@ async function verifyHeadlineWithGemini(
     const text = result.response.text().trim().toLowerCase();
     return text === "true";
   } catch (err) {
-    console.error("Gemini verification error:", err);
-    return false;
+    console.warn("Primary verification model failed, falling back to gemini-3.1-flash-lite");
+    try {
+      const fallbackModel = genAI.getGenerativeModel({
+        model: "gemini-3.1-flash-lite",
+      });
+      const result = await fallbackModel.generateContent(prompt);
+      const text = result.response.text().trim().toLowerCase();
+      return text === "true";
+    } catch (fallbackErr) {
+      console.error("Gemini verification error:", fallbackErr);
+      return false;
+    }
   }
 }
 
@@ -90,8 +100,18 @@ async function verifySourceWithGemini(
     const text = result.response.text().trim().toLowerCase();
     return text === "true";
   } catch (err) {
-    console.error("Gemini source verification error:", err);
-    return false;
+    console.warn("Primary source verification model failed, falling back to gemini-3.1-flash-lite");
+    try {
+      const fallbackModel = genAI.getGenerativeModel({
+        model: "gemini-3.1-flash-lite",
+      });
+      const result = await fallbackModel.generateContent(prompt);
+      const text = result.response.text().trim().toLowerCase();
+      return text === "true";
+    } catch (fallbackErr) {
+      console.error("Gemini source verification error:", fallbackErr);
+      return false;
+    }
   }
 }
 
@@ -142,10 +162,10 @@ Return ONLY the brief or ${NO_NEW_INFO_SENTINEL}. No quotes, no markdown.`;
     const result = await model.generateContent(prompt);
     return result.response.text().trim();
   } catch (err) {
-    console.warn("Primary model failed, falling back to gemini-2.5-flash");
+    console.warn("Primary model failed, falling back to gemini-3.1-flash-lite");
     try {
       const fallbackModel = genAI.getGenerativeModel({
-        model: "gemini-2.5-flash",
+        model: "gemini-3.1-flash-lite",
       });
       const result = await fallbackModel.generateContent(prompt);
       return result.response.text().trim();
