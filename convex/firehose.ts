@@ -107,14 +107,16 @@ interface VerifiedHeadline {
   hash: string;
 }
 
+const NO_NEW_INFO_SENTINEL = "NO_NEW_INFO";
+
 async function generateBrief(
   watchlistTitle: string,
   condition: string,
   headlines: VerifiedHeadline[],
   geminiKey: string,
+  recentBriefs: string[] = [],
 ): Promise<string> {
   const genAI = new GoogleGenerativeAI(geminiKey);
-  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
 
   const headlineList = headlines
     .map(
@@ -122,19 +124,25 @@ async function generateBrief(
     )
     .join("\n");
 
-  const prompt = `You are Snoopa, a sharp AI intelligence agent. Given these verified news headlines about "${watchlistTitle}" (tracking condition: "${condition}"), write a 1-2 sentence casual briefing that captures the key takeaway.
-    Sound natural, like you're briefing a friend. Be a bit detailed if you need to be.
-    Headlines:
-    ${headlineList}
+  const priorKnowledgeSection =
+    recentBriefs.length > 0
+      ? `IMPORTANT — What the user already knows (do NOT repeat this):\n${recentBriefs.map((b) => `- "${b}"`).join("\n")}\n\n`
+      : "";
 
-    Return ONLY the brief, no quotes, no markdown.`;
+  const prompt = `You are Snoopa, a sharp AI intelligence agent.
+${priorKnowledgeSection}Given these NEW verified headlines about "${watchlistTitle}" (tracking condition: "${condition}"):
+${headlineList}
+
+If ALL of the above is already covered by what the user already knows, reply with exactly: ${NO_NEW_INFO_SENTINEL}
+Otherwise, write a 1-2 sentence casual briefing covering ONLY what is genuinely new. Sound natural, like you're briefing a friend.
+Return ONLY the brief or ${NO_NEW_INFO_SENTINEL}. No quotes, no markdown.`;
 
   try {
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
     const result = await model.generateContent(prompt);
     return result.response.text().trim();
   } catch (err) {
-    console.warn("Primary model failed, falling back to gemini-2.5-flash-lite");
+    console.warn("Primary model failed, falling back to gemini-2.5-flash");
     try {
       const fallbackModel = genAI.getGenerativeModel({
         model: "gemini-2.5-flash",
@@ -493,12 +501,26 @@ async function _dispatchAlerts(
   let totalAlerts = 0;
 
   for (const [, { item, headlines }] of verifiedByItem) {
+    // Fetch the last 3 snoop briefs sent to the user for this item
+    const recent_briefs: string[] = await ctx.runQuery(
+      internal.chat.get_recent_snoop_briefs,
+      { watchlist_id: item._id, limit: 3 },
+    );
+
     const brief = await generateBrief(
       item.title,
       item.condition,
       headlines,
       geminiKey,
+      recent_briefs,
     );
+
+    // If everything in the new headlines is already known — skip dispatch
+    if (brief === NO_NEW_INFO_SENTINEL) {
+      console.log(`Firehose: "${item.title}" — no new info, skipping dispatch.`);
+      continue;
+    }
+
     console.log(`Firehose: brief for "${item.title}" → "${brief}"`);
 
     // 1. Save chat message

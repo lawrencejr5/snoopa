@@ -207,6 +207,35 @@ export const get_session_sources = query({
 });
 
 /**
+ * Internal query — fetches the last N "snoop" briefs for a watchlist item.
+ * Used by the firehose to give the AI prior-knowledge context before generating
+ * a new brief, preventing it from repeating information the user already has.
+ */
+export const get_recent_snoop_briefs = internalQuery({
+  args: {
+    watchlist_id: v.id("watchlist"),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const limit = args.limit ?? 3;
+    const messages = await ctx.db
+      .query("chats")
+      .withIndex("by_watchlist", (q) =>
+        q.eq("watchlist_id", args.watchlist_id),
+      )
+      .order("desc")
+      .filter((q) =>
+        q.and(
+          q.eq(q.field("role"), "snoopa"),
+          q.eq(q.field("type"), "snoop"),
+        ),
+      )
+      .take(limit);
+    return messages.map((m) => m.content);
+  },
+});
+
+/**
  * Batch insert sources map to a single chat identity.
  */
 export const batch_insert_sources = internalMutation({
