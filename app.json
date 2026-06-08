@@ -21,7 +21,10 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.lawrencejr.snoopa",
-      "buildNumber": "1"
+      "buildNumber": "1",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -48,7 +51,9 @@
         {
           "icon": "./assets/images/notification-icon.png",
           "color": "#EBEBDF",
-          "sounds": ["./assets/sounds/dog_bark_single.wav"]
+          "sounds": [
+            "./assets/sounds/dog_bark_single.wav"
+          ]
         }
       ],
       "expo-updates"
