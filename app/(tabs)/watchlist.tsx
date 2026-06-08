@@ -7,9 +7,15 @@ import { useTheme } from "@/context/ThemeContext";
 import { useUser } from "@/context/UserContext";
 import { api } from "@/convex/_generated/api";
 import { useIsFocused, useNavigation } from "@react-navigation/native";
-import { useConvexAuth, useQuery } from "convex/react";
+import { useConvexAuth, useQuery, useMutation } from "convex/react";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
+import { useCustomAlert } from "@/context/CustomAlertContext";
+import {
+  CommandsModal,
+  ConfirmationModal,
+  RenameModal,
+} from "@/components/WatchlistOptionsModal";
 import {
   Image,
   Pressable,
@@ -90,10 +96,12 @@ type WatchlistItem = {
 function ActiveSnoopCard({
   item,
   router,
+  onLongPress,
 }: {
   item: WatchlistItem;
   theme: string;
   router: ReturnType<typeof useRouter>;
+  onLongPress?: () => void;
 }) {
   const newCount =
     useQuery(api.log.get_new_logs_count, {
@@ -115,6 +123,8 @@ function ActiveSnoopCard({
           params: { id: item._id },
         })
       }
+      onLongPress={onLongPress}
+      delayLongPress={300}
       style={[
         styles.card,
         {
@@ -219,6 +229,84 @@ export default function WatchlistScreen() {
   const navigation = useNavigation();
   const [animationKey, setAnimationKey] = useState(0);
   const [showAddModal, setShowAddModal] = useState(false);
+
+  // Options Modal State
+  const [selectedSnoop, setSelectedSnoop] = useState<{
+    _id: import("@/convex/_generated/dataModel").Id<"watchlist">;
+    title: string;
+    status: "active" | "completed" | "inactive";
+  } | null>(null);
+  const [showCommands, setShowCommands] = useState(false);
+  const [showRename, setShowRename] = useState(false);
+  const [showConfirmation, setShowConfirmation] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  // Alert and Mutations
+  const { showCustomAlert } = useCustomAlert();
+  const deactivateWatchlist = useMutation(api.watchlist.deactivate_watchlist);
+  const reactivateWatchlist = useMutation(api.watchlist.reactivate_watchlist);
+  const updateWatchlist = useMutation(api.watchlist.update_watchlist_item);
+  const deleteWatchlist = useMutation(api.watchlist.delete_watchlist_item);
+
+  // Action Handlers
+  const handleLongPress = (item: any) => {
+    setSelectedSnoop(item);
+    setShowCommands(true);
+  };
+
+  const handlePauseResume = async () => {
+    if (!selectedSnoop) return;
+    const is_paused = selectedSnoop.status === "inactive";
+    setIsProcessing(true);
+    try {
+      if (is_paused) {
+        await reactivateWatchlist({ watchlist_id: selectedSnoop._id });
+        showCustomAlert("Watchlist tracking resumed", "success");
+      } else {
+        await deactivateWatchlist({ watchlist_id: selectedSnoop._id });
+        showCustomAlert("Watchlist tracking paused", "success");
+      }
+      setShowCommands(false);
+    } catch (e) {
+      console.error(e);
+      showCustomAlert("Failed to update tracking status", "danger");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleRename = async (newTitle: string) => {
+    if (!selectedSnoop || !newTitle.trim()) return;
+    setIsProcessing(true);
+    try {
+      await updateWatchlist({
+        watchlist_id: selectedSnoop._id,
+        title: newTitle.trim(),
+      });
+      showCustomAlert("Watchlist renamed successfully", "success");
+      setShowRename(false);
+    } catch (e) {
+      console.error(e);
+      showCustomAlert("Failed to rename watchlist", "danger");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!selectedSnoop) return;
+    setIsProcessing(true);
+    try {
+      await deleteWatchlist({ watchlist_id: selectedSnoop._id });
+      showCustomAlert("Watchlist deleted successfully", "success");
+      setShowConfirmation(false);
+    } catch (e) {
+      console.error(e);
+      showCustomAlert("Failed to delete watchlist", "danger");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   useEffect(() => {
     const unsubscribe = navigation.addListener("tabPress" as any, (e: any) => {
@@ -437,6 +525,7 @@ export default function WatchlistScreen() {
                     item={item as WatchlistItem}
                     theme={theme}
                     router={router}
+                    onLongPress={() => handleLongPress(item)}
                   />
                 ))}
               </Animated.View>
@@ -463,6 +552,8 @@ export default function WatchlistScreen() {
                         params: { id: item._id },
                       })
                     }
+                    onLongPress={() => handleLongPress(item)}
+                    delayLongPress={300}
                     style={[
                       styles.card,
                       {
@@ -535,6 +626,44 @@ export default function WatchlistScreen() {
         visible={showAddModal}
         onClose={() => setShowAddModal(false)}
       />
+
+      {selectedSnoop && (
+        <>
+          <CommandsModal
+            visible={showCommands}
+            onClose={() => setShowCommands(false)}
+            snoop={{ status: selectedSnoop.status, title: selectedSnoop.title }}
+            onTerminate={() => {
+              setShowCommands(false);
+              setTimeout(() => setShowConfirmation(true), 300);
+            }}
+            onPauseResume={handlePauseResume}
+            onRename={() => {
+              setShowCommands(false);
+              setTimeout(() => setShowRename(true), 300);
+            }}
+            isProcessing={isProcessing}
+            hideSourceAndCondition={true}
+          />
+
+          <RenameModal
+            visible={showRename}
+            onClose={() => setShowRename(false)}
+            currentTitle={selectedSnoop.title}
+            onSave={handleRename}
+            isProcessing={isProcessing}
+          />
+
+          <ConfirmationModal
+            visible={showConfirmation}
+            onClose={() => setShowConfirmation(false)}
+            onConfirm={handleConfirmDelete}
+            title="Delete Watchlist?"
+            message={`Are you sure you want to delete "${selectedSnoop.title}"? This will permanently remove all logs, chat history, and sources associated with this snoop.`}
+            isProcessing={isProcessing}
+          />
+        </>
+      )}
     </Container>
   );
 }
