@@ -207,6 +207,30 @@ export const get_session_sources = query({
 });
 
 /**
+ * Internal query — fetches the last N "snoop" briefs for a watchlist item.
+ * Used by the firehose to give the AI prior-knowledge context before generating
+ * a new brief, preventing it from repeating information the user already has.
+ */
+export const get_recent_snoop_briefs = internalQuery({
+  args: {
+    watchlist_id: v.id("watchlist"),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const limit = args.limit ?? 3;
+    const messages = await ctx.db
+      .query("chats")
+      .withIndex("by_watchlist", (q) => q.eq("watchlist_id", args.watchlist_id))
+      .order("desc")
+      .filter((q) =>
+        q.and(q.eq(q.field("role"), "snoopa"), q.eq(q.field("type"), "snoop")),
+      )
+      .take(limit);
+    return messages.map((m) => m.content);
+  },
+});
+
+/**
  * Batch insert sources map to a single chat identity.
  */
 export const batch_insert_sources = internalMutation({
@@ -294,15 +318,15 @@ async function _detectIntent(
     let result;
     try {
       const model = gen_ai.getGenerativeModel({
-        model: "gemini-2.0-flash-lite",
+        model: "gemini-2.5-flash-lite",
       });
       result = await model.generateContent(prompt);
     } catch (e) {
       console.warn(
-        "Primary model failed, falling back to gemini-2.5-flash-lite",
+        "Primary model failed, falling back to gemini-3.1-flash-lite",
       );
       const fallbackModel = gen_ai.getGenerativeModel({
-        model: "gemini-2.5-flash-lite",
+        model: "gemini-3.1-flash-lite",
       });
       result = await fallbackModel.generateContent(prompt);
     }
@@ -351,12 +375,12 @@ async function _extractConditionFromMessage(
     let result;
     try {
       const model = gen_ai.getGenerativeModel({
-        model: "gemini-2.0-flash-lite",
+        model: "gemini-2.5-flash-lite",
       });
       result = await model.generateContent(prompt);
     } catch (e) {
       const fallback = gen_ai.getGenerativeModel({
-        model: "gemini-2.5-flash-lite",
+        model: "gemini-3.1-flash-lite",
       });
       result = await fallback.generateContent(prompt);
     }
@@ -389,15 +413,15 @@ async function _determineSourceWeight(
     let result;
     try {
       const model = gen_ai.getGenerativeModel({
-        model: "gemini-2.0-flash-lite",
+        model: "gemini-2.5-flash-lite",
       });
       result = await model.generateContent(prompt);
     } catch (e) {
       console.warn(
-        "Primary model failed, falling back to gemini-2.5-flash-lite",
+        "Primary model failed, falling back to gemini-3.1-flash-lite",
       );
       const fallbackModel = gen_ai.getGenerativeModel({
-        model: "gemini-2.5-flash-lite",
+        model: "gemini-3.1-flash-lite",
       });
       result = await fallbackModel.generateContent(prompt);
     }
@@ -437,14 +461,14 @@ async function _generateSourceBrief(
 
     let result;
     try {
-      const model = gen_ai.getGenerativeModel({ model: "gemini-2.0-flash" });
+      const model = gen_ai.getGenerativeModel({
+        model: "gemini-2.5-flash-lite",
+      });
       result = await model.generateContent(prompt);
     } catch (e) {
-      console.warn(
-        "Primary model failed, falling back to gemini-2.5-flash-lite",
-      );
+      console.warn("Primary model failed, falling back to gemini-3.1-flash-lite");
       const fallbackModel = gen_ai.getGenerativeModel({
-        model: "gemini-2.5-flash-lite",
+        model: "gemini-3.1-flash-lite",
       });
       result = await fallbackModel.generateContent(prompt);
     }
@@ -482,14 +506,14 @@ async function _generateInitialBrief(
 
     let result;
     try {
-      const model = gen_ai.getGenerativeModel({ model: "gemini-2.0-flash" });
+      const model = gen_ai.getGenerativeModel({
+        model: "gemini-2.5-flash-lite",
+      });
       result = await model.generateContent(prompt);
     } catch (e) {
-      console.warn(
-        "Primary model failed, falling back to gemini-2.5-flash-lite",
-      );
+      console.warn("Primary model failed, falling back to gemini-3.1-flash-lite");
       const fallbackModel = gen_ai.getGenerativeModel({
-        model: "gemini-2.5-flash-lite",
+        model: "gemini-3.1-flash-lite",
       });
       result = await fallbackModel.generateContent(prompt);
     }
@@ -570,10 +594,7 @@ function _initAIClients() {
 }
 
 /** Builds the system instruction string based on intent and user profile. */
-function _buildSystemPrompt(
-  intent: Intent,
-  user: any,
-): string {
+function _buildSystemPrompt(intent: Intent, user: any): string {
   const fullname = user?.fullname || "User";
   const username = user?.username || "My friend";
   const userMemory =
@@ -670,10 +691,10 @@ async function _runAI(
     );
   }
 
-  // Fallback: Gemini 2.5 Flash
+  // Fallback: Gemini 3.1 Flash Lite
   try {
     const fallbackModel = gen_ai.getGenerativeModel({
-      model: "gemini-2.5-flash",
+      model: "gemini-3.1-flash-lite",
       systemInstruction: instructions,
     });
     const geminiHistory = messages.map((msg) => ({
@@ -687,7 +708,7 @@ async function _runAI(
       chat_session.sendMessage(userPrompt),
       timeout(20_000),
     ]);
-    console.log(`✅ Success (gemini-2.5-flash, fallback)`);
+    console.log(`✅ Success (gemini-3.1-flash-lite, fallback)`);
     return result.response.text();
   } catch (fallbackError: any) {
     console.error("All AI models failed or timed out:", fallbackError);
@@ -880,7 +901,14 @@ async function _handleSource(
     });
     const hostname = new URL(url).hostname;
     await ctx.runMutation(internal.chat.batch_insert_sources, {
-      entries: [{ watchlist_id: args.watchlist_id, chat_id: chatMsgId, title: hostname, url }],
+      entries: [
+        {
+          watchlist_id: args.watchlist_id,
+          chat_id: chatMsgId,
+          title: hostname,
+          url,
+        },
+      ],
     });
     return { response: response_text };
   }
@@ -900,7 +928,10 @@ async function _gatherIntel(
   ctx: any,
   args: { watchlist_id?: any; content: string },
   mappedHistory: { role: string; content: string }[],
-): Promise<{ leanNews: string; capturedSources: { title: string; url: string }[] }> {
+): Promise<{
+  leanNews: string;
+  capturedSources: { title: string; url: string }[];
+}> {
   let sourceUrl: string | undefined;
   let sourceWeight: "primary" | "secondary" | undefined;
   let monitoredSourceId: any;
@@ -927,13 +958,62 @@ async function _gatherIntel(
     const new_hash = await hashString(raw);
     await ctx.runMutation(
       internal.monitored_sources.update_monitored_source_hash,
-      { monitored_source_id: monitoredSourceId, last_snapshot: raw, last_hash: new_hash },
+      {
+        monitored_source_id: monitoredSourceId,
+        last_snapshot: raw,
+        last_hash: new_hash,
+      },
     );
     return raw.substring(0, 25000);
   };
 
   const getHostname = (url: string, fallback = "Source") => {
-    try { return new URL(url).hostname; } catch { return fallback; }
+    try {
+      return new URL(url).hostname;
+    } catch {
+      return fallback;
+    }
+  };
+
+  // Resolve watchlist preferred timeRange if watchlist_id is provided
+  let watchlist_time_range: "day" | "month" | "any_time" | undefined;
+  if (args.watchlist_id) {
+    const watchlist = await ctx.runQuery(api.watchlist.get_watchlist_item, {
+      watchlist_id: args.watchlist_id,
+    });
+    if (watchlist?.time_range) {
+      watchlist_time_range =
+        watchlist.time_range === "any_time" ? "any_time" : "day";
+    }
+  }
+
+  // Brave-first web search with Tavily as fallback
+  const webSearch = async (timeRange?: "day" | "month" | "any_time") => {
+    try {
+      const braveResult = await ctx.runAction(internal.brave.search, {
+        query: args.content,
+        history: mappedHistory,
+        timeRange,
+      });
+      if (braveResult.leanNews && braveResult.sources.length > 0) {
+        console.log("[Chat] Web search served by Brave.");
+        return braveResult as {
+          leanNews: string;
+          sources: { title: string; url: string }[];
+        };
+      }
+    } catch (err) {
+      console.warn("[Chat] Brave search failed, falling back to Tavily:", err);
+    }
+    console.log("[Chat] Web search falling back to Tavily.");
+    return ctx.runAction(internal.tavily.search, {
+      query: args.content,
+      history: mappedHistory,
+      timeRange,
+    }) as Promise<{
+      leanNews: string;
+      sources: { title: string; url: string }[];
+    }>;
   };
 
   if (sourceUrl && sourceWeight === "primary") {
@@ -942,25 +1022,24 @@ async function _gatherIntel(
     if (scraped) {
       return {
         leanNews: `PRIMARY SOURCE CONTENT (DIRECT SCRAPE):\nURL: ${sourceUrl}\n\n${scraped}`,
-        capturedSources: [{ title: getHostname(sourceUrl, "Primary Source"), url: sourceUrl }],
+        capturedSources: [
+          { title: getHostname(sourceUrl, "Primary Source"), url: sourceUrl },
+        ],
       };
     }
     // Extraction failed — fall back to web search
-    const searchResult = await ctx.runAction(internal.tavily.search, {
-      query: args.content,
-      history: mappedHistory,
-    });
-    return { leanNews: searchResult.leanNews, capturedSources: searchResult.sources };
+    const searchResult = await webSearch(watchlist_time_range);
+    return {
+      leanNews: searchResult.leanNews,
+      capturedSources: searchResult.sources,
+    };
   }
 
   if (sourceUrl && sourceWeight === "secondary") {
     // Secondary: scrape + general search in parallel, then merge
     const [scraped, searchResult] = await Promise.all([
       scrapeAndUpdate(sourceUrl),
-      ctx.runAction(internal.tavily.search, {
-        query: args.content,
-        history: mappedHistory,
-      }),
+      webSearch(watchlist_time_range),
     ]);
     const scrapedSection = scraped
       ? `SECONDARY SOURCE CONTENT (DIRECT SCRAPE):\nURL: ${sourceUrl}\n\n${scraped}\n\n---\n\n`
@@ -975,11 +1054,11 @@ async function _gatherIntel(
   }
 
   // No source — standard web search
-  const searchResult = await ctx.runAction(internal.tavily.search, {
-    query: args.content,
-    history: mappedHistory,
-  });
-  return { leanNews: searchResult.leanNews, capturedSources: searchResult.sources };
+  const searchResult = await webSearch(watchlist_time_range);
+  return {
+    leanNews: searchResult.leanNews,
+    capturedSources: searchResult.sources,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -1018,23 +1097,31 @@ export const send_message = action({
       content: args.content,
       type: "chat",
     });
-    const messages = _trimHistory([...raw_messages, { role: "user", content: args.content }]);
-    const mappedHistory = messages.map((m) => ({ role: m.role, content: m.content }));
+    const messages = _trimHistory([
+      ...raw_messages,
+      { role: "user", content: args.content },
+    ]);
+    const mappedHistory = messages.map((m) => ({
+      role: m.role,
+      content: m.content,
+    }));
 
     // 2. Resolve intent
     const intent: Intent =
       args.intent ??
       (await _detectIntent(
         args.content,
-        mappedHistory.map((m) => `${m.role.toUpperCase()}: ${m.content}`).join("\n"),
+        mappedHistory
+          .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
+          .join("\n"),
       ));
     console.log(`🔍 Intent${args.intent ? " (pre-detected)" : ""}: ${intent}`);
 
     // 3. Early-exit intents (no AI generation needed)
-    if (intent === "PAUSE")           return _handlePause(ctx, args.watchlist_id);
-    if (intent === "RESUME")          return _handleResume(ctx, args.watchlist_id);
-    if (intent === "EDIT_CONDITION")  return _handleEditCondition(ctx, args);
-    if (intent === "SOURCE")          return _handleSource(ctx, args);
+    if (intent === "PAUSE") return _handlePause(ctx, args.watchlist_id);
+    if (intent === "RESUME") return _handleResume(ctx, args.watchlist_id);
+    if (intent === "EDIT_CONDITION") return _handleEditCondition(ctx, args);
+    if (intent === "SOURCE") return _handleSource(ctx, args);
 
     // 4. Gather intel for SEARCH intent
     const { leanNews, capturedSources } =
@@ -1055,11 +1142,22 @@ export const send_message = action({
       intent === "SEARCH"
         ? `SEARCH RESULTS: ${leanNews}\n\nUSER QUESTION: ${args.content}`
         : args.content;
-    const openaiMessages = _buildOpenAIMessages(instructions, messages, userPrompt);
+    const openaiMessages = _buildOpenAIMessages(
+      instructions,
+      messages,
+      userPrompt,
+    );
 
     let response_text: string;
     try {
-      response_text = await _runAI(openaiMessages, gen_ai, openai, messages, userPrompt, instructions);
+      response_text = await _runAI(
+        openaiMessages,
+        gen_ai,
+        openai,
+        messages,
+        userPrompt,
+        instructions,
+      );
     } catch {
       const error_message = "Sorry, I'm having trouble responding to you";
       await ctx.runMutation(internal.chat.save_message, {
@@ -1093,8 +1191,6 @@ export const send_message = action({
   },
 });
 
-
-
 export const get_messages_internal = internalQuery({
   args: { watchlist_id: v.id("watchlist"), user_id: v.id("users") },
   handler: async (ctx, args) => {
@@ -1119,8 +1215,12 @@ export const get_messages_internal_session = internalQuery({
 // ===========================================================================
 
 /** Builds the system instruction string for the watchlist-creation AI call. */
-async function _buildWatchlistPrompt(ctx: any): Promise<{ instructions: string }> {
-  const recentTopics = await ctx.runQuery(api.watchlist.get_recent_canonical_topics);
+async function _buildWatchlistPrompt(
+  ctx: any,
+): Promise<{ instructions: string }> {
+  const recentTopics = await ctx.runQuery(
+    api.watchlist.get_recent_canonical_topics,
+  );
 
   const topicsContext =
     recentTopics.length > 0
@@ -1202,10 +1302,10 @@ async function _parseAndCreateWatchlist(
       `⚠️ DeepSeek failed or timed out:`,
       error.message?.split(":")[0] || error.message || "Unknown error",
     );
-    // Fallback: Gemini 2.5 Flash
+    // Fallback: Gemini 3.1 Flash Lite
     try {
       const fallbackModel = gen_ai.getGenerativeModel({
-        model: "gemini-2.5-flash",
+        model: "gemini-3.1-flash-lite",
         systemInstruction: instructions,
       });
       const result: any = await Promise.race([
@@ -1213,7 +1313,7 @@ async function _parseAndCreateWatchlist(
         timeout(20_000),
       ]);
       response_text = result.response.text();
-      console.log(`✅ Success (gemini-2.5-flash, fallback)`);
+      console.log(`✅ Success (gemini-3.1-flash-lite, fallback)`);
     } catch (fallbackError: any) {
       console.error("All AI models failed or timed out:", fallbackError);
       throw new Error("Failed generating tracking intelligence.");
@@ -1223,10 +1323,13 @@ async function _parseAndCreateWatchlist(
   // Parse the WATCHLIST_DATA separator (described as WATCHLIST-DATA-SEPARATOR in the prompt)
   const DELIMITER = "---WATCHLIST-DATA-SEPARATOR---";
   const delimiterIndex = response_text.indexOf(DELIMITER);
-  if (delimiterIndex === -1) throw new Error("Could not map WATCHLIST_DATA dynamically.");
+  if (delimiterIndex === -1)
+    throw new Error("Could not map WATCHLIST_DATA dynamically.");
 
   const final_snoop_text = response_text.substring(0, delimiterIndex).trim();
-  const jsonBody = response_text.substring(delimiterIndex + DELIMITER.length).trim();
+  const jsonBody = response_text
+    .substring(delimiterIndex + DELIMITER.length)
+    .trim();
   const payload = JSON.parse(jsonBody);
 
   // Create the watchlist record
@@ -1277,49 +1380,69 @@ async function _attachInitialIntel(
     url = cleanUrl(url);
 
     try {
-      const extractResult = await ctx.runAction(internal.tavily.extract_source, { url });
+      const extractResult = await ctx.runAction(
+        internal.tavily.extract_source,
+        { url },
+      );
       if (extractResult.success) {
         const snapshot = extractResult.content as string;
         const last_hash = await hashString(snapshot);
-        const source_weight = await _determineSourceWeight(prompt, payload.condition);
+        const source_weight = await _determineSourceWeight(
+          prompt,
+          payload.condition,
+        );
 
-        await ctx.runMutation(internal.monitored_sources.save_monitored_source_and_link, {
-          url,
-          last_snapshot: snapshot,
-          last_hash,
-          watchlist_id: wl_id,
-          source_weight,
-          status: "success",
-        });
+        await ctx.runMutation(
+          internal.monitored_sources.save_monitored_source_and_link,
+          {
+            url,
+            last_snapshot: snapshot,
+            last_hash,
+            watchlist_id: wl_id,
+            source_weight,
+            status: "success",
+          },
+        );
 
         const brief = await _generateSourceBrief(snapshot, payload.condition);
         sourceInfoText = `\n\n${brief}`;
       } else {
         extractionFailed = true;
-        await ctx.runMutation(internal.monitored_sources.save_monitored_source_and_link, {
-          url,
-          watchlist_id: wl_id,
-          status: "failure",
-        });
+        await ctx.runMutation(
+          internal.monitored_sources.save_monitored_source_and_link,
+          {
+            url,
+            watchlist_id: wl_id,
+            status: "failure",
+          },
+        );
         sourceInfoText = `I noticed you provided a link (${url}), but I couldn't extract any trackable content from it. Please double-check the URL or try a different source later if you want me to monitor it.`;
       }
     } catch (err) {
       console.error("Failed to extract source during initialization:", err);
       extractionFailed = true;
-      await ctx.runMutation(internal.monitored_sources.save_monitored_source_and_link, {
-        url,
-        watchlist_id: wl_id,
-        status: "failure",
-      });
+      await ctx.runMutation(
+        internal.monitored_sources.save_monitored_source_and_link,
+        {
+          url,
+          watchlist_id: wl_id,
+          status: "failure",
+        },
+      );
       sourceInfoText = `I encountered an issue trying to process the link you provided (${url}). You might want to try adding it again once we're inside the snoop dashboard.`;
     }
   } else {
     // No URL — do a quick intel search
     try {
       const searchQuery = payload.canonical_topic || payload.title || prompt;
-      const searchResult = await ctx.runAction(internal.tavily.search, { query: searchQuery });
+      const searchResult = await ctx.runAction(internal.tavily.search, {
+        query: searchQuery,
+      });
       if (searchResult?.leanNews) {
-        const brief = await _generateInitialBrief(searchResult.leanNews, payload.condition);
+        const brief = await _generateInitialBrief(
+          searchResult.leanNews,
+          payload.condition,
+        );
         if (brief) {
           sourceInfoText = `\n\n${brief}`;
           tavilySources = searchResult.sources || [];
@@ -1334,7 +1457,9 @@ async function _attachInitialIntel(
   const resultMsgId = await ctx.runMutation(internal.chat.save_message, {
     watchlist_id: wl_id,
     role: "snoopa",
-    content: extractionFailed ? sourceInfoText : final_snoop_text + sourceInfoText,
+    content: extractionFailed
+      ? sourceInfoText
+      : final_snoop_text + sourceInfoText,
     type: "watchlist",
   });
 
@@ -1344,13 +1469,17 @@ async function _attachInitialIntel(
     if (!url.startsWith("http")) url = `https://${url}`;
     const hostname = new URL(url).hostname;
     await ctx.runMutation(internal.chat.batch_insert_sources, {
-      entries: [{ watchlist_id: wl_id, chat_id: resultMsgId, title: hostname, url }],
+      entries: [
+        { watchlist_id: wl_id, chat_id: resultMsgId, title: hostname, url },
+      ],
     });
   } else if (tavilySources.length > 0) {
     await ctx.runMutation(internal.chat.batch_insert_sources, {
       entries: tavilySources.map((s) => {
         let hostname = s.title || "Tavily Source";
-        try { hostname = new URL(s.url).hostname || hostname; } catch {}
+        try {
+          hostname = new URL(s.url).hostname || hostname;
+        } catch {}
         return {
           watchlist_id: wl_id as Id<"watchlist">,
           chat_id: resultMsgId,
@@ -1384,14 +1513,17 @@ export const initialize_watchlist = action({
       const { instructions } = await _buildWatchlistPrompt(ctx);
 
       // 2. Call AI, parse response, create watchlist record + save user message
-      const { wl_id, final_snoop_text, payload } = await _parseAndCreateWatchlist(
-        ctx,
-        args.prompt,
-        instructions,
-      );
+      const { wl_id, final_snoop_text, payload } =
+        await _parseAndCreateWatchlist(ctx, args.prompt, instructions);
 
       // 3. Attach initial intel (source scrape or search brief) + snoopa message
-      await _attachInitialIntel(ctx, args.prompt, wl_id, final_snoop_text, payload);
+      await _attachInitialIntel(
+        ctx,
+        args.prompt,
+        wl_id,
+        final_snoop_text,
+        payload,
+      );
 
       return { watchlist_id: wl_id };
     } catch (err) {
@@ -1400,4 +1532,3 @@ export const initialize_watchlist = action({
     }
   },
 });
-

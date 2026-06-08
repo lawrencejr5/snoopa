@@ -1,7 +1,6 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
-import { Id } from "./_generated/dataModel";
 import { action, internalAction, internalQuery } from "./_generated/server";
 import { sendExpoPush } from "./notifications";
 import { hashString } from "./utils";
@@ -31,10 +30,10 @@ function headlineMatchesKeywords(
 }
 
 // ---------------------------------------------------------------------------
-// Tavily fetch
+// Search result shape (provider-agnostic)
 // ---------------------------------------------------------------------------
 
-interface TavilySearchResult {
+interface SearchResult {
   title: string;
   url: string;
   content: string;
@@ -67,8 +66,18 @@ async function verifyHeadlineWithGemini(
     const text = result.response.text().trim().toLowerCase();
     return text === "true";
   } catch (err) {
-    console.error("Gemini verification error:", err);
-    return false;
+    console.warn("Primary verification model failed, falling back to gemini-3.1-flash-lite");
+    try {
+      const fallbackModel = genAI.getGenerativeModel({
+        model: "gemini-3.1-flash-lite",
+      });
+      const result = await fallbackModel.generateContent(prompt);
+      const text = result.response.text().trim().toLowerCase();
+      return text === "true";
+    } catch (fallbackErr) {
+      console.error("Gemini verification error:", fallbackErr);
+      return false;
+    }
   }
 }
 
@@ -91,8 +100,18 @@ async function verifySourceWithGemini(
     const text = result.response.text().trim().toLowerCase();
     return text === "true";
   } catch (err) {
-    console.error("Gemini source verification error:", err);
-    return false;
+    console.warn("Primary source verification model failed, falling back to gemini-3.1-flash-lite");
+    try {
+      const fallbackModel = genAI.getGenerativeModel({
+        model: "gemini-3.1-flash-lite",
+      });
+      const result = await fallbackModel.generateContent(prompt);
+      const text = result.response.text().trim().toLowerCase();
+      return text === "true";
+    } catch (fallbackErr) {
+      console.error("Gemini source verification error:", fallbackErr);
+      return false;
+    }
   }
 }
 
@@ -108,14 +127,16 @@ interface VerifiedHeadline {
   hash: string;
 }
 
+const NO_NEW_INFO_SENTINEL = "NO_NEW_INFO";
+
 async function generateBrief(
   watchlistTitle: string,
   condition: string,
   headlines: VerifiedHeadline[],
   geminiKey: string,
+  recentBriefs: string[] = [],
 ): Promise<string> {
   const genAI = new GoogleGenerativeAI(geminiKey);
-  const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-lite" });
 
   const headlineList = headlines
     .map(
@@ -123,22 +144,28 @@ async function generateBrief(
     )
     .join("\n");
 
-  const prompt = `You are Snoopa, a sharp AI intelligence agent. Given these verified news headlines about "${watchlistTitle}" (tracking condition: "${condition}"), write a 1-2 sentence casual briefing that captures the key takeaway.
-    Sound natural, like you're briefing a friend. Be a bit detailed if you need to be.
-    Headlines:
-    ${headlineList}
+  const priorKnowledgeSection =
+    recentBriefs.length > 0
+      ? `IMPORTANT — What the user already knows (do NOT repeat this):\n${recentBriefs.map((b) => `- "${b}"`).join("\n")}\n\n`
+      : "";
 
-    Return ONLY the brief, no quotes, no markdown.`;
+  const prompt = `You are Snoopa, a sharp AI intelligence agent.
+${priorKnowledgeSection}Given these NEW verified headlines about "${watchlistTitle}" (tracking condition: "${condition}"):
+${headlineList}
+
+If ALL of the above is already covered by what the user already knows, reply with exactly: ${NO_NEW_INFO_SENTINEL}
+Otherwise, write a 1-2 sentence casual briefing covering ONLY what is genuinely new. Sound natural, like you're briefing a friend.
+Return ONLY the brief or ${NO_NEW_INFO_SENTINEL}. No quotes, no markdown.`;
 
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-lite" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
     const result = await model.generateContent(prompt);
     return result.response.text().trim();
   } catch (err) {
-    console.warn("Primary model failed, falling back to gemini-2.5-flash-lite");
+    console.warn("Primary model failed, falling back to gemini-3.1-flash-lite");
     try {
       const fallbackModel = genAI.getGenerativeModel({
-        model: "gemini-2.5-flash-lite",
+        model: "gemini-3.1-flash-lite",
       });
       const result = await fallbackModel.generateContent(prompt);
       return result.response.text().trim();
@@ -228,10 +255,7 @@ export const get_monitored_sources_for_items = internalQuery({
 // ---------------------------------------------------------------------------
 
 /** Phase 1 — loads active items for the tier and filters out recently-checked ones. */
-async function _loadDueItems(
-  ctx: any,
-  tier: number,
-): Promise<any[]> {
+async function _loadDueItems(ctx: any, tier: number): Promise<any[]> {
   const tierInterval = TIER_INTERVALS[tier] ?? TIER_INTERVALS[3];
   const allTierItems = await ctx.runQuery(
     internal.firehose.get_active_watchlist_items,
@@ -279,9 +303,12 @@ async function _processMonitoredSources(
   // Parallel fetch + verify all sources
   await Promise.all(
     allMonitoredSources.map(async (source: any) => {
-      const extractResult = await ctx.runAction(internal.tavily.extract_source, {
-        url: source.url,
-      });
+      const extractResult = await ctx.runAction(
+        internal.tavily.extract_source,
+        {
+          url: source.url,
+        },
+      );
       if (!extractResult.success) return;
 
       const snapshot = extractResult.content as string;
@@ -292,29 +319,41 @@ async function _processMonitoredSources(
       const item = activeItems.find((i: any) => i._id === source.watchlist_id);
       if (!item) return;
 
-      const satisfied = await verifySourceWithGemini(snapshot, item.condition, geminiKey);
+      const satisfied = await verifySourceWithGemini(
+        snapshot,
+        item.condition,
+        geminiKey,
+      );
       sourceUpdates.push({ source, newHash, newSnapshot: snapshot, satisfied });
     }),
   );
 
   // Persist hash updates and collect verified hits
   for (const update of sourceUpdates) {
-    await ctx.runMutation(internal.monitored_sources.update_monitored_source_hash, {
-      monitored_source_id: update.source._id,
-      last_hash: update.newHash,
-      last_snapshot: update.newSnapshot,
-    });
+    await ctx.runMutation(
+      internal.monitored_sources.update_monitored_source_hash,
+      {
+        monitored_source_id: update.source._id,
+        last_hash: update.newHash,
+        last_snapshot: update.newSnapshot,
+      },
+    );
 
     if (update.satisfied) {
-      const item = activeItems.find((i: any) => i._id === update.source.watchlist_id)!;
+      const item = activeItems.find(
+        (i: any) => i._id === update.source.watchlist_id,
+      )!;
       if (!verifiedByItem.has(item._id)) {
         verifiedByItem.set(item._id, { item, headlines: [] });
       }
       let hostname = "Source";
-      try { hostname = new URL(update.source.url).hostname; } catch {}
+      try {
+        hostname = new URL(update.source.url).hostname;
+      } catch {}
       verifiedByItem.get(item._id)!.headlines.push({
         title: `Source Update detected on ${hostname}`,
-        snippet: update.newSnapshot.substring(0, 200).replace(/\n/g, " ") + "...",
+        snippet:
+          update.newSnapshot.substring(0, 200).replace(/\n/g, " ") + "...",
         url: update.source.url,
         source: hostname,
         hash: update.newHash,
@@ -338,39 +377,72 @@ async function _runGeneralSearch(
   verifiedByItem: Map<string, { item: any; headlines: VerifiedHeadline[] }>,
   geminiKey: string,
 ): Promise<Array<{ urlHash: string; watchlist_id: any }>> {
-  // Build unique Tavily query configs (deduplicated by title+type+range)
-  const queryMap = new Map<string, { topic: string; searchType: "general" | "news"; timeRange: "day" | "any_time" }>();
+  // Build unique query configs (deduplicated by title+type+range)
+  const queryMap = new Map<
+    string,
+    {
+      topic: string;
+      searchType: "general" | "news";
+      timeRange: "day" | "any_time";
+    }
+  >();
   for (const item of itemsForGeneralSearch) {
     const type = item.search_type ?? "general";
     const range = item.time_range ?? "day";
     const key = `${item.title}::${type}::${range}`;
     if (!queryMap.has(key)) {
-      queryMap.set(key, { topic: item.title, searchType: type, timeRange: range });
+      queryMap.set(key, {
+        topic: item.title,
+        searchType: type,
+        timeRange: range,
+      });
     }
   }
-  const tavilyQueries = [...queryMap.values()];
+  const queries = [...queryMap.values()];
 
-  if (tavilyQueries.length === 0) {
-    console.log("Firehose: no items for general search, skipping Tavily fetch.");
+  if (queries.length === 0) {
+    console.log("Firehose: no items for general search, skipping fetch.");
     return [];
   }
 
-  // Fetch headlines in parallel
+  // Fetch headlines in parallel — Brave primary, Tavily fallback per query
   const headlineArrays = await Promise.all(
-    tavilyQueries.map((tq) =>
-      ctx.runAction(internal.tavily.firehose_search, {
-        query: tq.topic,
-        searchType: tq.searchType,
-        timeRange: tq.timeRange,
-      }),
-    ),
+    queries.map(async (q) => {
+      // 1. Try Brave first
+      const braveResults: SearchResult[] = await ctx.runAction(
+        internal.brave.firehose_search,
+        { query: q.topic, timeRange: q.timeRange },
+      );
+
+      if (braveResults.length > 0) {
+        console.log(
+          `Firehose [Brave]: "${q.topic}" → ${braveResults.length} results`,
+        );
+        return braveResults;
+      }
+
+      // 2. Brave returned nothing — fall back to Tavily
+      console.log(
+        `Firehose: Brave returned no results for "${q.topic}", falling back to Tavily.`,
+      );
+      const tavilyResults: SearchResult[] = await ctx.runAction(
+        internal.tavily.firehose_search,
+        { query: q.topic, searchType: q.searchType, timeRange: q.timeRange },
+      );
+      console.log(
+        `Firehose [Tavily fallback]: "${q.topic}" → ${tavilyResults.length} results`,
+      );
+      return tavilyResults;
+    }),
   );
   const allHeadlines = headlineArrays.flat();
-  console.log(`Firehose: fetched ${allHeadlines.length} headlines across ${tavilyQueries.length} queries.`);
+  console.log(
+    `Firehose: fetched ${allHeadlines.length} headlines across ${queries.length} queries.`,
+  );
 
   // Within-run dedup
   const seen = new Set<string>();
-  const uniqueHeadlines: Array<TavilySearchResult & { hash: string }> = [];
+  const uniqueHeadlines: Array<SearchResult & { hash: string }> = [];
   for (const h of allHeadlines) {
     const hash = await hashString(h.url);
     if (seen.has(hash)) continue;
@@ -419,7 +491,9 @@ async function _runGeneralSearch(
       }
     }
 
-    console.log(`Firehose: "${item.title}" — ${keywordMatches} keyword matches, ${verified} verified.`);
+    console.log(
+      `Firehose: "${item.title}" — ${keywordMatches} keyword matches, ${verified} verified.`,
+    );
   }
 
   return toMarkProcessed;
@@ -447,7 +521,26 @@ async function _dispatchAlerts(
   let totalAlerts = 0;
 
   for (const [, { item, headlines }] of verifiedByItem) {
-    const brief = await generateBrief(item.title, item.condition, headlines, geminiKey);
+    // Fetch the last 3 snoop briefs sent to the user for this item
+    const recent_briefs: string[] = await ctx.runQuery(
+      internal.chat.get_recent_snoop_briefs,
+      { watchlist_id: item._id, limit: 3 },
+    );
+
+    const brief = await generateBrief(
+      item.title,
+      item.condition,
+      headlines,
+      geminiKey,
+      recent_briefs,
+    );
+
+    // If everything in the new headlines is already known — skip dispatch
+    if (brief === NO_NEW_INFO_SENTINEL) {
+      console.log(`Firehose: "${item.title}" — no new info, skipping dispatch.`);
+      continue;
+    }
+
     console.log(`Firehose: brief for "${item.title}" → "${brief}"`);
 
     // 1. Save chat message
@@ -465,7 +558,9 @@ async function _dispatchAlerts(
       title: `${h.title}${h.source ? ` — ${h.source}` : ""}`,
       url: h.url,
     }));
-    await ctx.runMutation(internal.chat.batch_insert_sources, { entries: sourceEntries });
+    await ctx.runMutation(internal.chat.batch_insert_sources, {
+      entries: sourceEntries,
+    });
     totalAlerts += sourceEntries.length;
 
     // 3. Save in-app notification
@@ -478,12 +573,20 @@ async function _dispatchAlerts(
     });
 
     // 4. Push notification
-    const prefix = PUSH_PREFIXES[Math.floor(Math.random() * PUSH_PREFIXES.length)];
+    const prefix =
+      PUSH_PREFIXES[Math.floor(Math.random() * PUSH_PREFIXES.length)];
     const pushTitle = `${prefix} ${item.title}`;
     const pushTokens = await ctx.runQuery(internal.users.get_push_tokens, {
       user_id: item.user_id,
     });
-    await sendExpoPush(pushTokens, pushTitle, brief);
+
+    let pushBody = brief;
+    const words = brief.split(/\s+/).filter(Boolean);
+    if (words.length > 15) {
+      pushBody = words.slice(0, 15).join(" ") + "...";
+    }
+
+    await sendExpoPush(pushTokens, pushTitle, pushBody);
   }
 
   return totalAlerts;
@@ -505,10 +608,14 @@ export const run_firehose = internalAction({
     // 1. Load watchlist items due for this tier
     const activeItems = await _loadDueItems(ctx, args.tier);
     if (activeItems.length === 0) {
-      console.log(`Firehose (tier ${args.tier}): no items due for check, skipping.`);
+      console.log(
+        `Firehose (tier ${args.tier}): no items due for check, skipping.`,
+      );
       return;
     }
-    console.log(`Firehose (tier ${args.tier}): ${activeItems.length} items due for check.`);
+    console.log(
+      `Firehose (tier ${args.tier}): ${activeItems.length} items due for check.`,
+    );
 
     // 2. Bulk-load processed hashes (single query, in-memory set)
     const watchlistIds = activeItems.map((i: any) => i._id);
@@ -519,15 +626,19 @@ export const run_firehose = internalAction({
     const processedSet = new Set<string>(processedKeys);
 
     // Accumulator shared across phases
-    const verifiedByItem = new Map<string, { item: any; headlines: VerifiedHeadline[] }>();
+    const verifiedByItem = new Map<
+      string,
+      { item: any; headlines: VerifiedHeadline[] }
+    >();
 
     // 3A. Process monitored sources (primary + secondary)
-    const { sourceUpdates, sourcesByWatchlistId } = await _processMonitoredSources(
-      ctx,
-      activeItems,
-      verifiedByItem,
-      geminiKey,
-    );
+    const { sourceUpdates, sourcesByWatchlistId } =
+      await _processMonitoredSources(
+        ctx,
+        activeItems,
+        verifiedByItem,
+        geminiKey,
+      );
 
     // 3B. Determine which items still need a general search
     const itemsForGeneralSearch = activeItems.filter((item: any) => {
@@ -540,7 +651,9 @@ export const run_firehose = internalAction({
       );
       return !secondarySatisfied;
     });
-    console.log(`Firehose: ${itemsForGeneralSearch.length} items proceeding to General Search.`);
+    console.log(
+      `Firehose: ${itemsForGeneralSearch.length} items proceeding to General Search.`,
+    );
 
     // 4+5. Run general search, dedup, keyword match + Gemini verify
     const toMarkProcessed = await _runGeneralSearch(
@@ -571,7 +684,6 @@ export const run_firehose = internalAction({
     );
   },
 });
-
 
 // ---------------------------------------------------------------------------
 // Public action — manually trigger firehose (e.g. for testing)
