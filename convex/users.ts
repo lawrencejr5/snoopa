@@ -152,3 +152,30 @@ export const deleteUser = mutation({
     await ctx.db.delete(user_id);
   },
 });
+
+export const check_apple_user = query({
+  args: { apple_user_id: v.string(), email: v.string() },
+  handler: async (ctx, args) => {
+    const account = await ctx.db
+      .query("authAccounts")
+      .withIndex("providerAndAccountId", (q) =>
+        q.eq("provider", "apple").eq("providerAccountId", args.apple_user_id)
+      )
+      .unique();
+
+    if (account !== null) {
+      return { exists: true };
+    }
+
+    const users = await ctx.db
+      .query("users")
+      .withIndex("email", (q) => q.eq("email", args.email))
+      .collect();
+
+    if (users.length > 0) {
+      return { exists: true };
+    }
+
+    return { exists: false };
+  },
+});

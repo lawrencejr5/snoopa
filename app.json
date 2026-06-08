@@ -3,6 +3,12 @@
     "name": "Snoopa",
     "slug": "snoopa",
     "version": "2.0.0",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/43bf9433-2262-4db8-af1c-1bda9b67cbf6"
+    },
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "com.lawrencejr.snoopa",
@@ -13,14 +19,16 @@
       "backgroundColor": "#121212"
     },
     "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.lawrencejr.snoopa"
+      "supportsTablet": false,
+      "bundleIdentifier": "com.lawrencejr.snoopa",
+      "buildNumber": "1"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#121212"
       },
+      "versionCode": 1,
       "googleServicesFile": "./google-services.json",
       "predictiveBackGestureEnabled": false,
       "package": "com.lawrencejr.snoopa",
@@ -42,7 +50,8 @@
           "color": "#EBEBDF",
           "sounds": ["./assets/sounds/dog_bark_single.wav"]
         }
-      ]
+      ],
+      "expo-updates"
     ],
     "experiments": {
       "typedRoutes": true
