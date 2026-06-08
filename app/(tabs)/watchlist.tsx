@@ -115,6 +115,12 @@ function ActiveSnoopCard({
     }) ?? 0;
 
   const { theme } = useTheme();
+  const scale = useSharedValue(1);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
   return (
     <Pressable
       onPress={() =>
@@ -123,98 +129,183 @@ function ActiveSnoopCard({
           params: { id: item._id },
         })
       }
+      onPressIn={() => {
+        scale.value = withTiming(0.96, { duration: 100 });
+      }}
+      onPressOut={() => {
+        scale.value = withTiming(1, { duration: 150 });
+      }}
       onLongPress={onLongPress}
       delayLongPress={300}
-      style={[
-        styles.card,
-        {
-          backgroundColor: Colors[theme].surface,
-          borderColor: Colors[theme].border,
-        },
-      ]}
     >
-      <View style={styles.cardHeader}>
-        <View
-          style={{
-            flex: 1,
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 10,
-          }}
-        >
-          <PulsingDot color={Colors[theme].success} />
-          <Text style={[styles.cardTitle, { color: Colors[theme].text }]}>
-            {item.title}
-          </Text>
-        </View>
-        {newCount > 0 && (
+      <Animated.View
+        style={[
+          styles.card,
+          {
+            backgroundColor: Colors[theme].surface,
+            borderColor: Colors[theme].border,
+          },
+          animatedStyle,
+        ]}
+      >
+        <View style={styles.cardHeader}>
           <View
             style={{
-              backgroundColor: Colors[theme].success + "20",
-              paddingHorizontal: 8,
-              paddingVertical: 3,
-              borderRadius: 10,
+              flex: 1,
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 10,
             }}
+          >
+            <PulsingDot color={Colors[theme].success} />
+            <Text style={[styles.cardTitle, { color: Colors[theme].text }]}>
+              {item.title}
+            </Text>
+          </View>
+          {newCount > 0 && (
+            <View
+              style={{
+                backgroundColor: Colors[theme].success + "20",
+                paddingHorizontal: 8,
+                paddingVertical: 3,
+                borderRadius: 10,
+              }}
+            >
+              <Text
+                style={{
+                  color: Colors[theme].success,
+                  fontSize: 11,
+                  fontFamily: "FontBold",
+                }}
+              >
+                {newCount} new
+              </Text>
+            </View>
+          )}
+        </View>
+
+        <View
+          style={[styles.cardFooter, { borderTopColor: Colors[theme].border }]}
+        >
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
+            <Image
+              source={require("@/assets/icons/clock.png")}
+              style={{
+                width: 13,
+                height: 13,
+                tintColor: Colors[theme].text_secondary,
+                marginRight: 5,
+              }}
+            />
+            <Text
+              style={{
+                color: Colors[theme].text_secondary,
+                fontFamily: "FontMedium",
+                fontSize: 12,
+              }}
+            >
+              Last checked {formatTimeAgo(item.last_checked)}
+            </Text>
+          </View>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <Text
+              style={{
+                color: Colors[theme].primary,
+                fontFamily: "FontBold",
+                fontSize: 12,
+              }}
+            >
+              View Details
+            </Text>
+            {unseenCount > 0 && (
+              <View
+                style={{
+                  width: 5,
+                  height: 5,
+                  borderRadius: 4,
+                  backgroundColor: "#FF3B30",
+                  marginBottom: 8,
+                }}
+              />
+            )}
+          </View>
+        </View>
+      </Animated.View>
+    </Pressable>
+  );
+}
+
+function InactiveSnoopCard({
+  item,
+  router,
+  onLongPress,
+}: {
+  item: WatchlistItem;
+  router: ReturnType<typeof useRouter>;
+  onLongPress?: () => void;
+}) {
+  const { theme } = useTheme();
+  const scale = useSharedValue(1);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  return (
+    <Pressable
+      onPress={() =>
+        router.push({
+          pathname: "/snoop/[id]",
+          params: { id: item._id },
+        })
+      }
+      onPressIn={() => {
+        scale.value = withTiming(0.96, { duration: 100 });
+      }}
+      onPressOut={() => {
+        scale.value = withTiming(1, { duration: 150 });
+      }}
+      onLongPress={onLongPress}
+      delayLongPress={300}
+    >
+      <Animated.View
+        style={[
+          styles.card,
+          {
+            backgroundColor: Colors[theme].card,
+            borderColor: Colors[theme].border,
+            opacity: 0.6,
+          },
+          animatedStyle,
+        ]}
+      >
+        <View style={styles.cardHeader}>
+          <Text
+            style={[styles.cardTitle, { color: Colors[theme].text }]}
+            numberOfLines={1}
+          >
+            {item.title}
+          </Text>
+          <View
+            style={[
+              styles.statusBadge,
+              {
+                backgroundColor: Colors[theme].border,
+              },
+            ]}
           >
             <Text
               style={{
-                color: Colors[theme].success,
+                color: Colors[theme].text_secondary,
                 fontSize: 11,
                 fontFamily: "FontBold",
               }}
             >
-              {newCount} new
+              {item.status === "inactive" ? "STOPPED" : "CONFIRMED"}
             </Text>
           </View>
-        )}
-      </View>
-
-      <View
-        style={[styles.cardFooter, { borderTopColor: Colors[theme].border }]}
-      >
-        <View style={{ flexDirection: "row", alignItems: "center" }}>
-          <Image
-            source={require("@/assets/icons/clock.png")}
-            style={{
-              width: 13,
-              height: 13,
-              tintColor: Colors[theme].text_secondary,
-              marginRight: 5,
-            }}
-          />
-          <Text
-            style={{
-              color: Colors[theme].text_secondary,
-              fontFamily: "FontMedium",
-              fontSize: 12,
-            }}
-          >
-            Last checked {formatTimeAgo(item.last_checked)}
-          </Text>
         </View>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-          <Text
-            style={{
-              color: Colors[theme].primary,
-              fontFamily: "FontBold",
-              fontSize: 12,
-            }}
-          >
-            View Details
-          </Text>
-          {unseenCount > 0 && (
-            <View
-              style={{
-                width: 5,
-                height: 5,
-                borderRadius: 4,
-                backgroundColor: "#FF3B30",
-                marginBottom: 8,
-              }}
-            />
-          )}
-        </View>
-      </View>
+      </Animated.View>
     </Pressable>
   );
 }
@@ -544,55 +635,12 @@ export default function WatchlistScreen() {
                   Inactive Snoops
                 </Text>
                 {closedSnoops.map((item) => (
-                  <Pressable
+                  <InactiveSnoopCard
                     key={item._id}
-                    onPress={() =>
-                      router.push({
-                        pathname: "/snoop/[id]",
-                        params: { id: item._id },
-                      })
-                    }
+                    item={item as WatchlistItem}
+                    router={router}
                     onLongPress={() => handleLongPress(item)}
-                    delayLongPress={300}
-                    style={[
-                      styles.card,
-                      {
-                        backgroundColor: Colors[theme].card,
-                        borderColor: Colors[theme].border,
-                        opacity: 0.6,
-                      },
-                    ]}
-                  >
-                    <View style={styles.cardHeader}>
-                      <Text
-                        style={[
-                          styles.cardTitle,
-                          { color: Colors[theme].text },
-                        ]}
-                        numberOfLines={1}
-                      >
-                        {item.title}
-                      </Text>
-                      <View
-                        style={[
-                          styles.statusBadge,
-                          {
-                            backgroundColor: Colors[theme].border,
-                          },
-                        ]}
-                      >
-                        <Text
-                          style={{
-                            color: Colors[theme].text_secondary,
-                            fontSize: 11,
-                            fontFamily: "FontBold",
-                          }}
-                        >
-                          {item.status === "inactive" ? "STOPPED" : "CONFIRMED"}
-                        </Text>
-                      </View>
-                    </View>
-                  </Pressable>
+                  />
                 ))}
               </Animated.View>
             )}

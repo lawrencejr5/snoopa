@@ -182,6 +182,8 @@ function SnoopCard({
   const { theme } = useTheme();
   const router = useRouter();
 
+  const scale = useSharedValue(1);
+
   const unseenCount =
     useQuery(api.log.get_unseen_logs_count, {
       watchlist_id: item._id,
@@ -201,6 +203,10 @@ function SnoopCard({
 
   const isActive = item.status === "active";
 
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
   return (
     <Pressable
       onPress={() =>
@@ -209,113 +215,123 @@ function SnoopCard({
           params: { id: item._id },
         })
       }
+      onPressIn={() => {
+        scale.value = withTiming(0.96, { duration: 100 });
+      }}
+      onPressOut={() => {
+        scale.value = withTiming(1, { duration: 150 });
+      }}
       onLongPress={onLongPress}
       delayLongPress={300}
-      style={[
-        styles.snoopCard,
-        {
-          backgroundColor: Colors[theme].surface,
-          borderColor: Colors[theme].border,
-          opacity: isActive ? 1 : 0.5,
-        },
-      ]}
     >
-      <View style={styles.snoopCardRow}>
-        {/* Status indicator */}
-        <View style={{ marginRight: 12, paddingTop: 2 }}>
-          {isActive ? (
-            <PulsingDot color={Colors[theme].success} size={8} />
-          ) : (
+      <Animated.View
+        style={[
+          styles.snoopCard,
+          {
+            backgroundColor: Colors[theme].surface,
+            borderColor: Colors[theme].border,
+            opacity: isActive ? 1 : 0.5,
+          },
+          animatedStyle,
+        ]}
+      >
+        <View style={styles.snoopCardRow}>
+          {/* Status indicator */}
+          <View style={{ marginRight: 12, paddingTop: 2 }}>
+            {isActive ? (
+              <PulsingDot color={Colors[theme].success} size={8} />
+            ) : (
+              <View
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: 4,
+                  backgroundColor: Colors[theme].text_secondary,
+                  opacity: 0.4,
+                }}
+              />
+            )}
+          </View>
+
+          {/* Title & metadata */}
+          <View style={{ flex: 1 }}>
+            <Text
+              style={{
+                color: Colors[theme].text,
+                fontFamily: "FontBold",
+                fontSize: 15,
+                letterSpacing: -0.3,
+              }}
+              numberOfLines={1}
+            >
+              {item.title}
+            </Text>
             <View
               style={{
-                width: 8,
-                height: 8,
-                borderRadius: 4,
-                backgroundColor: Colors[theme].text_secondary,
-                opacity: 0.4,
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 8,
+                marginTop: 4,
               }}
-            />
+            >
+              <Text
+                style={{
+                  color: Colors[theme].text_secondary,
+                  fontFamily: "FontMedium",
+                  fontSize: 11,
+                }}
+              >
+                {isActive
+                  ? "Watching"
+                  : item.status === "completed"
+                    ? "Confirmed"
+                    : "Stopped"}
+              </Text>
+              <Text
+                style={{
+                  color: Colors[theme].text_secondary,
+                  fontFamily: "FontRegular",
+                  fontSize: 11,
+                }}
+              >
+                · {formatTimeAgo(item.last_checked)}
+              </Text>
+            </View>
+          </View>
+
+          {/* Unseen badge */}
+          {unseenCount > 0 && (
+            <View
+              style={[
+                styles.unseenBadge,
+                { backgroundColor: Colors[theme].success + "20" },
+              ]}
+            >
+              <Text
+                style={{
+                  color: Colors[theme].success,
+                  fontFamily: "FontBold",
+                  fontSize: 11,
+                }}
+              >
+                {unseenCount}
+              </Text>
+            </View>
           )}
-        </View>
 
-        {/* Title & metadata */}
-        <View style={{ flex: 1 }}>
-          <Text
+          {/* Arrow */}
+          <Image
+            source={require("@/assets/icons/chevron-right.png")}
             style={{
-              color: Colors[theme].text,
-              fontFamily: "FontBold",
-              fontSize: 15,
-              letterSpacing: -0.3,
+              width: 14,
+              height: 14,
+              tintColor: Colors[theme].text_secondary,
+              opacity: 0.5,
+              marginLeft: 8,
             }}
-            numberOfLines={1}
-          >
-            {item.title}
-          </Text>
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 8,
-              marginTop: 4,
-            }}
-          >
-            <Text
-              style={{
-                color: Colors[theme].text_secondary,
-                fontFamily: "FontMedium",
-                fontSize: 11,
-              }}
-            >
-              {isActive
-                ? "Watching"
-                : item.status === "completed"
-                  ? "Confirmed"
-                  : "Stopped"}
-            </Text>
-            <Text
-              style={{
-                color: Colors[theme].text_secondary,
-                fontFamily: "FontRegular",
-                fontSize: 11,
-              }}
-            >
-              · {formatTimeAgo(item.last_checked)}
-            </Text>
-          </View>
+          />
         </View>
-
-        {/* Unseen badge */}
-        {unseenCount > 0 && (
-          <View
-            style={[
-              styles.unseenBadge,
-              { backgroundColor: Colors[theme].success + "20" },
-            ]}
-          >
-            <Text
-              style={{
-                color: Colors[theme].success,
-                fontFamily: "FontBold",
-                fontSize: 11,
-              }}
-            >
-              {unseenCount}
-            </Text>
-          </View>
-        )}
-
-        {/* Arrow */}
-        <Image
-          source={require("@/assets/icons/chevron-right.png")}
-          style={{
-            width: 14,
-            height: 14,
-            tintColor: Colors[theme].text_secondary,
-            opacity: 0.5,
-            marginLeft: 8,
-          }}
-        />
-      </View>
+      </Animated.View>
     </Pressable>
   );
 }
