@@ -779,11 +779,17 @@
 .footer {
   position: relative;
   z-index: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   padding: 24px 40px;
   border-top: 1px solid var(--border);
+}
+
+.footerContainer {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
 }
 
 .footerText {
@@ -791,6 +797,33 @@
   font-weight: 500;
   color: var(--text-secondary);
   letter-spacing: 0.02em;
+}
+
+.footerLinks {
+  display: flex;
+  gap: 20px;
+}
+
+.footerLink {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  transition: color 0.2s ease;
+}
+
+.footerLink:hover {
+  color: var(--text);
+}
+
+@media (max-width: 640px) {
+  .footerContainer {
+    flex-direction: column;
+    gap: 12px;
+    text-align: center;
+  }
+  .footerLinks {
+    gap: 16px;
+  }
 }
 
 /* ── Enter animations ───────────────────────── */
