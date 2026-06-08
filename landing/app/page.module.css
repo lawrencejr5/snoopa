@@ -322,6 +322,8 @@
 
 .badge {
   display: inline-flex;
+  align-items: center;
+  gap: 8px;
   padding: 5px 14px;
   background: rgba(235, 235, 223, 0.05);
   border: 1px solid rgba(235, 235, 223, 0.1);
@@ -331,6 +333,42 @@
   color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.08em;
+}
+
+.pulseDot {
+  width: 7px;
+  height: 7px;
+  background-color: var(--success);
+  border-radius: 50%;
+  position: relative;
+  display: inline-block;
+}
+
+.pulseDot::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background-color: var(--success);
+  animation: pulse 1.8s infinite ease-in-out;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(0.95);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(2);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(0.95);
+    opacity: 0;
+  }
 }
 
 .heroTitle {
@@ -371,8 +409,33 @@
 @media (max-width: 640px) {
   .heroDownloadButtons,
   .downloadButtons {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
     justify-content: center;
+    gap: 8px;
     width: 100%;
+  }
+
+  .storeButton {
+    padding: 8px 12px !important;
+    gap: 6px !important;
+    flex: 1;
+    max-width: 155px;
+    min-width: 125px;
+  }
+
+  .storeIcon {
+    width: 18px !important;
+    height: 18px !important;
+  }
+
+  .storeButtonSub {
+    font-size: 0.52rem !important;
+  }
+
+  .storeButtonMain {
+    font-size: 0.76rem !important;
   }
 }
 

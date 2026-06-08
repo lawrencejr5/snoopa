@@ -160,7 +160,10 @@ export default function Home() {
         {/* ─ HERO CARD (big, wide) ─ */}
         <section className={styles.cardHero} id="hero">
           <div className={styles.heroContent}>
-            <span className={styles.badge}>Live</span>
+            <span className={styles.badge}>
+              <span className={styles.pulseDot} />
+              Live
+            </span>
             <h1 className={styles.heroTitle}>
               Don&apos;t search,
               <br />
@@ -174,7 +177,7 @@ export default function Home() {
             </p>
             <div className={styles.heroDownloadButtons}>
               <a
-                href="#"
+                href="https://apps.apple.com/app-store/"
                 className={styles.storeButton}
                 target="_blank"
                 rel="noopener noreferrer"
@@ -190,7 +193,7 @@ export default function Home() {
                 </div>
               </a>
               <a
-                href="#"
+                href="https://play.google.com/store/apps/details?id=com.lawrencejr.snoopa"
                 className={styles.storeButton}
                 target="_blank"
                 rel="noopener noreferrer"
