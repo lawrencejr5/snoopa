@@ -94,14 +94,17 @@ const WithinContext = ({ loaded }: { loaded: boolean }) => {
   }, []);
 
   useEffect(() => {
-    if (loaded) {
-      const timer = setTimeout(() => {
-        SplashScreen.hideAsync();
-        setShowSplash(false);
-      }, 1000);
-      return () => clearTimeout(timer);
-    }
-  }, [loaded]);
+    // Hide the default native splash immediately so user sees CustomSplash
+    SplashScreen.hideAsync().catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    // Force custom splash screen to show for at least 2 seconds (2000ms)
+    const timer = setTimeout(() => {
+      setShowSplash(false);
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     if (!loaded || isLoading || isFirstLaunch === null) return;
