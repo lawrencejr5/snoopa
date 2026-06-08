@@ -1,0 +1,187 @@
+/* ─────────────────────────────────────────────
+   Snoopa Landing — Legal Pages Styling
+   legal.module.css
+   ───────────────────────────────────────────── */
+
+.page {
+  position: relative;
+  min-height: 100vh;
+  background-color: #141414;
+  color: var(--text);
+  padding-bottom: 80px;
+}
+
+/* Noise overlay */
+.noise {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+  background-size: 200px 200px;
+  opacity: 0.012;
+}
+
+/* Header bar */
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 40px;
+  background: rgba(17, 17, 17, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--border);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.logo {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  object-fit: contain;
+}
+
+.brandName {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--primary);
+  letter-spacing: -0.02em;
+}
+
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  transition: color 0.2s ease;
+  padding: 6px 12px;
+  border: 1px solid rgba(235, 235, 223, 0.1);
+  border-radius: var(--radius-sm);
+  background: rgba(235, 235, 223, 0.02);
+}
+
+.backLink:hover {
+  color: var(--text);
+  border-color: var(--primary);
+  background: rgba(235, 235, 223, 0.05);
+}
+
+/* Main content wrapper */
+.container {
+  position: relative;
+  z-index: 1;
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 48px 24px;
+}
+
+.title {
+  font-size: clamp(2rem, 4vw, 2.8rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--text);
+  line-height: 1.15;
+  margin-bottom: 12px;
+}
+
+.meta {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 40px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* Legal text formatting */
+.content {
+  line-height: 1.75;
+  font-size: 1rem;
+  color: var(--text-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.content h2 {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.01em;
+  margin-top: 12px;
+}
+
+.content p {
+  margin: 0;
+}
+
+.content ul {
+  padding-left: 20px;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.content li {
+  margin: 0;
+}
+
+.content strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* Footer layout inside legal */
+.footer {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 40px;
+  border-top: 1px solid var(--border);
+  margin-top: 60px;
+}
+
+.footerText {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  letter-spacing: 0.02em;
+}
+
+@media (max-width: 640px) {
+  .header {
+    padding: 14px 20px;
+  }
+  .brandName {
+    font-size: 1.1rem;
+  }
+  .container {
+    padding: 32px 16px;
+  }
+  .title {
+    font-size: 1.8rem;
+  }
+  .content {
+    font-size: 0.95rem;
+    gap: 20px;
+  }
+  .content h2 {
+    font-size: 1.2rem;
+  }
+}

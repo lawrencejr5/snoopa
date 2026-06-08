@@ -1,6 +1,45 @@
+"use client";
+
+import Link from "next/link";
+import { useState } from "react";
 import styles from "./page.module.css";
 
+const FAQS = [
+  {
+    question: "What is Snoopa?",
+    answer:
+      "Snoopa is a conversational AI agent that acts as your private investigator for web information. It proactively searches the web to track topics you specify and delivers real-time alerts.",
+  },
+  {
+    question: "How does Snoopa track topics?",
+    answer:
+      "Snoopa uses advanced web search and scraping technologies (powered by Google and Brave search) to monitor changes, price shifts, news updates, or injury lists 24/7.",
+  },
+  {
+    question: "Can I customize what Snoopa tracks?",
+    answer:
+      "Absolutely! You can set up watchlists for any custom topics in plain English. For example, you can tell Snoopa to track when a specific player returns to training or when a product price changes.",
+  },
+  {
+    question: "How do I receive updates?",
+    answer:
+      "Snoopa delivers real-time push notifications directly to your mobile device as soon as a verified change is detected. We also compile clean, daily briefings summarizing all your watchlists.",
+  },
+  {
+    question: "Is the information reliable?",
+    answer:
+      "Yes, every update from Snoopa is backed by verifiable web sources. The app provides clickable links next to every piece of intel so you can see exactly where it was sourced.",
+  },
+];
+
 export default function Home() {
+  const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  const toggleFaq = (index: number) => {
+    setOpenFaqIndex(openFaqIndex === index ? null : index);
+  };
+
   return (
     <div className={styles.page}>
       {/* ── Noise overlay ───────────────────── */}
@@ -9,77 +48,174 @@ export default function Home() {
       {/* ── Navbar ──────────────────────────── */}
       <nav className={styles.navbar}>
         <div className={styles.navBrand}>
-          {/* <img
+          <img
             src="/images/icon-nobg.png"
             alt="Snoopa logo"
             className={styles.navLogo}
-          /> */}
-          <span className={styles.navName}>Snoopa</span>
-          <span className={styles.navSubName}>by Lawjun Labs</span>
+          />
+          <div className={styles.navBrandText}>
+            <span className={styles.navName}>Snoopa</span>
+            <span className={styles.navSubName}>by Lawjun Labs</span>
+          </div>
         </div>
         <div className={styles.navLinks}>
           <a href="#features" className={styles.navLink}>
             Features
           </a>
-
-          <a href="#waitlist" className={styles.navCta}>
-            Join Waitlist
-          </a>
+          <Link href="/terms" className={styles.navLink}>
+            Terms & Conditions
+          </Link>
+          <Link href="/privacy" className={styles.navLink}>
+            Privacy Policy
+          </Link>
         </div>
-
-        {/* Mobile menu button (visible < 768) */}
         <button
           className={styles.mobileMenuBtn}
-          id="mobile-menu-btn"
+          onClick={() => setIsSidebarOpen(true)}
           aria-label="Open menu"
         >
-          <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
-            <path
-              d="M3 6h16M3 11h16M3 16h16"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-            />
+          <svg
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <line x1="3" y1="12" x2="21" y2="12"></line>
+            <line x1="3" y1="6" x2="21" y2="6"></line>
+            <line x1="3" y1="18" x2="21" y2="18"></line>
           </svg>
         </button>
       </nav>
+
+      {/* ── Mobile Sidebar Drawer ────────────── */}
+      <div
+        className={`${styles.sidebarOverlay} ${isSidebarOpen ? styles.sidebarOverlayOpen : ""}`}
+        onClick={() => setIsSidebarOpen(false)}
+      />
+      <div
+        className={`${styles.sidebar} ${isSidebarOpen ? styles.sidebarOpen : ""}`}
+      >
+        <div className={styles.sidebarHeader}>
+          <div className={styles.navBrand}>
+            <img
+              src="/images/icon-nobg.png"
+              alt="Snoopa logo"
+              className={styles.navLogo}
+            />
+            <div className={styles.navBrandText}>
+              <span className={styles.navName}>Snoopa</span>
+            </div>
+          </div>
+          <button
+            className={styles.sidebarCloseBtn}
+            onClick={() => setIsSidebarOpen(false)}
+            aria-label="Close menu"
+          >
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+        <div className={styles.sidebarLinks}>
+          <a
+            href="#features"
+            className={styles.sidebarLink}
+            onClick={() => setIsSidebarOpen(false)}
+          >
+            Features
+          </a>
+          <Link
+            href="/terms"
+            className={styles.sidebarLink}
+            onClick={() => setIsSidebarOpen(false)}
+          >
+            Terms & Conditions
+          </Link>
+          <Link
+            href="/privacy"
+            className={styles.sidebarLink}
+            onClick={() => setIsSidebarOpen(false)}
+          >
+            Privacy Policy
+          </Link>
+        </div>
+      </div>
 
       {/* ── Bento Grid ──────────────────────── */}
       <main className={styles.bento}>
         {/* ─ HERO CARD (big, wide) ─ */}
         <section className={styles.cardHero} id="hero">
           <div className={styles.heroContent}>
-            <span className={styles.badge}>Private Beta</span>
+            <span className={styles.badge}>
+              <span className={styles.pulseDot} />
+              Live
+            </span>
             <h1 className={styles.heroTitle}>
               Don&apos;t search,
               <br />
               <span className={styles.heroAccent}>Just snoop.</span>
             </h1>
             <p className={styles.heroSub}>
-              Snoopa is a conversational AI agent that tracks the topics you
-              care about. From injury reports to market shifts, Snoopa monitors
-              the front page of the web 24/7 and pings you the moment something
-              changes.
+              Snoopa is a conversational AI agent that tracks the web for you so
+              you don't have to. From injury reports to market shifts, Snoopa
+              monitors the front page of the web 24/7 and pings you the moment
+              something changes.
             </p>
-            <a href="#waitlist" className={styles.heroCta}>
-              Join the Waitlist
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <path
-                  d="M3 8H13M13 8L9 4M13 8L9 12"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
+            <div className={styles.heroDownloadButtons}>
+              <a
+                href="https://apps.apple.com/app-store/"
+                className={styles.storeButton}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <img
+                  src="/images/icons/apple-logo.png"
+                  alt="App Store Icon"
+                  className={styles.storeIcon}
                 />
-              </svg>
-            </a>
+                <div className={styles.storeButtonText}>
+                  <span className={styles.storeButtonSub}>Download on the</span>
+                  <span className={styles.storeButtonMain}>App Store</span>
+                </div>
+              </a>
+              <a
+                href="https://play.google.com/store/apps/details?id=com.lawrencejr.snoopa"
+                className={styles.storeButton}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <img
+                  src="/images/icons/playstore.png"
+                  alt="Google Play Icon"
+                  className={styles.storeIcon}
+                />
+                <div className={styles.storeButtonText}>
+                  <span className={styles.storeButtonSub}>GET IT ON</span>
+                  <span className={styles.storeButtonMain}>Google Play</span>
+                </div>
+              </a>
+            </div>
           </div>
           <div className={styles.heroVisual}>
             <div className={styles.heroGlow} />
             <img
-              src="/images/favicon.png"
-              alt="Snoopa greyhound"
-              className={styles.heroMascot}
+              src="/images/transparent-hero-image.png"
+              alt="Snoopa mobile interface dashboard preview"
+              className={styles.heroMockup}
             />
           </div>
         </section>
@@ -89,264 +225,205 @@ export default function Home() {
           <h2>Features...</h2>
         </div>
 
-        {/* ─ FEATURE CARDS (3 bento tiles) ─ */}
-        <section className={styles.cardFeature} id="features">
-          <div className={styles.featureIcon}>
-            <svg
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M12 2v20M2 12h20M4.93 4.93l14.14 14.14M4.93 19.07L19.07 4.93" />
-              <circle cx="12" cy="12" r="10" />
-            </svg>
-          </div>
-          <h3 className={styles.featureTitle}>Autonomous Mission Deployment</h3>
-          <p className={styles.featureDesc}>
-            Deploy a global intelligence scout with a single natural language
-            prompt. Simply tell Snoopa what you want to follow, and our AI
-            automatically configures the tracking parameters to monitor the web
-            for you 24/7.
-          </p>
-        </section>
-
-        <section className={styles.cardFeature}>
-          <div className={styles.featureIcon}>
-            <svg
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <circle cx="12" cy="12" r="3" />
-              <path d="M3 12h4m10 0h4M12 3v4m0 10v4" />
-              <circle cx="12" cy="12" r="9" />
-            </svg>
-          </div>
-          <h3 className={styles.featureTitle}>Precision Source Targeting</h3>
-          <p className={styles.featureDesc}>
-            Lock on to specific URLs for deep, pinpoint monitoring of the data
-            you value most. Assign Snoopa to "Snip" specific websites, tracking
-            price drops, stock availability, or official updates directly from
-            the source of truth.
-          </p>
-        </section>
-
-        <section className={styles.cardFeature}>
-          <div className={styles.featureIcon}>
-            <svg
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-              <path d="M8 9h8M8 13h6" />
-            </svg>
-          </div>
-          <h3 className={styles.featureTitle}>Proactive Intel Briefings</h3>
-          <p className={styles.featureDesc}>
-            Receive refined, noise-free intelligence delivered straight to your
-            command center. Snoopa filters the chaos into high-signal briefings
-            and real-time push alerts that matter, summarized by AI and backed
-            by verified sources.
-          </p>
-        </section>
-
-        {/* ─ WAITLIST CARD ─ */}
-        <section className={styles.cardWaitlist} id="waitlist">
-          <h2 className={styles.waitlistTitle}>Get early access</h2>
-          <p className={styles.waitlistSub}>
-            Be one of the first to try Snoopa. Drop your email and we&apos;ll
-            reach out when it&apos;s your turn.
-          </p>
-          <form className={styles.waitlistForm} id="waitlist-form">
-            <div className={styles.inputGroup}>
-              <input
-                type="email"
-                id="email-input"
-                name="email"
-                className={styles.emailInput}
-                placeholder="your@email.com"
-                autoComplete="email"
-                required
-                aria-label="Email address"
-              />
-              <button
-                type="submit"
-                className={styles.submitBtn}
-                id="submit-btn"
+        {/* ─ FEATURE CARDS ─ */}
+        {/* Feature 1: Wide Layout */}
+        <section
+          className={`${styles.cardFeature} ${styles.cardFeatureWide}`}
+          id="features"
+        >
+          <div className={styles.featureText}>
+            <div className={styles.featureIcon}>
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
               >
-                <span className={styles.btnText} id="btn-text">
-                  Join
-                </span>
-                <span className={styles.btnLoader} id="btn-loader">
-                  <svg
-                    className={styles.spinner}
-                    width="18"
-                    height="18"
-                    viewBox="0 0 18 18"
-                    fill="none"
+                <path d="M12 2v20M2 12h20M4.93 4.93l14.14 14.14M4.93 19.07L19.07 4.93" />
+                <circle cx="12" cy="12" r="10" />
+              </svg>
+            </div>
+            <h3 className={styles.featureTitle}>
+              Your Daily AI Intelligence Briefing
+            </h3>
+            <p className={styles.featureDesc}>
+              Start your day with a curated, noise-free digest of everything
+              that changed on your watchlist. No noise, just the facts.
+            </p>
+          </div>
+          <div className={styles.featureVisualContainer}>
+            <img
+              src="/images/features/feature_1.png"
+              alt="Your Daily AI Intelligence Briefing"
+              className={styles.featureImage}
+            />
+          </div>
+        </section>
+
+        {/* Feature 2: Narrow Layout */}
+        <section className={styles.cardFeature}>
+          <div className={styles.featureText}>
+            <div className={styles.featureIcon}>
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+              >
+                <circle cx="12" cy="12" r="3" />
+                <path d="M3 12h4m10 0h4M12 3v4m0 10v4" />
+                <circle cx="12" cy="12" r="9" />
+              </svg>
+            </div>
+            <h3 className={styles.featureTitle}>
+              Track Anything. Automatically.
+            </h3>
+            <p className={styles.featureDesc}>
+              Deploy a global intelligence scout with a single prompt. From
+              injury lists to market updates, Snoopa monitors the web 24/7.
+            </p>
+          </div>
+          <div className={styles.featureVisualContainer}>
+            <img
+              src="/images/features/feature_2.png"
+              alt="Track Anything Automatically"
+              className={styles.featureImage}
+            />
+          </div>
+        </section>
+
+        {/* Feature 3: Narrow Layout */}
+        <section className={styles.cardFeature}>
+          <div className={styles.featureText}>
+            <div className={styles.featureIcon}>
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+              >
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+                <path d="M9 17V7h6v10" />
+              </svg>
+            </div>
+            <h3 className={styles.featureTitle}>
+              Managing Watchlists Made Simple
+            </h3>
+            <p className={styles.featureDesc}>
+              Organize, view, and refine your tracking settings using a
+              beautiful conversational interface.
+            </p>
+          </div>
+          <div className={styles.featureVisualContainer}>
+            <img
+              src="/images/features/feature_3.png"
+              alt="Managing Watchlists Made Simple"
+              className={styles.featureImage}
+            />
+          </div>
+        </section>
+
+        {/* Feature 4: Wide Layout */}
+        <section className={`${styles.cardFeature} ${styles.cardFeatureWide}`}>
+          <div className={styles.featureText}>
+            <div className={styles.featureIcon}>
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+              >
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                <path d="M8 9h8M8 13h6" />
+              </svg>
+            </div>
+            <h3 className={styles.featureTitle}>
+              Data You Can Trust, Sources You Can See
+            </h3>
+            <p className={styles.featureDesc}>
+              Every snoop is backed by verifiable web sources. Click through
+              directly to see where the data originated.
+            </p>
+          </div>
+          <div className={styles.featureVisualContainer}>
+            <img
+              src="/images/features/feature_4.png"
+              alt="Data You Can Trust Sources You Can See"
+              className={styles.featureImage}
+            />
+          </div>
+        </section>
+
+        {/* ─ FAQ SECTION ─ */}
+        <section className={styles.cardFaq} id="faq">
+          <h2 className={styles.faqTitle}>Frequently Asked Questions</h2>
+          <div className={styles.faqList}>
+            {FAQS.map((faq, index) => {
+              const isOpen = openFaqIndex === index;
+              return (
+                <div
+                  key={index}
+                  className={`${styles.faqItem} ${isOpen ? styles.faqItemOpen : ""}`}
+                >
+                  <button
+                    onClick={() => toggleFaq(index)}
+                    className={styles.faqQuestion}
+                    aria-expanded={isOpen}
                   >
-                    <circle
-                      cx="9"
-                      cy="9"
-                      r="7"
-                      stroke="currentColor"
-                      strokeOpacity="0.3"
-                      strokeWidth="2"
-                    />
-                    <path
-                      d="M9 2a7 7 0 0 1 7 7"
+                    <span>{faq.question}</span>
+                    <svg
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      fill="none"
                       stroke="currentColor"
                       strokeWidth="2"
                       strokeLinecap="round"
-                    />
-                  </svg>
-                </span>
-              </button>
-            </div>
-            <p className={styles.formError} id="form-error" role="alert"></p>
-            <p className={styles.formSuccess} id="form-success"></p>
-          </form>
-          <p className={styles.privacyNote}>No spam. Unsubscribe anytime.</p>
-          <p className={styles.counterText} id="counter-text"></p>
+                      strokeLinejoin="round"
+                      className={styles.faqArrow}
+                    >
+                      <polyline points="6 9 12 15 18 9"></polyline>
+                    </svg>
+                  </button>
+                  <div
+                    className={styles.faqAnswerContainer}
+                    style={{
+                      maxHeight: isOpen ? "200px" : "0px",
+                    }}
+                  >
+                    <p className={styles.faqAnswer}>{faq.answer}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </section>
       </main>
 
       {/* ── Footer ──────────────────────────── */}
       <footer className={styles.footer}>
-        <p className={styles.footerText}>
-          © {new Date().getFullYear()} Snoopa. By Lawjun Labs.
-        </p>
+        <div className={styles.footerContainer}>
+          <p className={styles.footerText}>
+            © {new Date().getFullYear()} Snoopa. By Lawjun Labs.
+          </p>
+          <div className={styles.footerLinks}>
+            <Link href="/terms" className={styles.footerLink}>
+              Terms & Conditions
+            </Link>
+            <Link href="/privacy" className={styles.footerLink}>
+              Privacy Policy
+            </Link>
+          </div>
+        </div>
       </footer>
-
-      {/* ── Client-side JS ──────────────────── */}
-      <WaitlistScript />
     </div>
   );
-}
-
-/* Inline script component for waitlist form handling */
-function WaitlistScript() {
-  const script = `
-    (function() {
-      const CONVEX_URL = "https://sensible-sandpiper-436.convex.cloud";
-
-      const form        = document.getElementById("waitlist-form");
-      const emailInput  = document.getElementById("email-input");
-      const submitBtn   = document.getElementById("submit-btn");
-      const formError   = document.getElementById("form-error");
-      const formSuccess = document.getElementById("form-success");
-      const btnLoader   = document.getElementById("btn-loader");
-      const btnText     = document.getElementById("btn-text");
-      const counterText = document.getElementById("counter-text");
-
-      function isValidEmail(e) {
-        return /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(e.trim());
-      }
-
-      function setError(msg) {
-        formError.textContent = msg;
-        formError.style.display = "block";
-        formSuccess.style.display = "none";
-      }
-
-      function clearError() {
-        formError.textContent = "";
-        formError.style.display = "none";
-      }
-
-      function showSuccess(position, alreadySignedUp) {
-        var msg = alreadySignedUp
-          ? "You\\'re already on the list! Check your email for your position."
-          : "You\\'re #" + position + " on the waitlist! Check your email.";
-        formSuccess.textContent = msg;
-        formSuccess.style.display = "block";
-        formError.style.display = "none";
-        emailInput.value = "";
-        // Update counter in place
-        if (counterText && !alreadySignedUp) {
-          counterText.textContent = position + " " + (position === 1 ? "person" : "people") + " already waiting";
-        }
-      }
-
-      function setLoading(v) {
-        submitBtn.disabled = v;
-        if (btnLoader) btnLoader.style.display = v ? "flex" : "none";
-        if (btnText)   btnText.style.display   = v ? "none" : "inline";
-      }
-
-      emailInput.addEventListener("input", function() {
-        if (formError.style.display === "block") clearError();
-      });
-
-      form.addEventListener("submit", async function(e) {
-        e.preventDefault();
-        clearError();
-        var email = emailInput.value.trim();
-        if (!email)              { setError("Please enter your email."); return; }
-        if (!isValidEmail(email)){ setError("That doesn\\'t look like a valid email."); return; }
-        setLoading(true);
-        try {
-          var res = await fetch(CONVEX_URL + "/api/mutation", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ path: "waitlist:join", args: { email: email } }),
-          });
-          if (!res.ok) throw new Error("Server error");
-          var data = await res.json();
-          var value = data.value || data;
-          showSuccess(value.position, value.already_signed_up);
-        } catch(err) {
-          setError("Something went wrong. Please try again.");
-        } finally {
-          setLoading(false);
-        }
-      });
-
-      // Load live count on mount
-      async function loadCounter() {
-        if (!counterText) return;
-        try {
-          var res = await fetch(CONVEX_URL + "/api/query", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ path: "waitlist:get_count", args: {} }),
-          });
-          if (!res.ok) return;
-          var data = await res.json();
-          var count = data.value;
-          if (typeof count === "number" && count > 0) {
-            counterText.textContent = count.toLocaleString() + " " + (count === 1 ? "person" : "people") + " already waiting";
-          }
-        } catch(_) {}
-      }
-      loadCounter();
-
-      // Mobile menu toggle
-      var menuBtn = document.getElementById("mobile-menu-btn");
-      if (menuBtn) {
-        menuBtn.addEventListener("click", function() {
-          var links = document.querySelector("." + "${styles.navLinks}");
-          if (links) links.classList.toggle("${styles.navLinksOpen}");
-        });
-      }
-    })();
-  `;
-
-  return <script dangerouslySetInnerHTML={{ __html: script }} />;
 }

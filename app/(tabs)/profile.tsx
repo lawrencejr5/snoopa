@@ -8,9 +8,10 @@ import { useUser } from "@/context/UserContext";
 import { api } from "@/convex/_generated/api";
 import { registerForPushNotificationsAsync } from "@/utils/reg_push_notifications";
 import { useAuthActions } from "@convex-dev/auth/react";
-import { useIsFocused, useNavigation } from "@react-navigation/native";
+import { useNavigation } from "@react-navigation/native";
 import { useConvexAuth, useMutation } from "convex/react";
 import { useRouter } from "expo-router";
+import * as WebBrowser from "expo-web-browser";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -63,23 +64,25 @@ export default function ProfileScreen() {
     {
       label: "About Snoopa",
       icon: require("@/assets/icons/info.png"),
-      route: "/account/about",
+      route: "https://snoopa.lawjun.ng",
     },
     {
       label: "Terms and Conditions",
       icon: require("@/assets/icons/document.png"),
-      route: "/account/terms",
+      route: "https://snoopa.lawjun.ng/terms",
     },
     {
       label: "Privacy Policy",
       icon: require("@/assets/icons/shield.png"),
-      route: "/account/privacy",
+      route: "https://snoopa.lawjun.ng/privacy",
     },
   ];
 
   const handlePress = (item: any) => {
     if (item.route === "modal") {
       setThemeModalVisible(true);
+    } else if (item.route.startsWith("http")) {
+      WebBrowser.openBrowserAsync(item.route);
     } else {
       router.push(item.route);
     }
@@ -255,12 +258,23 @@ export default function ProfileScreen() {
                 </Text>
               </View>
               <Image
-                source={require("@/assets/icons/chevron-right.png")}
-                style={{
-                  width: 14,
-                  height: 14,
-                  tintColor: Colors[theme].text_secondary,
-                }}
+                source={
+                  item.route.startsWith("http")
+                    ? require("@/assets/icons/arrow-up.png")
+                    : require("@/assets/icons/chevron-right.png")
+                }
+                style={[
+                  {
+                    width: 14,
+                    height: 14,
+                    tintColor: Colors[theme].text_secondary,
+                  },
+                  item.route.startsWith("http") && {
+                    width: 20,
+                    height: 20,
+                    transform: [{ rotate: "45deg" }],
+                  },
+                ]}
               />
             </Pressable>
           ))}
