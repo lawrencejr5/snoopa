@@ -42,7 +42,8 @@ const WelcomePage = () => {
   const [showNameModal, setShowNameModal] = useState<boolean>(false);
   const [firstName, setFirstName] = useState<string>("");
   const [lastName, setLastName] = useState<string>("");
-  const [pendingAppleCredential, setPendingAppleCredential] = useState<any>(null);
+  const [pendingAppleCredential, setPendingAppleCredential] =
+    useState<any>(null);
 
   useEffect(() => {
     AppleAuthentication.isAvailableAsync().then(setAppleAvailable);
@@ -54,15 +55,21 @@ const WelcomePage = () => {
       if (parts.length !== 3) return null;
       const payload_b64url = parts[1];
       const base64 = payload_b64url.replace(/-/g, "+").replace(/_/g, "/");
-      const padded_base64 = base64.padEnd(base64.length + (4 - (base64.length % 4)) % 4, "=");
-      
+      const padded_base64 = base64.padEnd(
+        base64.length + ((4 - (base64.length % 4)) % 4),
+        "=",
+      );
+
       let json_str: string;
       if (typeof atob === "function") {
         json_str = atob(padded_base64);
       } else {
-        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-        let buffer = '';
-        const clean_str = padded_base64.replace(/=+$/, '').replace(/[^A-Za-z0-9+/]/g, '');
+        const chars =
+          "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+        let buffer = "";
+        const clean_str = padded_base64
+          .replace(/=+$/, "")
+          .replace(/[^A-Za-z0-9+/]/g, "");
         let bc = 0;
         let bs = 0;
         for (let idx = 0; idx < clean_str.length; idx++) {
@@ -87,10 +94,12 @@ const WelcomePage = () => {
     credential: any,
     emailAddress: string,
     customFirstName?: string,
-    customLastName?: string
+    customLastName?: string,
   ) => {
-    const givenName = customFirstName || credential.fullName?.givenName || undefined;
-    const familyName = customLastName || credential.fullName?.familyName || undefined;
+    const givenName =
+      customFirstName || credential.fullName?.givenName || undefined;
+    const familyName =
+      customLastName || credential.fullName?.familyName || undefined;
 
     const appleArgs: Record<string, string> = {
       identityToken: credential.identityToken,
@@ -130,7 +139,7 @@ const WelcomePage = () => {
         pendingAppleCredential.credential,
         pendingAppleCredential.emailAddress,
         firstName.trim(),
-        lastName.trim()
+        lastName.trim(),
       );
     } catch (error: any) {
       console.log("Apple setup error", error);
@@ -192,7 +201,10 @@ const WelcomePage = () => {
     } catch (error: any) {
       if (error?.code !== "ERR_REQUEST_CANCELED") {
         console.log("Apple Sign-in error", error);
-        showCustomAlert(error?.message || "Apple Sign-in failed. Please try again.", "danger");
+        showCustomAlert(
+          error?.message || "Apple Sign-in failed. Please try again.",
+          "danger",
+        );
       }
     } finally {
       setAppleLoading(false);
@@ -368,7 +380,25 @@ const WelcomePage = () => {
           <Text
             style={[styles.legalText, { color: Colors[theme].text_secondary }]}
           >
-            By continuing, you agree to our Terms of Service and Privacy Policy.
+            By continuing, you agree to our{" "}
+            <Text
+              style={styles.legalLink}
+              onPress={() =>
+                WebBrowser.openBrowserAsync("https://snoopa.lawjun.ng/terms")
+              }
+            >
+              Terms & conditions
+            </Text>{" "}
+            and{" "}
+            <Text
+              style={styles.legalLink}
+              onPress={() =>
+                WebBrowser.openBrowserAsync("https://snoopa.lawjun.ng/privacy")
+              }
+            >
+              Privacy Policy
+            </Text>
+            .
           </Text>
         </View>
 
@@ -392,15 +422,45 @@ const WelcomePage = () => {
         }}
       >
         <View style={styles.modalContainer}>
-          <View style={[styles.modalContent, { backgroundColor: Colors[theme].surface, borderColor: Colors[theme].border }]}>
-            <Text style={[styles.modalTitle, { color: Colors[theme].text }]}>Almost there...</Text>
-            <Text style={[styles.modalSubtitle, { color: Colors[theme].text_secondary }]}>
-              Since you chose to hide your email, let us know how we should address you.
+          <View
+            style={[
+              styles.modalContent,
+              {
+                backgroundColor: Colors[theme].surface,
+                borderColor: Colors[theme].border,
+              },
+            ]}
+          >
+            <Text style={[styles.modalTitle, { color: Colors[theme].text }]}>
+              Almost there...
+            </Text>
+            <Text
+              style={[
+                styles.modalSubtitle,
+                { color: Colors[theme].text_secondary },
+              ]}
+            >
+              Since you chose to hide your email, let us know how we should
+              address you.
             </Text>
 
-            <Text style={[styles.inputLabel, { color: Colors[theme].text_secondary }]}>FIRST NAME</Text>
+            <Text
+              style={[
+                styles.inputLabel,
+                { color: Colors[theme].text_secondary },
+              ]}
+            >
+              FIRST NAME
+            </Text>
             <TextInput
-              style={[styles.input, { color: Colors[theme].text, backgroundColor: Colors[theme].background, borderColor: Colors[theme].border }]}
+              style={[
+                styles.input,
+                {
+                  color: Colors[theme].text,
+                  backgroundColor: Colors[theme].background,
+                  borderColor: Colors[theme].border,
+                },
+              ]}
               value={firstName}
               onChangeText={setFirstName}
               placeholder="Sherlock"
@@ -408,9 +468,23 @@ const WelcomePage = () => {
               autoCapitalize="words"
             />
 
-            <Text style={[styles.inputLabel, { color: Colors[theme].text_secondary }]}>LAST NAME</Text>
+            <Text
+              style={[
+                styles.inputLabel,
+                { color: Colors[theme].text_secondary },
+              ]}
+            >
+              LAST NAME
+            </Text>
             <TextInput
-              style={[styles.input, { color: Colors[theme].text, backgroundColor: Colors[theme].background, borderColor: Colors[theme].border }]}
+              style={[
+                styles.input,
+                {
+                  color: Colors[theme].text,
+                  backgroundColor: Colors[theme].background,
+                  borderColor: Colors[theme].border,
+                },
+              ]}
               value={lastName}
               onChangeText={setLastName}
               placeholder="Holmes"
@@ -420,10 +494,20 @@ const WelcomePage = () => {
 
             <View style={styles.modalButtons}>
               <Pressable
-                style={[styles.modalButton, { backgroundColor: Colors[theme].text }]}
+                style={[
+                  styles.modalButton,
+                  { backgroundColor: Colors[theme].text },
+                ]}
                 onPress={completeAppleSignInWithName}
               >
-                <Text style={[styles.modalButtonText, { color: Colors[theme].background }]}>Complete Setup</Text>
+                <Text
+                  style={[
+                    styles.modalButtonText,
+                    { color: Colors[theme].background },
+                  ]}
+                >
+                  Complete Setup
+                </Text>
               </Pressable>
 
               <Pressable
@@ -433,7 +517,14 @@ const WelcomePage = () => {
                   setPendingAppleCredential(null);
                 }}
               >
-                <Text style={[styles.modalCancelButtonText, { color: Colors[theme].text_secondary }]}>Cancel</Text>
+                <Text
+                  style={[
+                    styles.modalCancelButtonText,
+                    { color: Colors[theme].text_secondary },
+                  ]}
+                >
+                  Cancel
+                </Text>
               </Pressable>
             </View>
           </View>
@@ -510,6 +601,10 @@ const styles = StyleSheet.create({
     textAlign: "center",
     lineHeight: 18,
     maxWidth: "80%",
+  },
+  legalLink: {
+    fontFamily: "FontBold",
+    textDecorationLine: "underline",
   },
   brandText: {
     fontFamily: "FontMedium",
