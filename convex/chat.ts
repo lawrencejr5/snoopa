@@ -138,13 +138,6 @@ export const save_message = internalMutation({
       type: args.type,
     });
 
-    // Update watchlist's last_checked time
-    if (args.watchlist_id) {
-      await ctx.db.patch(args.watchlist_id, {
-        last_checked: Date.now(),
-      });
-    }
-
     return message;
   },
 });

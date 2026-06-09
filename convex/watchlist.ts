@@ -169,9 +169,7 @@ export const update_watchlist_item = mutation({
       throw new Error("Watchlist item not found or unauthorized");
     }
 
-    const updates: Record<string, any> = {
-      last_checked: Date.now(),
-    };
+    const updates: Record<string, any> = {};
     if (args.title !== undefined) updates.title = args.title;
     if (args.keywords !== undefined) updates.keywords = args.keywords;
     if (args.condition !== undefined) updates.condition = args.condition;
@@ -211,7 +209,6 @@ export const toggle_watchlist_status = mutation({
 
     await ctx.db.patch(args.watchlist_id, {
       status: newStatus,
-      last_checked: Date.now(),
     });
 
     // Log the status change
@@ -243,7 +240,6 @@ export const deactivate_watchlist = mutation({
 
     await ctx.db.patch(args.watchlist_id, {
       status: "inactive",
-      last_checked: Date.now(),
     });
 
     // Log the status change
@@ -275,7 +271,6 @@ export const reactivate_watchlist = mutation({
 
     await ctx.db.patch(args.watchlist_id, {
       status: "active",
-      last_checked: Date.now(),
     });
 
     // Log the status change

@@ -256,14 +256,9 @@ export const get_monitored_sources_for_items = internalQuery({
 
 /** Phase 1 — loads active items for the tier and filters out recently-checked ones. */
 async function _loadDueItems(ctx: any, tier: number): Promise<any[]> {
-  const tierInterval = TIER_INTERVALS[tier] ?? TIER_INTERVALS[3];
-  const allTierItems = await ctx.runQuery(
+  return await ctx.runQuery(
     internal.firehose.get_active_watchlist_items,
     { tier },
-  );
-  const now = Date.now();
-  return allTierItems.filter(
-    (item: any) => now - item.last_checked >= tierInterval * 0.9,
   );
 }
 
