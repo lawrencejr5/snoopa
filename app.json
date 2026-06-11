@@ -21,7 +21,6 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.lawrencejr.snoopa",
-      "buildNumber": "1",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -31,7 +30,6 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#121212"
       },
-      "versionCode": 1,
       "googleServicesFile": "./google-services.json",
       "predictiveBackGestureEnabled": false,
       "package": "com.lawrencejr.snoopa",
