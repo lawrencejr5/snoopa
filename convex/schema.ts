@@ -10,6 +10,16 @@ const schema = defineSchema({
     fullname: v.string(),
     username: v.optional(v.string()),
     plan: v.optional(v.union(v.literal("free"), v.literal("pro"))),
+    sub_tier: v.optional(
+      v.union(
+        v.literal("free"),
+        v.literal("pro"),
+        v.literal("supa"),
+        v.literal("max"),
+      ),
+    ),
+    date_of_sub: v.optional(v.number()),
+    is_premium: v.optional(v.boolean()),
     emailVerificationTime: v.optional(v.number()),
     pushTokens: v.optional(v.array(v.string())),
     memory: v.optional(v.string()),
@@ -127,6 +137,20 @@ const schema = defineSchema({
     images: v.optional(v.array(v.id("_storage"))),
     timestamp: v.number(),
   }).index("by_user", ["user_id"]),
+
+  snoops: defineTable({
+    user_id: v.id("users"),
+    snoops: v.number(),
+    remaining: v.number(),
+    type: v.union(
+      v.literal("free"),
+      v.literal("monthly"),
+      v.literal("top_up"),
+    ),
+    expiration_date: v.optional(v.number()),
+  })
+    .index("by_user", ["user_id"])
+    .index("by_user_expiry", ["user_id", "expiration_date"]),
 });
 
 export default schema;

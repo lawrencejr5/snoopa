@@ -1082,6 +1082,29 @@ export const send_message = action({
     if (!args.session_id && !args.watchlist_id)
       throw new Error("Attempted to chat without an active context.");
 
+    // -------------------------------------------------------------------------
+    // Snoop balance gate — deduct 1 snoop before doing any AI work.
+    // -------------------------------------------------------------------------
+    try {
+      await ctx.runMutation(internal.snoops.check_and_deduct, {
+        user_id,
+        watchlist_id: args.watchlist_id,
+      });
+    } catch (err: any) {
+      if (err?.data === "SNOOPS_EXHAUSTED" || err?.message?.includes("SNOOPS_EXHAUSTED")) {
+        const out_message =
+          "You've run out of snoops for this period. Top up or upgrade your plan to keep investigating. 🐾";
+        await ctx.runMutation(internal.chat.save_message, {
+          watchlist_id: args.watchlist_id,
+          role: "snoopa",
+          content: out_message,
+          type: "chat",
+        });
+        return { response: out_message };
+      }
+      throw err;
+    }
+
     // 1. Load + truncate history, save user message
     const raw_messages = await _loadHistory(ctx, args, user_id);
     await ctx.runMutation(internal.chat.save_message, {

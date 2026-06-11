@@ -202,3 +202,99 @@ export const backfill_watchlist_id_to_sources = internalMutation({
     return `Backfilled watchlist_id for ${count} sources.`;
   },
 });
+
+// ---------------------------------------------------------------------------
+// Snoop Economy Migrations
+// ---------------------------------------------------------------------------
+
+/**
+ * Sets sub_tier = "free" and is_premium = false for every user
+ * that doesn't already have these fields set.
+ */
+export const seed_free_users = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const users = await ctx.db.query("users").collect();
+    let count = 0;
+
+    for (const user of users) {
+      const db_user = user as any;
+      if (db_user.sub_tier === undefined || db_user.is_premium === undefined) {
+        await ctx.db.patch(user._id, {
+          sub_tier: "free",
+          is_premium: false,
+        } as any);
+        count++;
+      }
+    }
+
+    return `Set free tier on ${count} users.`;
+  },
+});
+
+/**
+ * Creates a 30-snoop "free" grant expiring at the end of the current calendar
+ * month for every user that does not already have a free/monthly grant
+ * active for this month.
+ */
+export const seed_free_snoops = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const now = Date.now();
+
+    // Compute end-of-month timestamp (UTC)
+    const nowDate = new Date(now);
+    const end_of_month = new Date(
+      Date.UTC(
+        nowDate.getUTCFullYear(),
+        nowDate.getUTCMonth() + 1,
+        0,
+        23,
+        59,
+        59,
+        999,
+      ),
+    ).getTime();
+
+    // Start-of-month for checking existing grants
+    const start_of_month = new Date(
+      Date.UTC(nowDate.getUTCFullYear(), nowDate.getUTCMonth(), 1),
+    ).getTime();
+
+    const users = await ctx.db.query("users").collect();
+    let created = 0;
+    let skipped = 0;
+
+    for (const user of users) {
+      // Check if the user already has a free or monthly grant for this month
+      const existing_grants = await ctx.db
+        .query("snoops")
+        .withIndex("by_user", (q) => q.eq("user_id", user._id))
+        .collect();
+
+      const has_current_grant = existing_grants.some(
+        (g) =>
+          (g.type === "free" || g.type === "monthly") &&
+          g.expiration_date !== undefined &&
+          g.expiration_date >= start_of_month,
+      );
+
+      if (has_current_grant) {
+        skipped++;
+        continue;
+      }
+
+      await ctx.db.insert("snoops", {
+        user_id: user._id,
+        snoops: 30,
+        remaining: 30,
+        type: "free",
+        expiration_date: end_of_month,
+      });
+      created++;
+    }
+
+    return `Created free snoop grants for ${created} users, skipped ${skipped} (already had a grant this month).`;
+  },
+});
+

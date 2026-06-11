@@ -516,6 +516,23 @@ async function _dispatchAlerts(
   let totalAlerts = 0;
 
   for (const [, { item, headlines }] of verifiedByItem) {
+    // -----------------------------------------------------------------------
+    // Snoop balance check — deduct 1 snoop before dispatching.
+    // If the user is out of snoops, skip this item and move on.
+    // -----------------------------------------------------------------------
+    try {
+      await ctx.runMutation(internal.snoops.check_and_deduct, {
+        user_id: item.user_id,
+        watchlist_id: item._id,
+      });
+    } catch (err: any) {
+      if (err?.data === "SNOOPS_EXHAUSTED" || err?.message?.includes("SNOOPS_EXHAUSTED")) {
+        console.log(`Firehose: Skipping "${item.title}" — user ${item.user_id} has exhausted their snoops.`);
+        continue;
+      }
+      // Re-throw unexpected errors
+      throw err;
+    }
     // Fetch the last 3 snoop briefs sent to the user for this item
     const recent_briefs: string[] = await ctx.runQuery(
       internal.chat.get_recent_snoop_briefs,
