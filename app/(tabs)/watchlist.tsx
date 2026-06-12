@@ -407,10 +407,7 @@ export default function WatchlistScreen() {
   const is_locked = watchlistData.length >= 2 && signedIn?.is_premium !== true;
   const snoop_balance = useQuery(api.snoops.get_snoop_balance) ?? 0;
   const snoop_grants = useQuery(api.snoops.get_snoop_grants) ?? [];
-  const primary_grant = (snoop_grants as any[]).find(
-    (g) => g.type === "free" || g.type === "monthly",
-  );
-  const snoop_total = primary_grant ? primary_grant.snoops : 30;
+  const snoop_total = (snoop_grants as any[]).reduce((sum, g) => sum + g.snoops, 0) || 30;
   const snoops_used = snoop_total - snoop_balance;
 
   const activeSnoops = watchlistData.filter((i) => i.status === "active");

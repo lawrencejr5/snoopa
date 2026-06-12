@@ -309,7 +309,7 @@ export default function BillingScreen() {
             { color: Colors[theme].text, marginBottom: 16 },
           ]}
         >
-          Upgrade Plans
+          {signedIn?.is_premium ? "Plans" : "Upgrade Plans"}
         </Text>
 
         {/* Plan Cards */}
@@ -329,19 +329,19 @@ export default function BillingScreen() {
                   styles.planCard,
                   {
                     backgroundColor: Colors[theme].card,
-                    borderColor: plan.highlight
+                    borderColor: plan.highlight || signedIn?.sub_tier === plan.id
                       ? Colors[theme].primary
                       : Colors[theme].border,
-                    borderWidth: plan.highlight ? 2 : 1,
+                    borderWidth: plan.highlight || signedIn?.sub_tier === plan.id ? 2 : 1,
                   },
                 ]}
               >
-              {plan.badge ? (
+              {plan.badge || signedIn?.sub_tier === plan.id ? (
                 <View
                   style={[
                     styles.badgeContainer,
                     {
-                      backgroundColor: plan.highlight
+                      backgroundColor: plan.highlight || signedIn?.sub_tier === plan.id
                         ? Colors[theme].primary
                         : Colors[theme].border,
                     },
@@ -351,13 +351,13 @@ export default function BillingScreen() {
                     style={[
                       styles.badgeText,
                       {
-                        color: plan.highlight
+                        color: plan.highlight || signedIn?.sub_tier === plan.id
                           ? Colors[theme].background
                           : Colors[theme].text,
                       },
                     ]}
                   >
-                    {plan.badge}
+                    {signedIn?.sub_tier === plan.id ? "CURRENT PLAN" : plan.badge}
                   </Text>
                 </View>
               ) : null}
