@@ -1,6 +1,7 @@
 import AddWatchlistModal from "@/components/AddWatchlistModal";
 import Container from "@/components/Container";
 import Loading from "@/components/Loading";
+import PremiumFeatureModal from "@/components/PremiumFeatureModal";
 import TopUpModal from "@/components/TopUpModal";
 import TrackTopicModal from "@/components/TrackTopicModal";
 import {
@@ -562,6 +563,7 @@ export default function HomeScreen() {
   const [showTrackModal, setShowTrackModal] = useState(false);
   const [selectedTopic, setSelectedTopic] = useState("");
   const [showTopUp, setShowTopUp] = useState(false);
+  const [showPremiumModal, setShowPremiumModal] = useState(false);
 
   const profileSheetRef = useRef<BottomSheetModal>(null);
 
@@ -678,7 +680,7 @@ export default function HomeScreen() {
   const snoop_total = primary_grant ? primary_grant.snoops : 30;
   const snoops_used = snoop_total - snoop_balance;
   const snoop_pct = snoop_total > 0 ? snoops_used / snoop_total : 0;
-  const is_low = snoop_balance <= snoop_total * 0.3;
+  const is_locked = watchlistData.length >= 2 && signedIn?.is_premium !== true;
 
   const activeSnoops = watchlistData
     .filter((i: any) => i.status === "active")
@@ -1066,30 +1068,49 @@ export default function HomeScreen() {
 
       {/* FAB */}
       <Pressable
-        onPress={() => setShowAddModal(true)}
-        style={[
+        onPress={() => {
+          if (is_locked) {
+            setShowPremiumModal(true);
+          } else {
+            setShowAddModal(true);
+          }
+        }}
+        style={({ pressed }) => [
           styles.fab,
           {
             backgroundColor: Colors[theme].primary,
+            opacity: pressed ? 0.82 : 1,
+            transform: [{ scale: pressed ? 0.96 : 1 }],
           },
         ]}
       >
-        <Text
-          style={{
-            fontSize: 28,
-            color: Colors[theme].background,
-            fontFamily: "FontLight",
-            marginTop: -2,
-          }}
-        >
-          +
-        </Text>
+        {is_locked ? (
+          <Octicons name="lock" size={18} color={Colors[theme].background} />
+        ) : (
+          <Text
+            style={{
+              fontSize: 28,
+              color: Colors[theme].background,
+              fontFamily: "FontLight",
+              marginTop: -2,
+            }}
+          >
+            +
+          </Text>
+        )}
       </Pressable>
 
       {/* Modals */}
       <AddWatchlistModal
         visible={showAddModal}
         onClose={() => setShowAddModal(false)}
+      />
+
+      <PremiumFeatureModal
+        visible={showPremiumModal}
+        onClose={() => setShowPremiumModal(false)}
+        featureName="Unlimited Watchlists"
+        featureDescription="Free accounts are limited to tracking up to 2 watchlists concurrently. Upgrade to Pro to track unlimited topics and more features 🔒"
       />
 
       <TrackTopicModal
@@ -1282,7 +1303,10 @@ export default function HomeScreen() {
           {snoop_pct >= 0.75 && (
             <Text
               style={{
-                color: snoop_pct >= 1.0 ? Colors[theme].danger : Colors[theme].warning,
+                color:
+                  snoop_pct >= 1.0
+                    ? Colors[theme].danger
+                    : Colors[theme].warning,
                 fontFamily: "FontMedium",
                 fontSize: 11,
                 marginTop: 4,
@@ -1290,8 +1314,8 @@ export default function HomeScreen() {
               }}
             >
               {snoop_pct >= 1.0
-                ? "Snoops exhausted — top up or upgrade to resume snooping 🐾"
-                : "Running low — top up or upgrade to keep tracking 🐾"}
+                ? "Snoops exhausted — top up or upgrade to resume snooping"
+                : "Running low — top up or upgrade to keep tracking"}
             </Text>
           )}
         </BottomSheetView>

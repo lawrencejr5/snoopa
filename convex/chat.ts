@@ -1591,6 +1591,16 @@ export const initialize_watchlist = action({
     const user_id = await getAuthUserId(ctx);
     if (!user_id) throw new Error("Not authenticated");
 
+    // Watchlist limit check for free users (max 2 watchlists)
+    const user_record = await ctx.runQuery(internal.users.get_user_internal, { user_id });
+    const is_premium = user_record?.is_premium === true;
+    if (!is_premium) {
+      const existing = await ctx.runQuery(api.watchlist.get_watchlists);
+      if (existing.length >= 2) {
+        throw new Error("FREE_LIMIT_REACHED: You have reached the maximum limit of 2 watchlists on a free account. Upgrade to Pro for unlimited watchlists! 🔒");
+      }
+    }
+
     try {
       // 1. Build the AI system prompt
       const { instructions } = await _buildWatchlistPrompt(ctx);

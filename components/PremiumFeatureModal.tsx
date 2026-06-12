@@ -1,6 +1,6 @@
 import Colors from "@/constants/Colors";
-import { useTheme } from "@/context/ThemeContext";
 import { useHapitcs } from "@/context/HapticsContext";
+import { useTheme } from "@/context/ThemeContext";
 import {
   BottomSheetBackdrop,
   BottomSheetModal,
@@ -8,13 +8,7 @@ import {
 } from "@gorhom/bottom-sheet";
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef } from "react";
-import {
-  Image,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 
 interface PremiumFeatureModalProps {
   visible: boolean;
@@ -48,7 +42,7 @@ export default function PremiumFeatureModal({
         onClose();
       }
     },
-    [onClose]
+    [onClose],
   );
 
   const renderBackdrop = useCallback(
@@ -59,7 +53,7 @@ export default function PremiumFeatureModal({
         appearsOnIndex={0}
       />
     ),
-    []
+    [],
   );
 
   const handleUpgradeNavigation = () => {
@@ -73,7 +67,7 @@ export default function PremiumFeatureModal({
   return (
     <BottomSheetModal
       ref={bottomSheetRef}
-      snapPoints={["40%"]}
+      snapPoints={["45%"]}
       index={0}
       onChange={handleSheetChanges}
       backdropComponent={renderBackdrop}
@@ -118,10 +112,7 @@ export default function PremiumFeatureModal({
           <View style={styles.buttonContainer}>
             <Pressable
               onPress={() => bottomSheetRef.current?.dismiss()}
-              style={[
-                styles.cancelBtn,
-                { borderColor: Colors[theme].border },
-              ]}
+              style={[styles.cancelBtn, { borderColor: Colors[theme].border }]}
             >
               <Text
                 style={[

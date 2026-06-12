@@ -123,6 +123,19 @@ export const add_watchlist_item = mutation({
     const user_id = await getAuthUserId(ctx);
     if (!user_id) throw new Error("Not authenticated");
 
+    // Watchlist limit check for free users (max 2 watchlists)
+    const user_record = await ctx.db.get(user_id);
+    const is_premium = user_record?.is_premium === true;
+    if (!is_premium) {
+      const existing = await ctx.db
+        .query("watchlist")
+        .withIndex("by_user", (q) => q.eq("user_id", user_id))
+        .collect();
+      if (existing.length >= 2) {
+        throw new Error("FREE_LIMIT_REACHED: Maximum 2 watchlists allowed on free tier.");
+      }
+    }
+
     const id = await ctx.db.insert("watchlist", {
       user_id,
       title: args.title,

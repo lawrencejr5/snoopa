@@ -1,4 +1,5 @@
 import AddWatchlistModal from "@/components/AddWatchlistModal";
+import PremiumFeatureModal from "@/components/PremiumFeatureModal";
 import Container from "@/components/Container";
 import Loading from "@/components/Loading";
 import {
@@ -12,6 +13,7 @@ import { useLoadingContext } from "@/context/LoadingContext";
 import { useTheme } from "@/context/ThemeContext";
 import { useUser } from "@/context/UserContext";
 import { api } from "@/convex/_generated/api";
+import { Octicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import { useRouter } from "expo-router";
@@ -314,6 +316,7 @@ export default function WatchlistScreen() {
   const navigation = useNavigation();
   const [animationKey, setAnimationKey] = useState(0);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showPremiumModal, setShowPremiumModal] = useState(false);
 
   // Options Modal State
   const [selectedSnoop, setSelectedSnoop] = useState<{
@@ -401,6 +404,7 @@ export default function WatchlistScreen() {
   }, [navigation]);
 
   const watchlistData = useQuery(api.watchlist.get_watchlists) || [];
+  const is_locked = watchlistData.length >= 2 && signedIn?.is_premium !== true;
   const snoop_balance = useQuery(api.snoops.get_snoop_balance) ?? 0;
   const snoop_grants = useQuery(api.snoops.get_snoop_grants) ?? [];
   const primary_grant = (snoop_grants as any[]).find(
@@ -687,29 +691,52 @@ export default function WatchlistScreen() {
 
       {/* Floating Action Button */}
       <Pressable
-        onPress={() => setShowAddModal(true)}
-        style={[
+        onPress={() => {
+          if (is_locked) {
+            setShowPremiumModal(true);
+          } else {
+            setShowAddModal(true);
+          }
+        }}
+        style={({ pressed }) => [
           styles.fab,
           {
             backgroundColor: Colors[theme].primary,
+            opacity: pressed ? 0.82 : 1,
+            transform: [{ scale: pressed ? 0.96 : 1 }],
           },
         ]}
       >
-        <Text
-          style={{
-            fontSize: 28,
-            color: Colors[theme].background,
-            fontFamily: "FontLight",
-            marginTop: -2,
-          }}
-        >
-          +
-        </Text>
+        {is_locked ? (
+          <Octicons
+            name="lock"
+            size={18}
+            color={Colors[theme].background}
+          />
+        ) : (
+          <Text
+            style={{
+              fontSize: 28,
+              color: Colors[theme].background,
+              fontFamily: "FontLight",
+              marginTop: -2,
+            }}
+          >
+            +
+          </Text>
+        )}
       </Pressable>
 
       <AddWatchlistModal
         visible={showAddModal}
         onClose={() => setShowAddModal(false)}
+      />
+
+      <PremiumFeatureModal
+        visible={showPremiumModal}
+        onClose={() => setShowPremiumModal(false)}
+        featureName="Unlimited Watchlists"
+        featureDescription="Free accounts are limited to tracking up to 2 watchlists concurrently. Upgrade to Pro to track unlimited topics and monitor all your custom intelligence streams! 🔒"
       />
 
       {selectedSnoop && (
