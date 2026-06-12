@@ -189,7 +189,7 @@ export default function ProfileScreen() {
                   { color: Colors[theme].text, textTransform: "capitalize" },
                 ]}
               >
-                {signedIn?.plan} Plan
+                {signedIn?.sub_tier === "supa" ? "Supa Snoopa" : `${signedIn?.sub_tier || "free"} Plan`}
               </Text>
             </View>
           </View>
