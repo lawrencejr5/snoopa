@@ -516,23 +516,6 @@ async function _dispatchAlerts(
   let totalAlerts = 0;
 
   for (const [, { item, headlines }] of verifiedByItem) {
-    // -----------------------------------------------------------------------
-    // Snoop balance check — deduct 1 snoop before dispatching.
-    // If the user is out of snoops, skip this item and move on.
-    // -----------------------------------------------------------------------
-    try {
-      await ctx.runMutation(internal.snoops.check_and_deduct, {
-        user_id: item.user_id,
-        watchlist_id: item._id,
-      });
-    } catch (err: any) {
-      if (err?.data === "SNOOPS_EXHAUSTED" || err?.message?.includes("SNOOPS_EXHAUSTED")) {
-        console.log(`Firehose: Skipping "${item.title}" — user ${item.user_id} has exhausted their snoops.`);
-        continue;
-      }
-      // Re-throw unexpected errors
-      throw err;
-    }
     // Fetch the last 3 snoop briefs sent to the user for this item
     const recent_briefs: string[] = await ctx.runQuery(
       internal.chat.get_recent_snoop_briefs,
@@ -629,8 +612,47 @@ export const run_firehose = internalAction({
       `Firehose (tier ${args.tier}): ${activeItems.length} items due for check.`,
     );
 
+    // 1.5 Filter out items for users with no remaining snoops
+    const itemsToProcess = [];
+    const userSnoopBalances = new Map<string, number>();
+
+    for (const item of activeItems) {
+      const balance = userSnoopBalances.get(item.user_id);
+      let actualBalance: number;
+      if (balance === undefined) {
+        const dbBalance = await ctx.runQuery(internal.snoops.get_total_remaining, {
+          user_id: item.user_id,
+        });
+        actualBalance = dbBalance ?? 0;
+        userSnoopBalances.set(item.user_id, actualBalance);
+      } else {
+        actualBalance = balance;
+      }
+
+      if (actualBalance < 1) {
+        // Trigger check_and_deduct mutation to log error and create notification
+        await ctx.runMutation(internal.snoops.check_and_deduct, {
+          user_id: item.user_id,
+          watchlist_id: item._id,
+        }).catch((err) => {
+          console.log(`Firehose: User ${item.user_id} has exhausted their snoops. Warning created.`);
+        });
+        continue;
+      }
+
+      userSnoopBalances.set(item.user_id, actualBalance - 1);
+      itemsToProcess.push(item);
+    }
+
+    if (itemsToProcess.length === 0) {
+      console.log(
+        `Firehose (tier ${args.tier}): no items to process after snoop balance verification.`,
+      );
+      return;
+    }
+
     // 2. Bulk-load processed hashes (single query, in-memory set)
-    const watchlistIds = activeItems.map((i: any) => i._id);
+    const watchlistIds = itemsToProcess.map((i: any) => i._id);
     const processedKeys = await ctx.runQuery(
       internal.log.get_processed_hashes_for_items,
       { watchlist_ids: watchlistIds },
@@ -647,13 +669,13 @@ export const run_firehose = internalAction({
     const { sourceUpdates, sourcesByWatchlistId } =
       await _processMonitoredSources(
         ctx,
-        activeItems,
+        itemsToProcess,
         verifiedByItem,
         geminiKey,
       );
 
     // 3B. Determine which items still need a general search
-    const itemsForGeneralSearch = activeItems.filter((item: any) => {
+    const itemsForGeneralSearch = itemsToProcess.filter((item: any) => {
       const sources = sourcesByWatchlistId.get(item._id) || [];
       if (sources.find((s: any) => s.source_weight === "primary")) return false;
       const secondarySatisfied = sources.some(
@@ -686,7 +708,25 @@ export const run_firehose = internalAction({
     // 7. Generate briefs + dispatch alerts (chat, notification, push)
     const totalAlerts = await _dispatchAlerts(ctx, verifiedByItem, geminiKey);
 
-    // 8. Update last_checked for all active items
+    // 8. Deduct 1 snoop for each successfully processed item
+    for (const item of itemsToProcess) {
+      try {
+        await ctx.runMutation(internal.snoops.deduct_snoops, {
+          user_id: item.user_id,
+          amount: 1,
+        });
+        console.log(
+          `Firehose: Deducted 1 snoop for user ${item.user_id} (watchlist: ${item._id})`,
+        );
+      } catch (deductErr) {
+        console.error(
+          `Firehose: Failed to deduct snoop for user ${item.user_id}`,
+          deductErr,
+        );
+      }
+    }
+
+    // 9. Update last_checked for all processed items
     await ctx.runMutation(internal.log.batch_update_last_checked, {
       watchlist_ids: watchlistIds,
     });

@@ -1,8 +1,10 @@
 import Container from "@/components/Container";
+import PremiumFeatureModal from "@/components/PremiumFeatureModal";
+import TopUpModal from "@/components/TopUpModal";
 import Colors from "@/constants/Colors";
-import { useTheme } from "@/context/ThemeContext";
-import { useHapitcs } from "@/context/HapticsContext";
 import { useCustomAlert } from "@/context/CustomAlertContext";
+import { useHapitcs } from "@/context/HapticsContext";
+import { useTheme } from "@/context/ThemeContext";
 import { useUser } from "@/context/UserContext";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
@@ -14,8 +16,6 @@ import {
   Text,
   View,
 } from "react-native";
-import TopUpModal from "@/components/TopUpModal";
-import PremiumFeatureModal from "@/components/PremiumFeatureModal";
 
 const PLANS = [
   {
@@ -77,7 +77,10 @@ export default function BillingScreen() {
 
   const handleSelectPlan = (planName: string) => {
     haptics.impact("success");
-    showCustomAlert(`${planName} subscription process is coming soon!`, "success");
+    showCustomAlert(
+      `${planName} subscription process is coming soon!`,
+      "success",
+    );
   };
 
   return (
@@ -350,7 +353,7 @@ export default function BillingScreen() {
                     { color: Colors[theme].text_secondary },
                   ]}
                 >
-                  Top up your active watchlists instantly
+                  Top up your snoops instantly
                 </Text>
               </View>
             </View>
@@ -406,7 +409,7 @@ export default function BillingScreen() {
                     { color: Colors[theme].text_secondary },
                   ]}
                 >
-                  Test the pro features lock bottom sheet
+                  Open pro lock
                 </Text>
               </View>
             </View>
