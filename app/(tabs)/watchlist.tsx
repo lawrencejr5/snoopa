@@ -103,14 +103,8 @@ function ActiveSnoopCard({
   router: ReturnType<typeof useRouter>;
   onLongPress?: () => void;
 }) {
-  const newCount =
-    useQuery(api.log.get_new_logs_count, {
-      watchlist_id: item._id,
-      since: item.last_checked,
-    }) ?? 0;
-
   const unseenCount =
-    useQuery(api.log.get_unseen_logs_count, {
+    useQuery(api.chat.get_unseen_chats_count, {
       watchlist_id: item._id,
     }) ?? 0;
 
@@ -162,7 +156,7 @@ function ActiveSnoopCard({
               {item.title}
             </Text>
           </View>
-          {newCount > 0 && (
+          {unseenCount > 0 && (
             <View
               style={{
                 backgroundColor: Colors[theme].success + "20",
@@ -178,7 +172,7 @@ function ActiveSnoopCard({
                   fontFamily: "FontBold",
                 }}
               >
-                {newCount} new
+                {unseenCount} new
               </Text>
             </View>
           )}
@@ -594,7 +588,7 @@ export default function WatchlistScreen() {
                     <Text
                       style={[styles.statNumber, { color: Colors[theme].text }]}
                     >
-                      {snoop_balance}
+                      {snoops_used}
                     </Text>
                     <Text
                       style={{
@@ -636,7 +630,7 @@ export default function WatchlistScreen() {
                     { color: Colors[theme].text_secondary },
                   ]}
                 >
-                  Snoops Left
+                  Snoops Used
                 </Text>
               </View>
             </Animated.View>

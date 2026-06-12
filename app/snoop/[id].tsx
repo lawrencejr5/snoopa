@@ -398,6 +398,9 @@ export default function SnoopDetailsScreen() {
   const [showCommands, setShowCommands] = useState(false);
   const [showRename, setShowRename] = useState(false);
   const [showTopUp, setShowTopUp] = useState(false);
+  const [submittingFeedback, setSubmittingFeedback] = useState<
+    Record<string, "like" | "dislike" | null>
+  >({});
   const [isProcessing, setIsProcessing] = useState(false);
   const [sending, setSending] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
@@ -535,9 +538,24 @@ export default function SnoopDetailsScreen() {
     return entries;
   }, [logs, chatMessages]);
 
+  const prevMessagesLength = useRef(0);
+  const prevLogsLength = useRef(0);
+
   // Auto-scroll to bottom when new messages/logs arrive
   useEffect(() => {
-    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 300);
+    const currentMessagesLength = chatMessages?.length ?? 0;
+    const currentLogsLength = logs?.length ?? 0;
+
+    // Only scroll to end if a new message or log was added
+    if (
+      currentMessagesLength > prevMessagesLength.current ||
+      currentLogsLength > prevLogsLength.current
+    ) {
+      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 300);
+    }
+
+    prevMessagesLength.current = currentMessagesLength;
+    prevLogsLength.current = currentLogsLength;
   }, [logs, chatMessages]);
 
   // Also scroll immediately when sending starts so the status label is visible
@@ -653,6 +671,28 @@ export default function SnoopDetailsScreen() {
     } finally {
       setSending(false);
       setLoadingStatus("...");
+    }
+  };
+
+  const handleFeedback = async (
+    chatId: string,
+    feedbackType: "like" | "dislike",
+  ) => {
+    setSubmittingFeedback((prev) => ({ ...prev, [chatId]: feedbackType }));
+    try {
+      await submitFeedback({
+        chat_id: chatId as Id<"chats">,
+        feedback: feedbackType,
+      });
+      showCustomAlert("Feedback submitted", "success");
+    } catch (err) {
+      console.error("Failed to submit feedback:", err);
+    } finally {
+      setSubmittingFeedback((prev) => {
+        const next = { ...prev };
+        delete next[chatId];
+        return next;
+      });
     }
   };
 
@@ -1389,69 +1429,81 @@ export default function SnoopDetailsScreen() {
                           }}
                         >
                           <Pressable
-                            onPress={() =>
-                              submitFeedback({
-                                chat_id: entry.id as Id<"chats">,
-                                feedback: "like",
-                              }).catch(() => {})
-                            }
-                            style={{
-                              paddingHorizontal: 10,
-                              paddingVertical: 5,
-                              borderRadius: 8,
-                              borderWidth: 1,
-                              borderColor:
-                                entry.feedback === "like"
-                                  ? Colors[theme].text
-                                  : Colors[theme].border,
-                              backgroundColor:
-                                entry.feedback === "like"
-                                  ? Colors[theme].text + "18"
-                                  : "transparent",
-                            }}
+                            onPress={() => handleFeedback(entry.id, "like")}
+                            disabled={submittingFeedback[entry.id] !== undefined}
+                            style={({ pressed }) => [
+                              {
+                                paddingHorizontal: 10,
+                                paddingVertical: 5,
+                                borderRadius: 8,
+                                borderWidth: 1,
+                                borderColor:
+                                  entry.feedback === "like"
+                                    ? Colors[theme].text
+                                    : Colors[theme].border,
+                                backgroundColor:
+                                  entry.feedback === "like"
+                                    ? Colors[theme].text + "18"
+                                    : "transparent",
+                                opacity: pressed ? 0.72 : 1,
+                              },
+                            ]}
                           >
-                            <Octicons
-                              name="thumbsup"
-                              size={12}
-                              color={
-                                entry.feedback === "like"
-                                  ? Colors[theme].text
-                                  : Colors[theme].text_secondary
-                              }
-                            />
+                            {submittingFeedback[entry.id] === "like" ? (
+                              <ActivityIndicator
+                                size={12}
+                                color={Colors[theme].text}
+                              />
+                            ) : (
+                              <Octicons
+                                name="thumbsup"
+                                size={12}
+                                color={
+                                  entry.feedback === "like"
+                                    ? Colors[theme].text
+                                    : Colors[theme].text_secondary
+                                }
+                              />
+                            )}
                           </Pressable>
 
                           <Pressable
-                            onPress={() =>
-                              submitFeedback({
-                                chat_id: entry.id as Id<"chats">,
-                                feedback: "dislike",
-                              }).catch(() => {})
-                            }
-                            style={{
-                              paddingHorizontal: 10,
-                              paddingVertical: 5,
-                              borderRadius: 8,
-                              borderWidth: 1,
-                              borderColor:
-                                entry.feedback === "dislike"
-                                  ? Colors[theme].text
-                                  : Colors[theme].border,
-                              backgroundColor:
-                                entry.feedback === "dislike"
-                                  ? Colors[theme].text + "18"
-                                  : "transparent",
-                            }}
+                            onPress={() => handleFeedback(entry.id, "dislike")}
+                            disabled={submittingFeedback[entry.id] !== undefined}
+                            style={({ pressed }) => [
+                              {
+                                paddingHorizontal: 10,
+                                paddingVertical: 5,
+                                borderRadius: 8,
+                                borderWidth: 1,
+                                borderColor:
+                                  entry.feedback === "dislike"
+                                    ? Colors[theme].text
+                                    : Colors[theme].border,
+                                backgroundColor:
+                                  entry.feedback === "dislike"
+                                    ? Colors[theme].text + "18"
+                                    : "transparent",
+                                opacity: pressed ? 0.72 : 1,
+                              },
+                            ]}
                           >
-                            <Octicons
-                              name="thumbsdown"
-                              size={12}
-                              color={
-                                entry.feedback === "dislike"
-                                  ? Colors[theme].text
-                                  : Colors[theme].text_secondary
-                              }
-                            />
+                            {submittingFeedback[entry.id] === "dislike" ? (
+                              <ActivityIndicator
+                                size={12}
+                                color={Colors[theme].text}
+                              />
+                            ) : (
+                              <Octicons
+                                name="thumbsdown"
+                                size={12}
+                                color={
+                                  entry.feedback === "dislike"
+                                    ? Colors[theme].text
+                                    : Colors[theme].text_secondary
+                                }
+                              />
+                            )}
                           </Pressable>
                         </View>
                       </View>
