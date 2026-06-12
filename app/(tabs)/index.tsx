@@ -118,6 +118,13 @@ function AvatarSnoopRing({
   const progress = total > 0 ? used / total : 0;
   const strokeDashoffset = circumference * (1 - progress);
 
+  let activeColor = color;
+  if (remaining <= 0) {
+    activeColor = Colors[theme].danger;
+  } else if (progress >= 0.75) {
+    activeColor = Colors[theme].warning;
+  }
+
   const gapLength = 3;
   const segmentLength = (circumference - 4 * gapLength) / 4;
 
@@ -167,7 +174,7 @@ function AvatarSnoopRing({
           cx={size / 2}
           cy={size / 2}
           r={radius}
-          stroke={color}
+          stroke={activeColor}
           strokeWidth={strokeWidth}
           fill="none"
           strokeDasharray={`${circumference}`}
@@ -1272,17 +1279,19 @@ export default function HomeScreen() {
           </View>
 
           {/* Low warning */}
-          {is_low && (
+          {snoop_pct >= 0.75 && (
             <Text
               style={{
-                color: Colors[theme].danger,
+                color: snoop_pct >= 1.0 ? Colors[theme].danger : Colors[theme].warning,
                 fontFamily: "FontMedium",
                 fontSize: 11,
                 marginTop: 4,
                 marginBottom: 10,
               }}
             >
-              Running low — top up or upgrade to keep tracking 🐾
+              {snoop_pct >= 1.0
+                ? "Snoops exhausted — top up or upgrade to resume snooping 🐾"
+                : "Running low — top up or upgrade to keep tracking 🐾"}
             </Text>
           )}
         </BottomSheetView>

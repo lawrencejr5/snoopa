@@ -280,16 +280,18 @@ export default function ProfileScreen() {
           </View>
 
           {/* Low warning */}
-          {is_low && (
+          {snoop_pct >= 0.75 && (
             <Text
               style={{
-                color: Colors[theme].danger,
+                color: snoop_pct >= 1.0 ? Colors[theme].danger : Colors[theme].warning,
                 fontFamily: "FontMedium",
                 fontSize: 11,
                 marginTop: 8,
               }}
             >
-              Running low — top up or upgrade to keep tracking 🐾
+              {snoop_pct >= 1.0
+                ? "Snoops exhausted — top up or upgrade to resume snooping 🐾"
+                : "Running low — top up or upgrade to keep tracking 🐾"}
             </Text>
           )}
         </Animated.View>
