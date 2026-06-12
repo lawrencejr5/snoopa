@@ -44,7 +44,7 @@ import Animated, {
   withSequence,
   withTiming,
 } from "react-native-reanimated";
-import Svg, { Circle } from "react-native-svg";
+import Svg, { Circle, Defs, Mask } from "react-native-svg";
 
 // ---------------------------------------------------------------------------
 // Pulsing Dot
@@ -116,8 +116,10 @@ function AvatarSnoopRing({
   const circumference = 2 * Math.PI * radius;
   const used = total > 0 ? Math.min(total - remaining, total) : 0;
   const progress = total > 0 ? used / total : 0;
-  // Progress goes from 12 o'clock (top), clockwise
   const strokeDashoffset = circumference * (1 - progress);
+
+  const gapLength = 3;
+  const segmentLength = (circumference - 4 * gapLength) / 4;
 
   const avatarSrc =
     avatar && AVATAR_MAP[avatar]
@@ -131,16 +133,36 @@ function AvatarSnoopRing({
         height={size}
         style={{ position: "absolute", top: 0, left: 0 }}
       >
-        {/* Track ring */}
+        <Defs>
+          <Mask id={`snoopRingMask-${size}`}>
+            <Circle
+              cx={size / 2}
+              cy={size / 2}
+              r={radius}
+              stroke="white"
+              strokeWidth={strokeWidth}
+              strokeDasharray={`${segmentLength} ${gapLength}`}
+              fill="none"
+              rotation="-90"
+              origin={`${size / 2}, ${size / 2}`}
+            />
+          </Mask>
+        </Defs>
+
+        {/* Track ring (broken into 4 parts) */}
         <Circle
           cx={size / 2}
           cy={size / 2}
           r={radius}
           stroke={bgColor}
           strokeWidth={strokeWidth}
+          strokeDasharray={`${segmentLength} ${gapLength}`}
           fill="none"
+          rotation="-90"
+          origin={`${size / 2}, ${size / 2}`}
         />
-        {/* Progress arc */}
+
+        {/* Progress arc (masked to align with the broken track) */}
         <Circle
           cx={size / 2}
           cy={size / 2}
@@ -153,6 +175,7 @@ function AvatarSnoopRing({
           strokeLinecap="round"
           rotation="-90"
           origin={`${size / 2}, ${size / 2}`}
+          mask={`url(#snoopRingMask-${size})`}
         />
       </Svg>
       <Image
@@ -1082,22 +1105,14 @@ export default function HomeScreen() {
         <BottomSheetView style={styles.sheetContainer}>
           {/* Profile Avatar Image (Large) & User Info */}
           <View style={{ alignItems: "center", marginBottom: 20 }}>
-            <Image
-              source={
-                (signedIn as any)?.avatar &&
-                AVATAR_MAP[(signedIn as any).avatar]
-                  ? AVATAR_MAP[(signedIn as any).avatar]
-                  : require("@/assets/images/splash-icon.png")
-              }
-              style={{
-                width: 80,
-                height: 80,
-                borderRadius: 40,
-                borderWidth: 2,
-                borderColor: Colors[theme].border,
-                backgroundColor: Colors[theme].surface,
-                marginBottom: 12,
-              }}
+            <AvatarSnoopRing
+              avatar={(signedIn as any)?.avatar}
+              remaining={snoop_balance}
+              total={snoop_total}
+              size={88}
+              strokeWidth={4}
+              color={Colors[theme].text}
+              bgColor={Colors[theme].border}
             />
             <Text
               style={{
@@ -1105,6 +1120,7 @@ export default function HomeScreen() {
                 fontFamily: "FontBold",
                 fontSize: 20,
                 letterSpacing: -0.5,
+                marginTop: 12,
                 marginBottom: 4,
               }}
             >

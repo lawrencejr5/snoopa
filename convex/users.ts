@@ -3,6 +3,13 @@ import { internalQuery, mutation, query } from "./_generated/server";
 
 import { getAuthUserId } from "@convex-dev/auth/server";
 
+export const get_user_internal = internalQuery({
+  args: { user_id: v.id("users") },
+  handler: async (ctx, args) => {
+    return await ctx.db.get(args.user_id);
+  },
+});
+
 export const get_current_user = query({
   args: {},
   handler: async (ctx) => {

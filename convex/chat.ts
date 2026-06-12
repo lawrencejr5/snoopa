@@ -167,6 +167,41 @@ export const submit_feedback = mutation({
 });
 
 /**
+ * Public mutation to save a premium gate message to chats.
+ */
+export const save_gate_message = mutation({
+  args: {
+    watchlist_id: v.id("watchlist"),
+    gate_type: v.union(v.literal("add_source"), v.literal("edit_condition")),
+  },
+  handler: async (ctx, args) => {
+    const user_id = await getAuthUserId(ctx);
+    if (!user_id) throw new Error("Not authenticated");
+
+    const watchlist = await ctx.db.get(args.watchlist_id);
+    if (!watchlist || watchlist.user_id !== user_id) {
+      throw new Error("Watchlist not found or unauthorized");
+    }
+
+    const gate_message =
+      args.gate_type === "add_source"
+        ? "PREMIUM_REQUIRED_ADD_SOURCE: Adding custom sources requires a Pro plan. Upgrade to tell Snoopa exactly where to get its intel! 🔒"
+        : "PREMIUM_REQUIRED_EDIT_CONDITION: Editing tracking conditions requires a Pro plan. Upgrade to customize what Snoopa tracks for you! 🔒";
+
+    const chatMsgId = await ctx.db.insert("chats", {
+      watchlist_id: args.watchlist_id,
+      role: "snoopa",
+      content: gate_message,
+      seen: false,
+      type: "chat",
+    });
+
+    return chatMsgId;
+  },
+});
+
+
+/**
  * Get sources for all chats in a watchlist (and legacy session).
  */
 export const get_session_sources = query({
@@ -1092,6 +1127,14 @@ export const send_message = action({
       });
     } catch (err: any) {
       if (err?.data === "SNOOPS_EXHAUSTED" || err?.message?.includes("SNOOPS_EXHAUSTED")) {
+        // Save the user's incoming message first
+        await ctx.runMutation(internal.chat.save_message, {
+          watchlist_id: args.watchlist_id,
+          role: "user",
+          content: args.content,
+          type: "chat",
+        });
+
         const out_message =
           "You've run out of snoops for this period. Top up or upgrade your plan to keep investigating. 🐾";
         await ctx.runMutation(internal.chat.save_message, {
@@ -1132,6 +1175,30 @@ export const send_message = action({
           .join("\n"),
       ));
     console.log(`🔍 Intent${args.intent ? " (pre-detected)" : ""}: ${intent}`);
+
+    // -------------------------------------------------------------------------
+    // Premium feature gate — SOURCE and EDIT_CONDITION require a paid plan.
+    // Checked AFTER intent resolution so it catches both explicit and
+    // AI-detected intents (e.g. user chatting "update my condition to X").
+    // -------------------------------------------------------------------------
+    if (intent === "SOURCE" || intent === "EDIT_CONDITION") {
+      const user_record = await ctx.runQuery(internal.users.get_user_internal, { user_id });
+      const is_premium = user_record?.is_premium === true;
+      if (!is_premium) {
+        const gate_message =
+          intent === "SOURCE"
+            ? "PREMIUM_REQUIRED_ADD_SOURCE: Adding custom sources requires a Pro plan. Upgrade to tell Snoopa exactly where to get its intel! 🔒"
+            : "PREMIUM_REQUIRED_EDIT_CONDITION: Editing tracking conditions requires a Pro plan. Upgrade to customize what Snoopa tracks for you! 🔒";
+
+        await ctx.runMutation(internal.chat.save_message, {
+          watchlist_id: args.watchlist_id,
+          role: "snoopa",
+          content: gate_message,
+          type: "chat",
+        });
+        return { response: gate_message };
+      }
+    }
 
     // 3. Early-exit intents (no AI generation needed)
     if (intent === "PAUSE") return _handlePause(ctx, args.watchlist_id);

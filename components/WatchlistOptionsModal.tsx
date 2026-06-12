@@ -32,8 +32,10 @@ export function CommandsModal({
   onRename,
   onEdit,
   onAddSource,
+  onUpgrade,
   isProcessing,
   hideSourceAndCondition = false,
+  isPremium = false,
 }: {
   visible: boolean;
   onClose: () => void;
@@ -43,8 +45,10 @@ export function CommandsModal({
   onRename: () => void;
   onEdit?: () => void;
   onAddSource?: () => void;
+  onUpgrade?: (gate_type: "add_source" | "edit_condition") => void;
   isProcessing: boolean;
   hideSourceAndCondition?: boolean;
+  isPremium?: boolean;
 }) {
   const { theme } = useTheme();
 
@@ -56,16 +60,18 @@ export function CommandsModal({
             id: "add_source",
             label: "Add source URL",
             icon: "link",
-            action: onAddSource!,
+            action: isPremium ? onAddSource! : () => onUpgrade?.("add_source"),
             color: Colors[theme].text,
+            locked: !isPremium,
           },
         ]),
     {
       id: "pause_resume",
-      label: snoop.status === "inactive" ? "Resume tracking" : "Pause tracking",
+      label: snoop.status === "inactive" ? "Resume tracking" : "Stop tracking",
       icon: snoop.status === "inactive" ? "play" : "pause",
       action: onPauseResume,
       color: Colors[theme].text,
+      locked: false,
     },
     ...(hideSourceAndCondition
       ? []
@@ -74,8 +80,9 @@ export function CommandsModal({
             id: "edit",
             label: "Edit condition",
             icon: "document",
-            action: onEdit!,
+            action: isPremium ? onEdit! : () => onUpgrade?.("edit_condition"),
             color: Colors[theme].text,
+            locked: !isPremium,
           },
         ]),
     {
@@ -84,6 +91,7 @@ export function CommandsModal({
       icon: "document",
       action: onRename,
       color: Colors[theme].text,
+      locked: false,
     },
     {
       id: "terminate",
@@ -91,6 +99,7 @@ export function CommandsModal({
       icon: "times",
       action: onTerminate,
       color: Colors[theme].danger,
+      locked: false,
     },
   ];
 
@@ -162,7 +171,7 @@ export function CommandsModal({
             key={o.id}
             onPress={() => {
               o.action();
-              bottomSheetRef.current?.dismiss();
+              if (!o.locked) bottomSheetRef.current?.dismiss();
             }}
             disabled={isProcessing}
             style={[
@@ -183,17 +192,49 @@ export function CommandsModal({
                   color: o.color,
                   fontFamily: "FontMedium",
                   fontSize: 15,
+                  opacity: o.locked ? 0.5 : 1,
                 }}
               >
                 {o.label}
               </Text>
+              {o.locked && (
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 4,
+                    backgroundColor: "transparent",
+                    borderWidth: 1,
+                    borderColor: Colors[theme].border,
+                    borderRadius: 6,
+                    paddingHorizontal: 7,
+                    paddingVertical: 2,
+                  }}
+                >
+                  <Octicons
+                    name="lock"
+                    size={10}
+                    color={Colors[theme].text_secondary}
+                  />
+                  <Text
+                    style={{
+                      color: Colors[theme].text_secondary,
+                      fontFamily: "FontBold",
+                      fontSize: 10,
+                      letterSpacing: 0.5,
+                    }}
+                  >
+                    PRO
+                  </Text>
+                </View>
+              )}
             </View>
             {o.icon === "link" ? (
               <Octicons
                 name="link"
                 size={16}
                 color={o.color}
-                style={{ opacity: 0.7 }}
+                style={{ opacity: o.locked ? 0.3 : 0.7 }}
               />
             ) : (
               <Image
@@ -210,7 +251,7 @@ export function CommandsModal({
                   width: 16,
                   height: 16,
                   tintColor: o.color,
-                  opacity: 0.7,
+                  opacity: o.locked ? 0.3 : 0.7,
                 }}
               />
             )}

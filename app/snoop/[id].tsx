@@ -1,17 +1,20 @@
 import Container from "@/components/Container";
 import FormatText from "@/components/FormatText";
 import Loading from "@/components/Loading";
-import Colors from "@/constants/Colors";
-import { useTheme } from "@/context/ThemeContext";
-import { useUser } from "@/context/UserContext";
-import { api } from "@/convex/_generated/api";
-import { Id } from "@/convex/_generated/dataModel";
-import { Octicons, SimpleLineIcons } from "@expo/vector-icons";
+import TopUpModal from "@/components/TopUpModal";
 import {
   CommandsModal,
   ConfirmationModal,
   RenameModal,
 } from "@/components/WatchlistOptionsModal";
+import Colors from "@/constants/Colors";
+import { useCustomAlert } from "@/context/CustomAlertContext";
+import { useHapitcs } from "@/context/HapticsContext";
+import { useTheme } from "@/context/ThemeContext";
+import { useUser } from "@/context/UserContext";
+import { api } from "@/convex/_generated/api";
+import { Id } from "@/convex/_generated/dataModel";
+import { Octicons, SimpleLineIcons } from "@expo/vector-icons";
 import {
   BottomSheetBackdrop,
   BottomSheetModal,
@@ -38,7 +41,6 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { useCustomAlert } from "@/context/CustomAlertContext";
 import { KeyboardStickyView } from "react-native-keyboard-controller";
 import Animated, {
   FadeIn,
@@ -82,7 +84,6 @@ const BlinkingCursor = ({ color }: { color: string }) => {
 // ---------------------------------------------------------------------------
 // Commands Modal
 // ---------------------------------------------------------------------------
-
 
 // ---------------------------------------------------------------------------
 // Edit Modal
@@ -211,8 +212,6 @@ function EditModal({
     </Modal>
   );
 }
-
-
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -389,6 +388,7 @@ function SourcesSheet({
 export default function SnoopDetailsScreen() {
   const { theme } = useTheme();
   const router = useRouter();
+  const haptics = useHapitcs();
   const { showCustomAlert } = useCustomAlert();
   const { id } = useLocalSearchParams();
   const { signedIn } = useUser();
@@ -397,6 +397,7 @@ export default function SnoopDetailsScreen() {
   const [input, setInput] = useState("");
   const [showCommands, setShowCommands] = useState(false);
   const [showRename, setShowRename] = useState(false);
+  const [showTopUp, setShowTopUp] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [sending, setSending] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
@@ -439,6 +440,7 @@ export default function SnoopDetailsScreen() {
   const markLogsSeen = useMutation(api.log.mark_logs_seen);
   const markChatsSeen = useMutation(api.chat.mark_chats_seen);
   const submitFeedback = useMutation(api.chat.submit_feedback);
+  const saveGateMessage = useMutation(api.chat.save_gate_message);
   const deleteMonitoredSource = useMutation(
     api.monitored_sources.delete_monitored_source,
   );
@@ -456,11 +458,12 @@ export default function SnoopDetailsScreen() {
   const timeline = useMemo(() => {
     const entries: Array<{
       id: string;
-      type: "log" | "user" | "snoopa";
+      type: "log" | "user" | "snoopa" | "gate";
       content: string;
       timestamp: number;
       logType?: "success" | "error";
       feedback?: "like" | "dislike";
+      gateType?: "top_up" | "upgrade";
     }> = [];
 
     // Add logs
@@ -485,6 +488,37 @@ export default function SnoopDetailsScreen() {
               .substring(0, msg.content.indexOf("---WATCHLIST_DATA---"))
               .trim()
           : msg.content;
+
+        // Detect gate messages saved by the backend
+        const is_snoops_gate =
+          cleanContent.includes("SNOOPS_EXHAUSTED") ||
+          cleanContent.startsWith("You've run out of snoops");
+        const is_premium_gate =
+          cleanContent.includes("PREMIUM_REQUIRED") ||
+          cleanContent.startsWith("This feature requires a Pro");
+
+        if ((is_snoops_gate || is_premium_gate) && msg.role === "snoopa") {
+          let displayContent = cleanContent;
+          if (is_premium_gate) {
+            displayContent = cleanContent
+              .replace(/^PREMIUM_REQUIRED(_[A-Z0-9_]+)?:?\s*/i, "")
+              .trim();
+            if (!displayContent) {
+              displayContent = "This feature requires a Pro plan.";
+            }
+          } else {
+            displayContent = "You've run out of snoops for this period.";
+          }
+
+          entries.push({
+            id: msg._id,
+            type: "gate",
+            content: displayContent,
+            timestamp: msg._creationTime,
+            gateType: is_premium_gate ? "upgrade" : "top_up",
+          });
+          continue;
+        }
 
         entries.push({
           id: msg._id,
@@ -545,14 +579,22 @@ export default function SnoopDetailsScreen() {
   // Intent → friendly loading label
   const getStatusLabel = (intent: string) => {
     switch (intent) {
-      case "SEARCH":         return "Snooping the web...";
-      case "WATCHLIST":      return "Setting up watchlist...";
-      case "SOURCE":         return "Tracking source...";
-      case "PAUSE":          return "Pausing watchlist...";
-      case "RESUME":         return "Resuming watchlist...";
-      case "EDIT_CONDITION": return "Updating condition...";
-      case "CHAT":           return "Thinking...";
-      default:               return "Working on it...";
+      case "SEARCH":
+        return "Snooping the web...";
+      case "WATCHLIST":
+        return "Setting up watchlist...";
+      case "SOURCE":
+        return "Tracking source...";
+      case "PAUSE":
+        return "Pausing watchlist...";
+      case "RESUME":
+        return "Resuming watchlist...";
+      case "EDIT_CONDITION":
+        return "Updating condition...";
+      case "CHAT":
+        return "Thinking...";
+      default:
+        return "Working on it...";
     }
   };
 
@@ -560,10 +602,23 @@ export default function SnoopDetailsScreen() {
   const handleSend = async () => {
     if (!input.trim() || sending || !id) return;
     const content = input.trim();
+    const current_mode = commandMode;
+    const is_premium = signedIn?.is_premium ?? false;
+
+    // Gate: SOURCE and EDIT_CONDITION require premium
+    if (!is_premium && (current_mode === "source" || current_mode === "edit")) {
+      saveGateMessage({
+        watchlist_id: id as Id<"watchlist">,
+        gate_type: current_mode === "source" ? "add_source" : "edit_condition",
+      }).catch((err) => console.error("Failed to save gate message:", err));
+      setCommandMode(null);
+      setInput("");
+      return;
+    }
+
     setInput("");
     setSending(true);
     setLoadingStatus("...");
-    const current_mode = commandMode;
 
     try {
       // If commandMode pre-determines intent, set status immediately
@@ -573,9 +628,11 @@ export default function SnoopDetailsScreen() {
         setLoadingStatus("Updating condition...");
       } else {
         // Detect intent concurrently so loading text updates ASAP
-        detectIntent({ content }).then((intent) => {
-          setLoadingStatus(getStatusLabel(intent));
-        }).catch(() => {});
+        detectIntent({ content })
+          .then((intent) => {
+            setLoadingStatus(getStatusLabel(intent));
+          })
+          .catch(() => {});
       }
 
       await sendMessage({
@@ -1169,7 +1226,64 @@ export default function SnoopDetailsScreen() {
                     />
                   </View>
 
-                  {entry.type === "log" ? (
+                  {entry.type === "gate" ? (
+                    // ── Premium / Snoop-exhausted gate card ──────────────────
+                    <View
+                      style={{
+                        borderRadius: 12,
+                        // padding: 14,
+                        marginTop: 4,
+                        width: "100%",
+                      }}
+                    >
+                      <Text
+                        style={{
+                          color: Colors[theme].text,
+                          fontFamily: "FontRegular",
+                          fontSize: 15,
+                          lineHeight: 19,
+                          marginBottom: 12,
+                        }}
+                      >
+                        {entry.content}
+                      </Text>
+                      <Pressable
+                        style={({ pressed }) => [
+                          {
+                            alignSelf: "flex-end",
+                            paddingHorizontal: 14,
+                            paddingVertical: 7,
+                            borderRadius: 8,
+                            backgroundColor: Colors[theme].primary,
+                            flexDirection: "row",
+                            alignItems: "center",
+                            gap: 6,
+                            opacity: pressed ? 0.72 : 1,
+                            transform: [{ scale: pressed ? 0.96 : 1 }],
+                          },
+                        ]}
+                        onPress={() => {
+                          haptics.impact("light");
+                          if (entry.gateType === "upgrade") {
+                            router.push("/account/billing");
+                          } else {
+                            setShowTopUp(true);
+                          }
+                        }}
+                      >
+                        <Text
+                          style={{
+                            color: Colors[theme].background,
+                            fontFamily: "FontBold",
+                            fontSize: 12,
+                            letterSpacing: 0.5,
+                          }}
+                        >
+                          {entry.gateType === "upgrade" ? "UPGRADE" : "TOP UP"}
+                        </Text>
+                      </Pressable>
+                    </View>
+                  ) : entry.type === "log" ? (
                     <View style={{ width: "100%" }}>
                       <Text
                         style={[
@@ -1505,6 +1619,18 @@ export default function SnoopDetailsScreen() {
           setShowCommands(false);
           setTimeout(() => setCommandMode("source"), 300);
         }}
+        onUpgrade={(gate_type) => {
+          setShowCommands(false);
+          if (id) {
+            saveGateMessage({
+              watchlist_id: id as Id<"watchlist">,
+              gate_type,
+            }).catch((err) =>
+              console.error("Failed to save gate message:", err),
+            );
+          }
+        }}
+        isPremium={signedIn?.is_premium ?? false}
         isProcessing={isProcessing}
       />
 
@@ -1533,6 +1659,9 @@ export default function SnoopDetailsScreen() {
         onClose={() => setShowSources(false)}
         sources={selectedSources}
       />
+
+      {/* Top Up Modal */}
+      <TopUpModal visible={showTopUp} onClose={() => setShowTopUp(false)} />
     </Container>
   );
 }
