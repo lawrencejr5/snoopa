@@ -2,7 +2,13 @@ import AddWatchlistModal from "@/components/AddWatchlistModal";
 import Container from "@/components/Container";
 import Loading from "@/components/Loading";
 import TrackTopicModal from "@/components/TrackTopicModal";
+import {
+  CommandsModal,
+  ConfirmationModal,
+  RenameModal,
+} from "@/components/WatchlistOptionsModal";
 import Colors from "@/constants/Colors";
+import { useCustomAlert } from "@/context/CustomAlertContext";
 import { useLoadingContext } from "@/context/LoadingContext";
 import { useTheme } from "@/context/ThemeContext";
 import { useUser } from "@/context/UserContext";
@@ -10,15 +16,9 @@ import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { Octicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
-import { useConvexAuth, useQuery, useMutation } from "convex/react";
+import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import { useCustomAlert } from "@/context/CustomAlertContext";
-import {
-  CommandsModal,
-  ConfirmationModal,
-  RenameModal,
-} from "@/components/WatchlistOptionsModal";
 import {
   Image,
   Pressable,
@@ -38,6 +38,7 @@ import Animated, {
   withSequence,
   withTiming,
 } from "react-native-reanimated";
+import Svg, { Circle } from "react-native-svg";
 
 // ---------------------------------------------------------------------------
 // Pulsing Dot
@@ -74,6 +75,95 @@ const PulsingDot = ({ color, size = 6 }: { color: string; size?: number }) => {
     />
   );
 };
+
+// ---------------------------------------------------------------------------
+// Avatar ring with snoop progress
+// ---------------------------------------------------------------------------
+const AVATAR_MAP: Record<string, any> = {
+  chill: require("@/assets/images/avatars/chill.png"),
+  gay: require("@/assets/images/avatars/gay.png"),
+  relax: require("@/assets/images/avatars/relax.png"),
+  shy: require("@/assets/images/avatars/shy.png"),
+  swaga: require("@/assets/images/avatars/swaga.png"),
+};
+
+function AvatarSnoopRing({
+  avatar,
+  remaining,
+  total,
+  size = 48,
+  strokeWidth = 3,
+  color,
+  bgColor,
+}: {
+  avatar: string | undefined;
+  remaining: number;
+  total: number;
+  size?: number;
+  strokeWidth?: number;
+  color: string;
+  bgColor: string;
+}) {
+  const { theme } = useTheme();
+
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const used = total > 0 ? Math.min(total - remaining, total) : 0;
+  const progress = total > 0 ? used / total : 0;
+  // Progress goes from 12 o'clock (top), clockwise
+  const strokeDashoffset = circumference * (1 - progress);
+
+  const avatarSrc =
+    avatar && AVATAR_MAP[avatar]
+      ? AVATAR_MAP[avatar]
+      : require("@/assets/images/splash-icon.png");
+
+  return (
+    <View style={{ width: size, height: size, position: "relative" }}>
+      <Svg
+        width={size}
+        height={size}
+        style={{ position: "absolute", top: 0, left: 0 }}
+      >
+        {/* Track ring */}
+        <Circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          stroke={bgColor}
+          strokeWidth={strokeWidth}
+          fill="none"
+        />
+        {/* Progress arc */}
+        <Circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          stroke={color}
+          strokeWidth={strokeWidth}
+          fill="none"
+          strokeDasharray={`${circumference}`}
+          strokeDashoffset={strokeDashoffset}
+          strokeLinecap="round"
+          rotation="-90"
+          origin={`${size / 2}, ${size / 2}`}
+        />
+      </Svg>
+      <Image
+        source={avatarSrc}
+        style={{
+          width: size - strokeWidth * 2 - 8,
+          height: size - strokeWidth * 2 - 8,
+          borderRadius: (size - strokeWidth * 2 - 2) / 2,
+          position: "absolute",
+          top: strokeWidth + 4,
+          left: strokeWidth + 4,
+          backgroundColor: Colors[theme].surface,
+        }}
+      />
+    </View>
+  );
+}
 
 const formatTimeAgo = (timestamp: number) => {
   const now = Date.now();
@@ -520,6 +610,13 @@ export default function HomeScreen() {
     useQuery(api.watchlist.get_trending_topics) || []
   ).slice(0, 7);
   const unreadCount = useQuery(api.notifications.unread_count) ?? 0;
+  const snoop_balance = useQuery(api.snoops.get_snoop_balance) ?? 0;
+  const snoop_grants = useQuery(api.snoops.get_snoop_grants) ?? [];
+  // Total snoops from first non-top-up grant (free/monthly)
+  const primary_grant = snoop_grants.find(
+    (g: any) => g.type === "free" || g.type === "monthly",
+  );
+  const snoop_total = primary_grant ? primary_grant.snoops : 30;
 
   const activeSnoops = watchlistData
     .filter((i: any) => i.status === "active")
@@ -541,30 +638,39 @@ export default function HomeScreen() {
     <Container>
       {/* Header */}
       <Animated.View entering={FadeIn.duration(400)} style={styles.header}>
-        <View>
-          <Text
-            style={{
-              color: Colors[theme].text_secondary,
-              fontFamily: "FontMedium",
-              fontSize: 13,
-              marginBottom: 4,
-            }}
-          >
-            {currentDate}
-          </Text>
-          <Text
-            style={[
-              styles.headerTitle,
-              { color: Colors[theme].text, fontSize: 32 },
-            ]}
-          >
-            SNOOPA
-          </Text>
+        {/* Left — Avatar ring + title */}
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+          <AvatarSnoopRing
+            avatar={(signedIn as any)?.avatar}
+            remaining={snoop_balance}
+            total={snoop_total}
+            size={48}
+            strokeWidth={3}
+            color={Colors[theme].text}
+            bgColor={Colors[theme].border}
+          />
+          <View>
+            <Text
+              style={{
+                color: Colors[theme].text_secondary,
+                fontFamily: "FontMedium",
+                fontSize: 11,
+                marginBottom: 2,
+              }}
+            >
+              {currentDate}
+            </Text>
+            <Text style={[styles.headerTitle, { color: Colors[theme].text }]}>
+              SNOOPA
+            </Text>
+          </View>
         </View>
+
+        {/* Right — Notification bell */}
         <View style={{ flexDirection: "row", alignItems: "center", gap: 16 }}>
           <Pressable
             onPress={() => router.push("/notifications" as any)}
-            style={{ position: "relative", marginTop: 10 }}
+            style={{ position: "relative" }}
           >
             <Image
               source={require("@/assets/icons/bells.png")}
@@ -800,7 +906,7 @@ export default function HomeScreen() {
                   { color: Colors[theme].text_secondary },
                 ]}
               >
-                ACTIVE SNOOP(S)
+                ACTIVE WATCHLISTS
               </Text>
             </View>
             {activeSnoops.length > 0 && (
@@ -974,13 +1080,13 @@ export default function HomeScreen() {
 // ---------------------------------------------------------------------------
 const styles = StyleSheet.create({
   header: {
-    paddingVertical: 20,
+    paddingVertical: 16,
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "flex-start",
+    alignItems: "center",
   },
   headerTitle: {
-    fontSize: 26,
+    fontSize: 22,
     fontFamily: "FontBold",
     letterSpacing: -1,
   },

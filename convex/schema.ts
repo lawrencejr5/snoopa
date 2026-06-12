@@ -20,6 +20,15 @@ const schema = defineSchema({
     ),
     date_of_sub: v.optional(v.number()),
     is_premium: v.optional(v.boolean()),
+    avatar: v.optional(
+      v.union(
+        v.literal("chill"),
+        v.literal("gay"),
+        v.literal("relax"),
+        v.literal("shy"),
+        v.literal("swaga"),
+      ),
+    ),
     emailVerificationTime: v.optional(v.number()),
     pushTokens: v.optional(v.array(v.string())),
     memory: v.optional(v.string()),

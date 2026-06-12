@@ -1,21 +1,21 @@
 import AddWatchlistModal from "@/components/AddWatchlistModal";
 import Container from "@/components/Container";
 import Loading from "@/components/Loading";
-import Colors from "@/constants/Colors";
-import { useLoadingContext } from "@/context/LoadingContext";
-import { useTheme } from "@/context/ThemeContext";
-import { useUser } from "@/context/UserContext";
-import { api } from "@/convex/_generated/api";
-import { useIsFocused, useNavigation } from "@react-navigation/native";
-import { useConvexAuth, useQuery, useMutation } from "convex/react";
-import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
-import { useCustomAlert } from "@/context/CustomAlertContext";
 import {
   CommandsModal,
   ConfirmationModal,
   RenameModal,
 } from "@/components/WatchlistOptionsModal";
+import Colors from "@/constants/Colors";
+import { useCustomAlert } from "@/context/CustomAlertContext";
+import { useLoadingContext } from "@/context/LoadingContext";
+import { useTheme } from "@/context/ThemeContext";
+import { useUser } from "@/context/UserContext";
+import { api } from "@/convex/_generated/api";
+import { useNavigation } from "@react-navigation/native";
+import { useConvexAuth, useMutation, useQuery } from "convex/react";
+import { useRouter } from "expo-router";
+import { useEffect, useState } from "react";
 import {
   Image,
   Pressable,
@@ -407,6 +407,13 @@ export default function WatchlistScreen() {
   }, [navigation]);
 
   const watchlistData = useQuery(api.watchlist.get_watchlists) || [];
+  const snoop_balance = useQuery(api.snoops.get_snoop_balance) ?? 0;
+  const snoop_grants = useQuery(api.snoops.get_snoop_grants) ?? [];
+  const primary_grant = (snoop_grants as any[]).find(
+    (g) => g.type === "free" || g.type === "monthly",
+  );
+  const snoop_total = primary_grant ? primary_grant.snoops : 30;
+  const snoops_used = snoop_total - snoop_balance;
 
   const activeSnoops = watchlistData.filter((i) => i.status === "active");
   const closedSnoops = watchlistData.filter(
@@ -562,9 +569,10 @@ export default function WatchlistScreen() {
                     { color: Colors[theme].text_secondary },
                   ]}
                 >
-                  Active Snoops
+                  Tracking
                 </Text>
               </View>
+              {/* Snoop Balance Card */}
               <View
                 style={[
                   styles.statCard,
@@ -574,18 +582,53 @@ export default function WatchlistScreen() {
                   },
                 ]}
               >
-                <View
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: 8,
-                  }}
-                >
-                  <Text
-                    style={[styles.statNumber, { color: Colors[theme].text }]}
+                <View style={{ alignItems: "center", width: "100%" }}>
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "baseline",
+                      gap: 2,
+                      marginBottom: 4,
+                    }}
                   >
-                    {watchlistData.length}
-                  </Text>
+                    <Text
+                      style={[styles.statNumber, { color: Colors[theme].text }]}
+                    >
+                      {snoop_balance}
+                    </Text>
+                    <Text
+                      style={{
+                        color: Colors[theme].text_secondary,
+                        fontFamily: "FontMedium",
+                        fontSize: 11,
+                      }}
+                    >
+                      /{snoop_total}
+                    </Text>
+                  </View>
+                  {/* Mini progress bar */}
+                  {/* <View
+                    style={{
+                      width: "100%",
+                      height: 3,
+                      borderRadius: 2,
+                      backgroundColor: Colors[theme].border,
+                      marginBottom: 8,
+                      overflow: "hidden",
+                    }}
+                  >
+                    <View
+                      style={{
+                        width: `${snoop_total > 0 ? (snoop_balance / snoop_total) * 100 : 0}%`,
+                        height: 3,
+                        borderRadius: 2,
+                        backgroundColor:
+                          snoop_balance > snoop_total * 0.3
+                            ? Colors[theme].success
+                            : Colors[theme].danger,
+                      }}
+                    />
+                  </View> */}
                 </View>
                 <Text
                   style={[
@@ -593,7 +636,7 @@ export default function WatchlistScreen() {
                     { color: Colors[theme].text_secondary },
                   ]}
                 >
-                  Total Tracked
+                  Snoops Left
                 </Text>
               </View>
             </Animated.View>
@@ -608,7 +651,7 @@ export default function WatchlistScreen() {
                 <Text
                   style={[styles.sectionTitle, { color: Colors[theme].text }]}
                 >
-                  Active Snoops
+                  Active Watchlists
                 </Text>
                 {activeSnoops.map((item) => (
                   <ActiveSnoopCard

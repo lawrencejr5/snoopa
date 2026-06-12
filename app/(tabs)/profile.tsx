@@ -1,5 +1,6 @@
 import Container from "@/components/Container";
 import Loading from "@/components/Loading";
+import TopUpModal from "@/components/TopUpModal";
 import Colors from "@/constants/Colors";
 import { useCustomAlert } from "@/context/CustomAlertContext";
 import { useLoadingContext } from "@/context/LoadingContext";
@@ -9,7 +10,7 @@ import { api } from "@/convex/_generated/api";
 import { registerForPushNotificationsAsync } from "@/utils/reg_push_notifications";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useNavigation } from "@react-navigation/native";
-import { useConvexAuth, useMutation } from "convex/react";
+import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import { useRouter } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import { useEffect, useState } from "react";
@@ -39,6 +40,18 @@ export default function ProfileScreen() {
   const { signOut } = useAuthActions();
 
   const [themeModalVisible, setThemeModalVisible] = useState(false);
+  const [showTopUp, setShowTopUp] = useState(false);
+
+  // Snoop balance
+  const snoop_balance = useQuery(api.snoops.get_snoop_balance) ?? 0;
+  const snoop_grants = useQuery(api.snoops.get_snoop_grants) ?? [];
+  const primary_grant = (snoop_grants as any[]).find(
+    (g) => g.type === "free" || g.type === "monthly",
+  );
+  const snoop_total = primary_grant ? primary_grant.snoops : 30;
+  const snoops_used = snoop_total - snoop_balance;
+  const snoop_pct = snoop_total > 0 ? snoops_used / snoop_total : 0;
+  const is_low = snoop_balance <= snoop_total * 0.3;
 
   const menuItems = [
     {
@@ -140,46 +153,145 @@ export default function ProfileScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 50 }}
       >
-        {/* User Card */}
+        {/* User & Snoop Card */}
         <Animated.View
-          key={`profile-user-${animationKey}`}
+          key={`profile-user-snoop-${animationKey}`}
           entering={FadeInDown.delay(100).duration(400)}
           style={[
-            styles.userCard,
+            styles.userSnoopCard,
             {
               backgroundColor: Colors[theme].surface,
               borderColor: Colors[theme].border,
             },
           ]}
         >
-          <View>
-            <Text style={[styles.userName, { color: Colors[theme].text }]}>
-              {signedIn?.fullname}
-            </Text>
-            <Text
+          {/* User Details & Plan Row */}
+          <View style={styles.cardHeaderRow}>
+            <View style={{ flex: 1, marginRight: 10 }}>
+              <Text style={[styles.userName, { color: Colors[theme].text }]}>
+                {signedIn?.fullname}
+              </Text>
+              <Text
+                style={[
+                  styles.userEmail,
+                  { color: Colors[theme].text_secondary, marginBottom: 0 },
+                ]}
+              >
+                {signedIn?.email}
+              </Text>
+            </View>
+            <View
               style={[
-                styles.userEmail,
-                { color: Colors[theme].text_secondary },
+                styles.planBadge,
+                { backgroundColor: Colors[theme].text_secondary + "15" },
               ]}
             >
-              {signedIn?.email}
-            </Text>
+              <Text
+                style={[
+                  styles.planText,
+                  { color: Colors[theme].text, textTransform: "capitalize" },
+                ]}
+              >
+                {signedIn?.plan} Plan
+              </Text>
+            </View>
           </View>
+
+          {/* Divider */}
           <View
-            style={[
-              styles.planBadge,
-              { backgroundColor: Colors[theme].text_secondary + "15" },
-            ]}
+            style={{
+              height: 1,
+              backgroundColor: Colors[theme].border,
+              marginVertical: 16,
+            }}
+          />
+
+          {/* Snoop Progress Header */}
+          <View
+            style={{
+              flexDirection: "row",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: 10,
+            }}
           >
-            <Text
+            <View>
+              <Text
+                style={{
+                  color: Colors[theme].text,
+                  fontFamily: "FontBold",
+                  fontSize: 14,
+                  letterSpacing: -0.3,
+                }}
+              >
+                Snoop Balance
+              </Text>
+              <Text
+                style={{
+                  color: Colors[theme].text_secondary,
+                  fontFamily: "FontMedium",
+                  fontSize: 11,
+                  marginTop: 2,
+                }}
+              >
+                {snoops_used} of {snoop_total} used
+              </Text>
+            </View>
+            <Pressable
+              onPress={() => setShowTopUp(true)}
               style={[
-                styles.planText,
-                { color: Colors[theme].text, textTransform: "capitalize" },
+                styles.topUpBtn,
+                {
+                  backgroundColor: Colors[theme].primary,
+                  borderColor: Colors[theme].primary + "40",
+                },
               ]}
             >
-              {signedIn?.plan} Plan
-            </Text>
+              <Text
+                style={{
+                  color: Colors[theme].background,
+                  fontFamily: "FontBold",
+                  fontSize: 11,
+                  letterSpacing: 0.5,
+                }}
+              >
+                TOP UP
+              </Text>
+            </Pressable>
           </View>
+
+          {/* Progress track */}
+          <View
+            style={{
+              height: 6,
+              borderRadius: 3,
+              backgroundColor: Colors[theme].border,
+              overflow: "hidden",
+            }}
+          >
+            <View
+              style={{
+                width: `${snoop_pct * 100}%`,
+                height: 6,
+                borderRadius: 3,
+                backgroundColor: Colors[theme].text_secondary,
+              }}
+            />
+          </View>
+
+          {/* Low warning */}
+          {is_low && (
+            <Text
+              style={{
+                color: Colors[theme].danger,
+                fontFamily: "FontMedium",
+                fontSize: 11,
+                marginTop: 8,
+              }}
+            >
+              Running low — top up or upgrade to keep tracking 🐾
+            </Text>
+          )}
         </Animated.View>
 
         {/* Upgrade Card */}
@@ -319,6 +431,8 @@ export default function ProfileScreen() {
         </Animated.View>
       </ScrollView>
 
+      <TopUpModal visible={showTopUp} onClose={() => setShowTopUp(false)} />
+
       {/* Theme Modal */}
       <Modal
         animationType="fade"
@@ -385,15 +499,17 @@ const styles = StyleSheet.create({
     fontFamily: "FontBold",
     letterSpacing: -1,
   },
-  userCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: 15,
+  userSnoopCard: {
+    padding: 16,
     borderRadius: 20,
     borderWidth: 1,
     marginTop: 10,
     marginBottom: 20,
+  },
+  cardHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   userName: {
     fontSize: 18,
@@ -414,6 +530,12 @@ const styles = StyleSheet.create({
   planText: {
     fontSize: 12,
     fontFamily: "FontBold",
+  },
+  topUpBtn: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
   },
   upgradeCard: {
     padding: 20,

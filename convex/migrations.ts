@@ -298,3 +298,24 @@ export const seed_free_snoops = internalMutation({
   },
 });
 
+/**
+ * Assigns a random avatar to every user that doesn't already have one.
+ */
+export const seed_user_avatars = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const avatars = ["chill", "gay", "relax", "shy", "swaga"] as const;
+    const users = await ctx.db.query("users").collect();
+    let count = 0;
+
+    for (const user of users) {
+      if ((user as any).avatar === undefined) {
+        const random_avatar = avatars[Math.floor(Math.random() * avatars.length)];
+        await ctx.db.patch(user._id, { avatar: random_avatar } as any);
+        count++;
+      }
+    }
+
+    return `Assigned random avatars to ${count} users.`;
+  },
+});
