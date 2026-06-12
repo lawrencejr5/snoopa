@@ -1,6 +1,7 @@
 import AddWatchlistModal from "@/components/AddWatchlistModal";
 import Container from "@/components/Container";
 import Loading from "@/components/Loading";
+import TopUpModal from "@/components/TopUpModal";
 import TrackTopicModal from "@/components/TrackTopicModal";
 import {
   CommandsModal,
@@ -15,10 +16,15 @@ import { useUser } from "@/context/UserContext";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { Octicons } from "@expo/vector-icons";
+import {
+  BottomSheetBackdrop,
+  BottomSheetModal,
+  BottomSheetView,
+} from "@gorhom/bottom-sheet";
 import { useNavigation } from "@react-navigation/native";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Image,
   Pressable,
@@ -525,6 +531,29 @@ export default function HomeScreen() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showTrackModal, setShowTrackModal] = useState(false);
   const [selectedTopic, setSelectedTopic] = useState("");
+  const [showTopUp, setShowTopUp] = useState(false);
+
+  const profileSheetRef = useRef<BottomSheetModal>(null);
+
+  const renderProfileBackdrop = useCallback(
+    (props: any) => (
+      <BottomSheetBackdrop
+        {...props}
+        disappearsOnIndex={-1}
+        appearsOnIndex={0}
+      />
+    ),
+    [],
+  );
+
+  const handleOpenProfileSheet = () => {
+    profileSheetRef.current?.present();
+  };
+
+  const handleTopUpFromSheet = () => {
+    profileSheetRef.current?.dismiss();
+    setShowTopUp(true);
+  };
 
   // Options Modal State
   const [selectedSnoop, setSelectedSnoop] = useState<{
@@ -617,6 +646,9 @@ export default function HomeScreen() {
     (g: any) => g.type === "free" || g.type === "monthly",
   );
   const snoop_total = primary_grant ? primary_grant.snoops : 30;
+  const snoops_used = snoop_total - snoop_balance;
+  const snoop_pct = snoop_total > 0 ? snoops_used / snoop_total : 0;
+  const is_low = snoop_balance <= snoop_total * 0.3;
 
   const activeSnoops = watchlistData
     .filter((i: any) => i.status === "active")
@@ -640,15 +672,17 @@ export default function HomeScreen() {
       <Animated.View entering={FadeIn.duration(400)} style={styles.header}>
         {/* Left — Avatar ring + title */}
         <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-          <AvatarSnoopRing
-            avatar={(signedIn as any)?.avatar}
-            remaining={snoop_balance}
-            total={snoop_total}
-            size={48}
-            strokeWidth={3}
-            color={Colors[theme].text}
-            bgColor={Colors[theme].border}
-          />
+          <Pressable onPress={handleOpenProfileSheet}>
+            <AvatarSnoopRing
+              avatar={(signedIn as any)?.avatar}
+              remaining={snoop_balance}
+              total={snoop_total}
+              size={48}
+              strokeWidth={3}
+              color={Colors[theme].text}
+              bgColor={Colors[theme].border}
+            />
+          </Pressable>
           <View>
             <Text
               style={{
@@ -1034,6 +1068,210 @@ export default function HomeScreen() {
         onClose={() => setShowTrackModal(false)}
       />
 
+      <TopUpModal visible={showTopUp} onClose={() => setShowTopUp(false)} />
+
+      {/* Profile Detail Bottom Sheet */}
+      <BottomSheetModal
+        ref={profileSheetRef}
+        snapPoints={["55%"]}
+        index={0}
+        backdropComponent={renderProfileBackdrop}
+        backgroundStyle={{ backgroundColor: Colors[theme].surface }}
+        handleIndicatorStyle={{ backgroundColor: Colors[theme].border }}
+      >
+        <BottomSheetView style={styles.sheetContainer}>
+          {/* Profile Avatar Image (Large) & User Info */}
+          <View style={{ alignItems: "center", marginBottom: 20 }}>
+            <Image
+              source={
+                (signedIn as any)?.avatar &&
+                AVATAR_MAP[(signedIn as any).avatar]
+                  ? AVATAR_MAP[(signedIn as any).avatar]
+                  : require("@/assets/images/splash-icon.png")
+              }
+              style={{
+                width: 80,
+                height: 80,
+                borderRadius: 40,
+                borderWidth: 2,
+                borderColor: Colors[theme].border,
+                backgroundColor: Colors[theme].surface,
+                marginBottom: 12,
+              }}
+            />
+            <Text
+              style={{
+                color: Colors[theme].text,
+                fontFamily: "FontBold",
+                fontSize: 20,
+                letterSpacing: -0.5,
+                marginBottom: 4,
+              }}
+            >
+              {signedIn?.fullname}
+            </Text>
+            <Text
+              style={{
+                color: Colors[theme].text_secondary,
+                fontFamily: "FontMedium",
+                fontSize: 14,
+                marginBottom: 12,
+              }}
+            >
+              {signedIn?.email}
+            </Text>
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+                borderWidth: 1,
+                borderColor: Colors[theme].border,
+                borderRadius: 12,
+                paddingHorizontal: 16,
+                paddingVertical: 10,
+                width: "90%",
+                marginTop: 4,
+              }}
+            >
+              <Text
+                style={{
+                  color: Colors[theme].text,
+                  fontFamily: "FontMedium",
+                  fontSize: 14,
+                  textTransform: "capitalize",
+                }}
+              >
+                {signedIn?.plan} Plan
+              </Text>
+              {(signedIn as any)?.plan !== "max" && (
+                <Pressable
+                  onPress={() => {
+                    profileSheetRef.current?.dismiss();
+                    router.push("/account/billing");
+                  }}
+                  style={{
+                    backgroundColor: Colors[theme].text,
+                    paddingHorizontal: 12,
+                    paddingVertical: 6,
+                    borderRadius: 8,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: Colors[theme].background,
+                      fontFamily: "FontBold",
+                      fontSize: 11,
+                      letterSpacing: 0.3,
+                    }}
+                  >
+                    UPGRADE
+                  </Text>
+                </Pressable>
+              )}
+            </View>
+          </View>
+
+          {/* Divider */}
+          <View
+            style={{
+              height: 1,
+              backgroundColor: Colors[theme].border,
+              marginBottom: 20,
+            }}
+          />
+
+          {/* Snoop Progress Header */}
+          <View
+            style={{
+              flexDirection: "row",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: 10,
+            }}
+          >
+            <View>
+              <Text
+                style={{
+                  color: Colors[theme].text,
+                  fontFamily: "FontBold",
+                  fontSize: 14,
+                  letterSpacing: -0.3,
+                }}
+              >
+                Snoop Balance
+              </Text>
+              <Text
+                style={{
+                  color: Colors[theme].text_secondary,
+                  fontFamily: "FontMedium",
+                  fontSize: 11,
+                  marginTop: 2,
+                }}
+              >
+                {snoops_used} of {snoop_total} used
+              </Text>
+            </View>
+            <Pressable
+              onPress={handleTopUpFromSheet}
+              style={[
+                styles.topUpBtn,
+                {
+                  backgroundColor: Colors[theme].primary + "10",
+                  borderColor: Colors[theme].primary + "40",
+                },
+              ]}
+            >
+              <Text
+                style={{
+                  color: Colors[theme].text,
+                  fontFamily: "FontBold",
+                  fontSize: 11,
+                  letterSpacing: 0.5,
+                }}
+              >
+                TOP UP
+              </Text>
+            </Pressable>
+          </View>
+
+          {/* Progress track */}
+          <View
+            style={{
+              height: 6,
+              borderRadius: 3,
+              backgroundColor: Colors[theme].border,
+              overflow: "hidden",
+              marginBottom: 10,
+            }}
+          >
+            <View
+              style={{
+                width: `${snoop_pct * 100}%`,
+                height: 6,
+                borderRadius: 3,
+                backgroundColor: Colors[theme].text_secondary,
+              }}
+            />
+          </View>
+
+          {/* Low warning */}
+          {is_low && (
+            <Text
+              style={{
+                color: Colors[theme].danger,
+                fontFamily: "FontMedium",
+                fontSize: 11,
+                marginTop: 4,
+                marginBottom: 10,
+              }}
+            >
+              Running low — top up or upgrade to keep tracking 🐾
+            </Text>
+          )}
+        </BottomSheetView>
+      </BottomSheetModal>
+
       {selectedSnoop && (
         <>
           <CommandsModal
@@ -1172,5 +1410,27 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
+  },
+  topUpBtn: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  planBadge: {
+    alignSelf: "center",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  planText: {
+    fontSize: 12,
+    fontFamily: "FontBold",
+  },
+  sheetContainer: {
+    flex: 1,
+    paddingHorizontal: 24,
+    paddingTop: 12,
+    paddingBottom: 30,
   },
 });
