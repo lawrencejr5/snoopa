@@ -1,4 +1,6 @@
-import React, { createContext, FC, ReactNode, useContext } from "react";
+import React, { createContext, FC, ReactNode, useContext, useEffect } from "react";
+import Purchases from "react-native-purchases";
+import { Platform } from "react-native";
 
 import { api } from "@/convex/_generated/api";
 import { Doc } from "@/convex/_generated/dataModel";
@@ -14,6 +16,19 @@ const UserContext = createContext<UserContextType | null>(null);
 const UserProvider: FC<{ children: ReactNode }> = ({ children }) => {
   const currentUser = useQuery(api.users.get_current_user);
   const signedIn = currentUser as UserData;
+
+  useEffect(() => {
+    if (Platform.OS === "web") return;
+    if (signedIn?._id) {
+      Purchases.logIn(signedIn._id).catch((err) => {
+        console.error("RevenueCat login error:", err);
+      });
+    } else {
+      Purchases.logOut().catch((err) => {
+        console.error("RevenueCat logout error:", err);
+      });
+    }
+  }, [signedIn?._id]);
 
   return (
     <UserContext.Provider value={{ signedIn }}>{children}</UserContext.Provider>

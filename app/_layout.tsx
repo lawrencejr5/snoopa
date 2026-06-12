@@ -4,6 +4,8 @@ import * as SplashScreen from "expo-splash-screen";
 import { useEffect, useState } from "react";
 import "react-native-reanimated";
 import CustomSplash from "./splashscreen";
+import Purchases from "react-native-purchases";
+import { Platform } from "react-native";
 
 import { ConvexAuthProvider } from "@convex-dev/auth/react";
 import { ConvexReactClient, useConvexAuth } from "convex/react";
@@ -34,6 +36,14 @@ const convex = new ConvexReactClient(process.env.EXPO_PUBLIC_CONVEX_URL!, {
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
+  useEffect(() => {
+    if (Platform.OS === "android") {
+      Purchases.configure({ apiKey: "goog_cdHpElMIUawEmgegCRwXFNiOqhi" });
+    } else if (Platform.OS === "ios") {
+      Purchases.configure({ apiKey: "appl_COatCguwPZtkvjzcXNWVhuJbvJD" });
+    }
+  }, []);
+
   const [loaded, error] = useFonts({
     FontBold: require("../assets/fonts/SpaceGrotesk/SpaceGrotesk-Bold.ttf"),
     FontLight: require("../assets/fonts/SpaceGrotesk/SpaceGrotesk-Light.ttf"),

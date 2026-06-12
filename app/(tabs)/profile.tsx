@@ -297,49 +297,51 @@ export default function ProfileScreen() {
         </Animated.View>
 
         {/* Upgrade Card */}
-        <Animated.View
-          key={`profile-upgrade-${animationKey}`}
-          entering={FadeInDown.delay(200).duration(400)}
-          style={[
-            styles.upgradeCard,
-            {
-              backgroundColor: "transparent",
-              borderWidth: 1,
-              borderRadius: 20,
-              borderColor: Colors[theme].border,
-            },
-          ]}
-        >
-          <Text style={[styles.upgradeTitle, { color: Colors[theme].text }]}>
-            Want more from Snoopa?
-          </Text>
-          <Text
-            style={[styles.upgradeDescription, { color: Colors[theme].text }]}
-          >
-            Unlock unlimited tracking, deeper insights, and faster updates with
-            Pro.
-          </Text>
-          <Pressable
+        {signedIn?.is_premium !== true && (
+          <Animated.View
+            key={`profile-upgrade-${animationKey}`}
+            entering={FadeInDown.delay(200).duration(400)}
             style={[
-              styles.upgradeButton,
+              styles.upgradeCard,
               {
-                backgroundColor: Colors[theme].text,
+                backgroundColor: "transparent",
                 borderWidth: 1,
+                borderRadius: 20,
                 borderColor: Colors[theme].border,
               },
             ]}
-            onPress={() => router.push("/account/billing")}
           >
-            <Text
-              style={[
-                styles.upgradeButtonText,
-                { color: Colors[theme].background },
-              ]}
-            >
-              Upgrade to Pro
+            <Text style={[styles.upgradeTitle, { color: Colors[theme].text }]}>
+              Want more from Snoopa?
             </Text>
-          </Pressable>
-        </Animated.View>
+            <Text
+              style={[styles.upgradeDescription, { color: Colors[theme].text }]}
+            >
+              Unlock unlimited tracking, deeper insights, and faster updates with
+              Pro.
+            </Text>
+            <Pressable
+              style={[
+                styles.upgradeButton,
+                {
+                  backgroundColor: Colors[theme].text,
+                  borderWidth: 1,
+                  borderColor: Colors[theme].border,
+                },
+              ]}
+              onPress={() => router.push("/account/billing")}
+            >
+              <Text
+                style={[
+                  styles.upgradeButtonText,
+                  { color: Colors[theme].background },
+                ]}
+              >
+                Upgrade to Pro
+              </Text>
+            </Pressable>
+          </Animated.View>
+        )}
 
         {/* Settings List */}
         <Animated.View

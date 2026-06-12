@@ -7,7 +7,7 @@ import { useHapitcs } from "@/context/HapticsContext";
 import { useTheme } from "@/context/ThemeContext";
 import { useUser } from "@/context/UserContext";
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Image,
   Pressable,
@@ -15,7 +15,12 @@ import {
   StyleSheet,
   Text,
   View,
+  ActivityIndicator,
+  Platform,
 } from "react-native";
+import { useMutation } from "convex/react";
+import { api } from "@/convex/_generated/api";
+import Purchases from "react-native-purchases";
 
 const PLANS = [
   {
@@ -62,25 +67,127 @@ const PLANS = [
   },
 ];
 
+const TIER_LEVELS: Record<string, number> = {
+  free: 0,
+  pro: 1,
+  supa: 2,
+  max: 3,
+};
+
 export default function BillingScreen() {
   const { theme } = useTheme();
   const router = useRouter();
   const haptics = useHapitcs();
   const { showCustomAlert } = useCustomAlert();
   const { signedIn } = useUser();
+  const upgradeUserTier = useMutation(api.snoops.upgrade_user_tier);
+
+  const getPlanBtnText = (planId: string) => {
+    const currentTier = signedIn?.sub_tier || "free";
+    if (currentTier === planId) {
+      return "Current Plan";
+    }
+    const currentLevel = TIER_LEVELS[currentTier] ?? 0;
+    const targetLevel = TIER_LEVELS[planId] ?? 0;
+    if (targetLevel > currentLevel) {
+      return "Upgrade";
+    } else {
+      return "Downgrade";
+    }
+  };
 
   const [topUpVisible, setTopUpVisible] = useState(false);
   const [featureLockVisible, setFeatureLockVisible] = useState(false);
+  const [packages, setPackages] = useState<any[]>([]);
+  const [isPurchasing, setIsPurchasing] = useState<string | null>(null);
+  const [nextBillingDate, setNextBillingDate] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function loadCustomerInfo() {
+      if (Platform.OS === "web") return;
+      try {
+        const customerInfo = await Purchases.getCustomerInfo();
+        const entitlement = customerInfo.entitlements.active["snoopa_premium_monthly"];
+        if (entitlement && entitlement.expirationDate) {
+          const date = new Date(entitlement.expirationDate);
+          setNextBillingDate(
+            date.toLocaleDateString("en-US", {
+              month: "long",
+              day: "numeric",
+              year: "numeric",
+            })
+          );
+        }
+      } catch (err) {
+        console.error("Failed to fetch customer info:", err);
+      }
+    }
+    loadCustomerInfo();
+  }, []);
+
+  useEffect(() => {
+    async function loadOfferings() {
+      if (Platform.OS === "web") return;
+      try {
+        const offerings = await Purchases.getOfferings();
+        if (offerings.all["default_paywall"]?.availablePackages) {
+          setPackages(offerings.all["default_paywall"].availablePackages);
+        } else if (offerings.current?.availablePackages) {
+          setPackages(offerings.current.availablePackages);
+        }
+      } catch (err) {
+        console.error("Failed to fetch offerings:", err);
+      }
+    }
+    loadOfferings();
+  }, []);
 
   // Fallback to "Free" if signedIn user does not have a plan set.
-  const currentPlan = signedIn?.plan ? signedIn.plan.toUpperCase() : "FREE";
+  const currentPlan = signedIn?.sub_tier 
+    ? signedIn.sub_tier.toUpperCase() 
+    : signedIn?.plan 
+      ? signedIn.plan.toUpperCase() 
+      : "FREE";
 
-  const handleSelectPlan = (planName: string) => {
+  const handleSelectPlan = async (planId: string) => {
     haptics.impact("success");
-    showCustomAlert(
-      `${planName} subscription process is coming soon!`,
-      "success",
-    );
+    if (Platform.OS === "web") {
+      showCustomAlert("Purchases are not supported on web.", "danger");
+      return;
+    }
+
+    let rcPackageId = "";
+    if (planId === "pro") rcPackageId = "rc_pro";
+    else if (planId === "supa") rcPackageId = "rc_supa";
+    else if (planId === "max") rcPackageId = "rc_max";
+
+    const pkg = packages.find((p) => p.identifier === rcPackageId);
+    if (!pkg) {
+      showCustomAlert(
+        "This plan is currently unavailable for purchase. Please try again later.",
+        "danger"
+      );
+      return;
+    }
+
+    try {
+      setIsPurchasing(planId);
+      const { customerInfo } = await Purchases.purchasePackage(pkg);
+      
+      const entitlement = customerInfo.entitlements.active["snoopa_premium_monthly"];
+      if (entitlement) {
+        await upgradeUserTier({ tier: planId as "pro" | "supa" | "max" });
+        showCustomAlert(`Successfully upgraded to Snoopa ${planId.toUpperCase()}!`, "success");
+      } else {
+        showCustomAlert("Purchase completed, but premium entitlement is not active. Please contact support.", "warning");
+      }
+    } catch (e: any) {
+      if (!e.userCancelled) {
+        showCustomAlert(e.message || "Purchase failed", "danger");
+      }
+    } finally {
+      setIsPurchasing(null);
+    }
   };
 
   return (
@@ -173,6 +280,26 @@ export default function BillingScreen() {
               </Text>
             </View>
           </View>
+          {signedIn?.sub_tier && signedIn.sub_tier !== "free" && nextBillingDate && (
+            <View
+              style={{
+                marginTop: 12,
+                paddingTop: 12,
+                borderTopWidth: 1,
+                borderTopColor: Colors[theme].border,
+              }}
+            >
+              <Text
+                style={{
+                  fontFamily: "FontMedium",
+                  fontSize: 13,
+                  color: Colors[theme].text_secondary,
+                }}
+              >
+                Next billing date: {nextBillingDate}
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* Pricing Tiers header */}
@@ -187,20 +314,28 @@ export default function BillingScreen() {
 
         {/* Plan Cards */}
         <View style={styles.plansContainer}>
-          {PLANS.map((plan) => (
-            <View
-              key={plan.id}
-              style={[
-                styles.planCard,
-                {
-                  backgroundColor: Colors[theme].card,
-                  borderColor: plan.highlight
-                    ? Colors[theme].primary
-                    : Colors[theme].border,
-                  borderWidth: plan.highlight ? 2 : 1,
-                },
-              ]}
-            >
+          {[...PLANS]
+            .sort((a, b) => {
+              const isAActive = signedIn?.sub_tier === a.id;
+              const isBActive = signedIn?.sub_tier === b.id;
+              if (isAActive && !isBActive) return -1;
+              if (!isAActive && isBActive) return 1;
+              return 0;
+            })
+            .map((plan) => (
+              <View
+                key={plan.id}
+                style={[
+                  styles.planCard,
+                  {
+                    backgroundColor: Colors[theme].card,
+                    borderColor: plan.highlight
+                      ? Colors[theme].primary
+                      : Colors[theme].border,
+                    borderWidth: plan.highlight ? 2 : 1,
+                  },
+                ]}
+              >
               {plan.badge ? (
                 <View
                   style={[
@@ -244,6 +379,20 @@ export default function BillingScreen() {
                 </Text>
               </Text>
 
+              {signedIn?.sub_tier === plan.id && nextBillingDate && (
+                <Text
+                  style={{
+                    fontFamily: "FontMedium",
+                    fontSize: 13,
+                    color: Colors[theme].text_secondary,
+                    marginBottom: 16,
+                    marginTop: -10,
+                  }}
+                >
+                  Renews: {nextBillingDate}
+                </Text>
+              )}
+
               {/* Feature List */}
               <View style={styles.featuresList}>
                 {plan.features.map((feature, idx) => (
@@ -270,7 +419,8 @@ export default function BillingScreen() {
 
               {/* Action Button */}
               <Pressable
-                onPress={() => handleSelectPlan(plan.name)}
+                onPress={() => handleSelectPlan(plan.id)}
+                disabled={isPurchasing !== null || signedIn?.sub_tier === plan.id}
                 style={({ pressed }) => [
                   styles.planBtn,
                   {
@@ -279,22 +429,33 @@ export default function BillingScreen() {
                       : "transparent",
                     borderColor: Colors[theme].primary,
                     borderWidth: 1,
-                    opacity: pressed ? 0.9 : 1,
+                    opacity: (pressed || isPurchasing !== null || signedIn?.sub_tier === plan.id) ? 0.7 : 1,
                   },
                 ]}
               >
-                <Text
-                  style={[
-                    styles.planBtnText,
-                    {
-                      color: plan.highlight
+                {isPurchasing === plan.id ? (
+                  <ActivityIndicator
+                    color={
+                      plan.highlight
                         ? Colors[theme].background
-                        : Colors[theme].primary,
-                    },
-                  ]}
-                >
-                  Get Started
-                </Text>
+                        : Colors[theme].primary
+                    }
+                    size="small"
+                  />
+                ) : (
+                  <Text
+                    style={[
+                      styles.planBtnText,
+                      {
+                        color: plan.highlight
+                          ? Colors[theme].background
+                          : Colors[theme].primary,
+                      },
+                    ]}
+                  >
+                    {getPlanBtnText(plan.id)}
+                  </Text>
+                )}
               </Pressable>
             </View>
           ))}
@@ -354,62 +515,6 @@ export default function BillingScreen() {
                   ]}
                 >
                   Top up your snoops instantly
-                </Text>
-              </View>
-            </View>
-            <Image
-              source={require("@/assets/icons/chevron-right.png")}
-              style={{
-                width: 14,
-                height: 14,
-                tintColor: Colors[theme].text_secondary,
-              }}
-            />
-          </Pressable>
-
-          <Pressable
-            onPress={() => {
-              haptics.impact("light");
-              setFeatureLockVisible(true);
-            }}
-            style={({ pressed }) => [
-              styles.utilityBtn,
-              {
-                backgroundColor: Colors[theme].surface,
-                borderColor: Colors[theme].border,
-                opacity: pressed ? 0.9 : 1,
-              },
-            ]}
-          >
-            <View style={styles.utilityBtnLeft}>
-              <View
-                style={[
-                  styles.utilityIconContainer,
-                  { backgroundColor: Colors[theme].primary + "12" },
-                ]}
-              >
-                <Image
-                  source={require("@/assets/icons/lock.png")}
-                  style={{
-                    width: 16,
-                    height: 16,
-                    tintColor: Colors[theme].primary,
-                  }}
-                />
-              </View>
-              <View>
-                <Text
-                  style={[styles.utilityTitle, { color: Colors[theme].text }]}
-                >
-                  Preview Feature Lock Modal
-                </Text>
-                <Text
-                  style={[
-                    styles.utilityDesc,
-                    { color: Colors[theme].text_secondary },
-                  ]}
-                >
-                  Open pro lock
                 </Text>
               </View>
             </View>

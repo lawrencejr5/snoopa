@@ -727,7 +727,13 @@ export default function HomeScreen() {
               {currentDate}
             </Text>
             <Text style={[styles.headerTitle, { color: Colors[theme].text }]}>
-              SNOOPA
+              {signedIn.sub_tier === "pro"
+                ? "SNOOPA PRO"
+                : signedIn.sub_tier === "supa"
+                  ? "SUPA SNOOPA"
+                  : signedIn.sub_tier === "max"
+                    ? "SNOOPA MAX"
+                    : "SNOOPA"}
             </Text>
           </View>
         </View>

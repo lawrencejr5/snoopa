@@ -1,20 +1,25 @@
 import Colors from "@/constants/Colors";
 import { useCustomAlert } from "@/context/CustomAlertContext";
-import { useTheme } from "@/context/ThemeContext";
 import { useHapitcs } from "@/context/HapticsContext";
+import { useTheme } from "@/context/ThemeContext";
+import { api } from "@/convex/_generated/api";
 import {
   BottomSheetBackdrop,
   BottomSheetModal,
   BottomSheetView,
 } from "@gorhom/bottom-sheet";
-import React, { useCallback, useEffect, useRef } from "react";
+import { useMutation } from "convex/react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Image,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
   View,
 } from "react-native";
+import Purchases, { PURCHASE_TYPE } from "react-native-purchases";
 
 interface TopUpModalProps {
   visible: boolean;
@@ -50,6 +55,31 @@ export default function TopUpModal({ visible, onClose }: TopUpModalProps) {
   const haptics = useHapitcs();
   const { showCustomAlert } = useCustomAlert();
   const bottomSheetRef = useRef<BottomSheetModal>(null);
+  const addTopUp = useMutation(api.snoops.add_top_up);
+
+  const [products, setProducts] = useState<any[]>([]);
+  const [isPurchasing, setIsPurchasing] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function loadProducts() {
+      if (Platform.OS === "web") return;
+      try {
+        const productIds = [
+          "snoopa_boost_200_consumable",
+          "snoopa_fuel_500_consumable",
+          "snoopa_surge_1200_consumable",
+        ];
+        const fetchedProducts = await Purchases.getProducts(
+          productIds,
+          PURCHASE_TYPE.INAPP,
+        );
+        setProducts(fetchedProducts);
+      } catch (err) {
+        console.error("Failed to fetch products:", err);
+      }
+    }
+    loadProducts();
+  }, []);
 
   useEffect(() => {
     if (visible) {
@@ -65,7 +95,7 @@ export default function TopUpModal({ visible, onClose }: TopUpModalProps) {
         onClose();
       }
     },
-    [onClose]
+    [onClose],
   );
 
   const renderBackdrop = useCallback(
@@ -76,14 +106,53 @@ export default function TopUpModal({ visible, onClose }: TopUpModalProps) {
         appearsOnIndex={0}
       />
     ),
-    []
+    [],
   );
 
-  const handlePurchase = (packName: string) => {
+  const handlePurchase = async (packId: string) => {
     haptics.impact("success");
-    showCustomAlert(`${packName} purchase coming soon!`, "success");
-    bottomSheetRef.current?.dismiss();
-    onClose();
+    if (Platform.OS === "web") {
+      showCustomAlert("Purchases are not supported on web.", "danger");
+      return;
+    }
+
+    let rcProductId = "";
+    let amount = 0;
+    if (packId === "boost_pack") {
+      rcProductId = "snoopa_boost_200_consumable";
+      amount = 200;
+    } else if (packId === "fuel_pack") {
+      rcProductId = "snoopa_fuel_500_consumable";
+      amount = 500;
+    } else if (packId === "surge_pack") {
+      rcProductId = "snoopa_surge_1200_consumable";
+      amount = 1200;
+    }
+
+    const product = products.find((p) => p.identifier === rcProductId);
+    if (!product) {
+      showCustomAlert(
+        "This top-up pack is currently unavailable. Please try again later.",
+        "danger",
+      );
+      return;
+    }
+
+    try {
+      setIsPurchasing(packId);
+      await Purchases.purchaseStoreProduct(product);
+
+      await addTopUp({ amount });
+      showCustomAlert(`Successfully purchased ${amount} Snoops!`, "success");
+      bottomSheetRef.current?.dismiss();
+      onClose();
+    } catch (e: any) {
+      if (!e.userCancelled) {
+        showCustomAlert(e.message || "Purchase failed", "danger");
+      }
+    } finally {
+      setIsPurchasing(null);
+    }
   };
 
   return (
@@ -120,8 +189,11 @@ export default function TopUpModal({ visible, onClose }: TopUpModalProps) {
           </Pressable>
         </View>
 
-        <Text style={[styles.subtitle, { color: Colors[theme].text_secondary }]}>
-          Running low on snoops? Purchase one-off top-up packs to keep monitoring your intelligence streams.
+        <Text
+          style={[styles.subtitle, { color: Colors[theme].text_secondary }]}
+        >
+          Running low on snoops? Purchase one-off top-up packs to keep
+          monitoring your intelligence streams.
         </Text>
 
         {/* Packs list */}
@@ -129,13 +201,14 @@ export default function TopUpModal({ visible, onClose }: TopUpModalProps) {
           {PACKS.map((pack) => (
             <Pressable
               key={pack.id}
-              onPress={() => handlePurchase(pack.name)}
+              onPress={() => handlePurchase(pack.id)}
+              disabled={isPurchasing !== null}
               style={({ pressed }) => [
                 styles.packCard,
                 {
                   backgroundColor: Colors[theme].surface,
                   borderColor: Colors[theme].border,
-                  opacity: pressed ? 0.92 : 1,
+                  opacity: pressed || isPurchasing !== null ? 0.7 : 1,
                 },
               ]}
             >
@@ -156,7 +229,9 @@ export default function TopUpModal({ visible, onClose }: TopUpModalProps) {
                   />
                 </View>
                 <View style={styles.textContainer}>
-                  <Text style={[styles.packName, { color: Colors[theme].text }]}>
+                  <Text
+                    style={[styles.packName, { color: Colors[theme].text }]}
+                  >
                     {pack.name}
                   </Text>
                   <Text
@@ -171,21 +246,28 @@ export default function TopUpModal({ visible, onClose }: TopUpModalProps) {
               </View>
 
               <View style={styles.packRight}>
-                <View
-                  style={[
-                    styles.priceBadge,
-                    { backgroundColor: Colors[theme].primary },
-                  ]}
-                >
-                  <Text
+                {isPurchasing === pack.id ? (
+                  <ActivityIndicator
+                    color={Colors[theme].primary}
+                    size="small"
+                  />
+                ) : (
+                  <View
                     style={[
-                      styles.priceText,
-                      { color: Colors[theme].background },
+                      styles.priceBadge,
+                      { backgroundColor: Colors[theme].primary },
                     ]}
                   >
-                    {pack.price}
-                  </Text>
-                </View>
+                    <Text
+                      style={[
+                        styles.priceText,
+                        { color: Colors[theme].background },
+                      ]}
+                    >
+                      {pack.price}
+                    </Text>
+                  </View>
+                )}
               </View>
             </Pressable>
           ))}
