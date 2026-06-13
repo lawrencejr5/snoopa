@@ -1,6 +1,7 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
-import { internalMutation, mutation, query } from "./_generated/server";
+import { internalAction, internalMutation, mutation, query } from "./_generated/server";
+import { internal } from "./_generated/api";
 
 // ---------------------------------------------------------------------------
 // Queries
@@ -243,5 +244,34 @@ export const claim_reward = mutation({
       seen: true,
       read: true,
     });
+  },
+});
+
+/**
+ * Action to send a push notification when a user is low or out of snoops.
+ * Triggered asynchronously from snoops mutations.
+ */
+export const send_snoop_alert_push = internalAction({
+  args: {
+    user_id: v.id("users"),
+    alert_type: v.union(v.literal("low"), v.literal("exhausted")),
+  },
+  handler: async (ctx, args) => {
+    const push_tokens = await ctx.runQuery(internal.users.get_push_tokens, {
+      user_id: args.user_id,
+    });
+    if (!push_tokens || push_tokens.length === 0) return;
+
+    const title =
+      args.alert_type === "low"
+        ? "Running Low on Snoops 🐾"
+        : "You're out of Snoops 🐾";
+
+    const message =
+      args.alert_type === "low"
+        ? "You've used 95% of your snoops this month. Top up or upgrade your plan to keep tracking!"
+        : "You've run out of snoops for this period. Top up or upgrade your plan to keep investigating.";
+
+    await sendExpoPush(push_tokens, title, message);
   },
 });

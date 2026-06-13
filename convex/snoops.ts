@@ -7,6 +7,7 @@ import {
   mutation,
   query,
 } from "./_generated/server";
+import { internal } from "./_generated/api";
 
 const TIER_LABELS: Record<string, string> = {
   pro: "Snoopa Pro",
@@ -32,6 +33,82 @@ export function end_of_month_timestamp(): number {
     Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0, 23, 59, 59, 999),
   );
   return end.getTime();
+}
+
+/** Returns the timestamp for the very start of the current calendar month (UTC). */
+export function start_of_month_timestamp(): number {
+  const now = new Date();
+  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0, 0));
+  return start.getTime();
+}
+
+/** Checks user snoop limits and triggers Low or Exhausted alerts if needed. */
+export async function check_and_trigger_snoop_alerts(ctx: any, user_id: Id<"users">) {
+  const grants = await _fetch_active_grants(ctx, user_id);
+  const remaining_total = grants.reduce((sum: number, g: any) => sum + g.remaining, 0);
+  const allocated_total = grants.reduce((sum: number, g: any) => sum + g.snoops, 0);
+
+  if (allocated_total <= 0) return;
+
+  const start_time = start_of_month_timestamp();
+
+  if (remaining_total === 0) {
+    // Check if we already alerted this month
+    const existing_exhausted = await ctx.db
+      .query("notifications")
+      .withIndex("by_user", (q: any) => q.eq("user_id", user_id))
+      .filter((q: any) =>
+        q.and(
+          q.eq(q.field("title"), "You're out of Snoops 🐾"),
+          q.gt(q.field("_creationTime"), start_time)
+        )
+      )
+      .first();
+
+    if (!existing_exhausted) {
+      await ctx.db.insert("notifications", {
+        user_id,
+        type: "system",
+        title: "You're out of Snoops 🐾",
+        message: "You've used all your snoops for this period. Top up or upgrade your plan to keep tracking.",
+        seen: false,
+        read: false,
+      });
+
+      await ctx.scheduler.runAfter(0, internal.notifications.send_snoop_alert_push, {
+        user_id,
+        alert_type: "exhausted",
+      });
+    }
+  } else if (remaining_total / allocated_total <= 0.05) {
+    // Check if we already alerted this month
+    const existing_low = await ctx.db
+      .query("notifications")
+      .withIndex("by_user", (q: any) => q.eq("user_id", user_id))
+      .filter((q: any) =>
+        q.and(
+          q.eq(q.field("title"), "Running Low on Snoops 🐾"),
+          q.gt(q.field("_creationTime"), start_time)
+        )
+      )
+      .first();
+
+    if (!existing_low) {
+      await ctx.db.insert("notifications", {
+        user_id,
+        type: "info",
+        title: "Running Low on Snoops 🐾",
+        message: `You've used 95% of your snoops this month (${remaining_total} remaining). Top up or upgrade your plan to keep tracking.`,
+        seen: false,
+        read: false,
+      });
+
+      await ctx.scheduler.runAfter(0, internal.notifications.send_snoop_alert_push, {
+        user_id,
+        alert_type: "low",
+      });
+    }
+  }
 }
 
 /**
@@ -129,6 +206,9 @@ export const deduct_snoops = internalMutation({
       });
       remaining_to_deduct -= deduct_from_this;
     }
+
+    // Trigger snoop alerts check
+    await check_and_trigger_snoop_alerts(ctx, args.user_id);
   },
 });
 
@@ -160,17 +240,8 @@ export const check_and_deduct = internalMutation({
         });
       }
 
-      // Save a system notification so the user sees it in-app
-      await ctx.db.insert("notifications", {
-        user_id: args.user_id,
-        type: "system",
-        title: "You're out of Snoops 🐾",
-        message:
-          "You've used all your snoops for this period. Top up or upgrade your plan to keep tracking.",
-        seen: false,
-        read: false,
-        watchlist_id: args.watchlist_id,
-      });
+      // Check and trigger snoop alerts (handles push notification + DB notification + monthly deduplication)
+      await check_and_trigger_snoop_alerts(ctx, args.user_id);
 
       throw new ConvexError("SNOOPS_EXHAUSTED");
     }
@@ -183,6 +254,9 @@ export const check_and_deduct = internalMutation({
         break;
       }
     }
+
+    // Check snoop alert thresholds after deduction (handles 95% used / 100% used triggers)
+    await check_and_trigger_snoop_alerts(ctx, args.user_id);
   },
 });
 
