@@ -19,15 +19,23 @@ const UserProvider: FC<{ children: ReactNode }> = ({ children }) => {
 
   useEffect(() => {
     if (Platform.OS === "web") return;
-    if (signedIn?._id) {
-      Purchases.logIn(signedIn._id).catch((err) => {
-        console.error("RevenueCat login error:", err);
-      });
-    } else {
-      Purchases.logOut().catch((err) => {
-        console.error("RevenueCat logout error:", err);
-      });
-    }
+    
+    const syncUser = async () => {
+      try {
+        if (signedIn?._id) {
+          await Purchases.logIn(signedIn._id);
+        } else {
+          const isAnon = await Purchases.isAnonymous();
+          if (!isAnon) {
+            await Purchases.logOut();
+          }
+        }
+      } catch (err) {
+        console.error("RevenueCat auth sync error:", err);
+      }
+    };
+
+    syncUser();
   }, [signedIn?._id]);
 
   return (
