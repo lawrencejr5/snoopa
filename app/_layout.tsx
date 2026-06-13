@@ -35,14 +35,13 @@ const convex = new ConvexReactClient(process.env.EXPO_PUBLIC_CONVEX_URL!, {
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
 
+if (Platform.OS === "android") {
+  Purchases.configure({ apiKey: "goog_cdHpElMIUawEmgegCRwXFNiOqhi" });
+} else if (Platform.OS === "ios") {
+  Purchases.configure({ apiKey: "appl_COatCguwPZtkvjzcXNWVhuJbvJD" });
+}
+
 export default function RootLayout() {
-  useEffect(() => {
-    if (Platform.OS === "android") {
-      Purchases.configure({ apiKey: "goog_cdHpElMIUawEmgegCRwXFNiOqhi" });
-    } else if (Platform.OS === "ios") {
-      Purchases.configure({ apiKey: "appl_COatCguwPZtkvjzcXNWVhuJbvJD" });
-    }
-  }, []);
 
   const [loaded, error] = useFonts({
     FontBold: require("../assets/fonts/SpaceGrotesk/SpaceGrotesk-Bold.ttf"),
