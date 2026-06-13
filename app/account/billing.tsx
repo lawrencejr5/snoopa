@@ -6,20 +6,20 @@ import { useCustomAlert } from "@/context/CustomAlertContext";
 import { useHapitcs } from "@/context/HapticsContext";
 import { useTheme } from "@/context/ThemeContext";
 import { useUser } from "@/context/UserContext";
+import { api } from "@/convex/_generated/api";
+import { useMutation } from "convex/react";
 import { useRouter } from "expo-router";
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Image,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
-  ActivityIndicator,
-  Platform,
 } from "react-native";
-import { useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api";
 import Purchases from "react-native-purchases";
 
 const PLANS = [
@@ -29,9 +29,9 @@ const PLANS = [
     price: "$12",
     features: [
       "1,000 snoops per month",
-      "Customize watchlist conditions",
       "Unlimited watchlists",
-      "Up to 2 source URLs",
+      "Customize watchlist conditions",
+      "Set source url",
       "Prioritized customer support",
     ],
     highlight: false,
@@ -42,10 +42,10 @@ const PLANS = [
     name: "Supa Snoopa",
     price: "$29",
     features: [
-      "4,000 snoops per month",
-      "Up to 3 source URLs",
-      "Customize watchlist conditions",
       "Unlimited watchlists",
+      "4,000 snoops per month",
+      "Set source url",
+      "Customize watchlist conditions",
       "Prioritized customer support",
     ],
     highlight: true,
@@ -57,9 +57,9 @@ const PLANS = [
     price: "$69",
     features: [
       "12,000 snoops per month",
-      "Up to 5 source URLs",
-      "Customize watchlist conditions",
       "Unlimited watchlists",
+      "Set source url",
+      "Customize watchlist conditions",
       "Prioritized customer support",
     ],
     highlight: false,
@@ -107,7 +107,8 @@ export default function BillingScreen() {
       if (Platform.OS === "web") return;
       try {
         const customerInfo = await Purchases.getCustomerInfo();
-        const entitlement = customerInfo.entitlements.active["snoopa_premium_monthly"];
+        const entitlement =
+          customerInfo.entitlements.active["snoopa_premium_monthly"];
         if (entitlement && entitlement.expirationDate) {
           const date = new Date(entitlement.expirationDate);
           setNextBillingDate(
@@ -115,7 +116,7 @@ export default function BillingScreen() {
               month: "long",
               day: "numeric",
               year: "numeric",
-            })
+            }),
           );
         }
       } catch (err) {
@@ -143,10 +144,10 @@ export default function BillingScreen() {
   }, []);
 
   // Fallback to "Free" if signedIn user does not have a plan set.
-  const currentPlan = signedIn?.sub_tier 
-    ? signedIn.sub_tier.toUpperCase() 
-    : signedIn?.plan 
-      ? signedIn.plan.toUpperCase() 
+  const currentPlan = signedIn?.sub_tier
+    ? signedIn.sub_tier.toUpperCase()
+    : signedIn?.plan
+      ? signedIn.plan.toUpperCase()
       : "FREE";
 
   const handleSelectPlan = async (planId: string) => {
@@ -165,7 +166,7 @@ export default function BillingScreen() {
     if (!pkg) {
       showCustomAlert(
         "This plan is currently unavailable for purchase. Please try again later.",
-        "danger"
+        "danger",
       );
       return;
     }
@@ -173,13 +174,20 @@ export default function BillingScreen() {
     try {
       setIsPurchasing(planId);
       const { customerInfo } = await Purchases.purchasePackage(pkg);
-      
-      const entitlement = customerInfo.entitlements.active["snoopa_premium_monthly"];
+
+      const entitlement =
+        customerInfo.entitlements.active["snoopa_premium_monthly"];
       if (entitlement) {
         await upgradeUserTier({ tier: planId as "pro" | "supa" | "max" });
-        showCustomAlert(`Successfully upgraded to Snoopa ${planId.toUpperCase()}!`, "success");
+        showCustomAlert(
+          `Successfully upgraded to Snoopa ${planId.toUpperCase()}!`,
+          "success",
+        );
       } else {
-        showCustomAlert("Purchase completed, but premium entitlement is not active. Please contact support.", "warning");
+        showCustomAlert(
+          "Purchase completed, but premium entitlement is not active. Please contact support.",
+          "warning",
+        );
       }
     } catch (e: any) {
       if (!e.userCancelled) {
@@ -280,26 +288,28 @@ export default function BillingScreen() {
               </Text>
             </View>
           </View>
-          {signedIn?.sub_tier && signedIn.sub_tier !== "free" && nextBillingDate && (
-            <View
-              style={{
-                marginTop: 12,
-                paddingTop: 12,
-                borderTopWidth: 1,
-                borderTopColor: Colors[theme].border,
-              }}
-            >
-              <Text
+          {signedIn?.sub_tier &&
+            signedIn.sub_tier !== "free" &&
+            nextBillingDate && (
+              <View
                 style={{
-                  fontFamily: "FontMedium",
-                  fontSize: 13,
-                  color: Colors[theme].text_secondary,
+                  marginTop: 12,
+                  paddingTop: 12,
+                  borderTopWidth: 1,
+                  borderTopColor: Colors[theme].border,
                 }}
               >
-                Next billing date: {nextBillingDate}
-              </Text>
-            </View>
-          )}
+                <Text
+                  style={{
+                    fontFamily: "FontMedium",
+                    fontSize: 13,
+                    color: Colors[theme].text_secondary,
+                  }}
+                >
+                  Next billing date: {nextBillingDate}
+                </Text>
+              </View>
+            )}
         </View>
 
         {/* Pricing Tiers header */}
@@ -329,136 +339,149 @@ export default function BillingScreen() {
                   styles.planCard,
                   {
                     backgroundColor: Colors[theme].card,
-                    borderColor: plan.highlight || signedIn?.sub_tier === plan.id
-                      ? Colors[theme].primary
-                      : Colors[theme].border,
-                    borderWidth: plan.highlight || signedIn?.sub_tier === plan.id ? 2 : 1,
+                    borderColor:
+                      plan.highlight || signedIn?.sub_tier === plan.id
+                        ? Colors[theme].primary
+                        : Colors[theme].border,
+                    borderWidth:
+                      plan.highlight || signedIn?.sub_tier === plan.id ? 2 : 1,
                   },
                 ]}
               >
-              {plan.badge || signedIn?.sub_tier === plan.id ? (
-                <View
-                  style={[
-                    styles.badgeContainer,
+                {plan.badge || signedIn?.sub_tier === plan.id ? (
+                  <View
+                    style={[
+                      styles.badgeContainer,
+                      {
+                        backgroundColor:
+                          plan.highlight || signedIn?.sub_tier === plan.id
+                            ? Colors[theme].primary
+                            : Colors[theme].border,
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.badgeText,
+                        {
+                          color:
+                            plan.highlight || signedIn?.sub_tier === plan.id
+                              ? Colors[theme].background
+                              : Colors[theme].text,
+                        },
+                      ]}
+                    >
+                      {signedIn?.sub_tier === plan.id
+                        ? "CURRENT PLAN"
+                        : plan.badge}
+                    </Text>
+                  </View>
+                ) : null}
+
+                <Text style={[styles.planName, { color: Colors[theme].text }]}>
+                  {plan.name}
+                </Text>
+
+                <Text style={[styles.price, { color: Colors[theme].primary }]}>
+                  {plan.price}
+                  <Text
+                    style={{
+                      fontSize: 16,
+                      color: Colors[theme].text_secondary,
+                      fontFamily: "FontRegular",
+                    }}
+                  >
+                    /mo
+                  </Text>
+                </Text>
+
+                {signedIn?.sub_tier === plan.id && nextBillingDate && (
+                  <Text
+                    style={{
+                      fontFamily: "FontMedium",
+                      fontSize: 13,
+                      color: Colors[theme].text_secondary,
+                      marginBottom: 16,
+                      marginTop: -10,
+                    }}
+                  >
+                    Renews: {nextBillingDate}
+                  </Text>
+                )}
+
+                {/* Feature List */}
+                <View style={styles.featuresList}>
+                  {plan.features.map((feature, idx) => (
+                    <View key={idx} style={styles.featureRow}>
+                      <Image
+                        source={require("@/assets/icons/check-fill.png")}
+                        style={{
+                          width: 16,
+                          height: 16,
+                          tintColor: Colors[theme].primary,
+                        }}
+                      />
+                      <Text
+                        style={[
+                          styles.featureText,
+                          { color: Colors[theme].text_secondary },
+                        ]}
+                      >
+                        {feature}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+
+                {/* Action Button */}
+                <Pressable
+                  onPress={() => handleSelectPlan(plan.id)}
+                  disabled={
+                    isPurchasing !== null || signedIn?.sub_tier === plan.id
+                  }
+                  style={({ pressed }) => [
+                    styles.planBtn,
                     {
-                      backgroundColor: plan.highlight || signedIn?.sub_tier === plan.id
+                      backgroundColor: plan.highlight
                         ? Colors[theme].primary
-                        : Colors[theme].border,
+                        : "transparent",
+                      borderColor: Colors[theme].primary,
+                      borderWidth: 1,
+                      opacity:
+                        pressed ||
+                        isPurchasing !== null ||
+                        signedIn?.sub_tier === plan.id
+                          ? 0.7
+                          : 1,
                     },
                   ]}
                 >
-                  <Text
-                    style={[
-                      styles.badgeText,
-                      {
-                        color: plan.highlight || signedIn?.sub_tier === plan.id
+                  {isPurchasing === plan.id ? (
+                    <ActivityIndicator
+                      color={
+                        plan.highlight
                           ? Colors[theme].background
-                          : Colors[theme].text,
-                      },
-                    ]}
-                  >
-                    {signedIn?.sub_tier === plan.id ? "CURRENT PLAN" : plan.badge}
-                  </Text>
-                </View>
-              ) : null}
-
-              <Text style={[styles.planName, { color: Colors[theme].text }]}>
-                {plan.name}
-              </Text>
-
-              <Text style={[styles.price, { color: Colors[theme].primary }]}>
-                {plan.price}
-                <Text
-                  style={{
-                    fontSize: 16,
-                    color: Colors[theme].text_secondary,
-                    fontFamily: "FontRegular",
-                  }}
-                >
-                  /mo
-                </Text>
-              </Text>
-
-              {signedIn?.sub_tier === plan.id && nextBillingDate && (
-                <Text
-                  style={{
-                    fontFamily: "FontMedium",
-                    fontSize: 13,
-                    color: Colors[theme].text_secondary,
-                    marginBottom: 16,
-                    marginTop: -10,
-                  }}
-                >
-                  Renews: {nextBillingDate}
-                </Text>
-              )}
-
-              {/* Feature List */}
-              <View style={styles.featuresList}>
-                {plan.features.map((feature, idx) => (
-                  <View key={idx} style={styles.featureRow}>
-                    <Image
-                      source={require("@/assets/icons/check-fill.png")}
-                      style={{
-                        width: 16,
-                        height: 16,
-                        tintColor: Colors[theme].primary,
-                      }}
+                          : Colors[theme].primary
+                      }
+                      size="small"
                     />
+                  ) : (
                     <Text
                       style={[
-                        styles.featureText,
-                        { color: Colors[theme].text_secondary },
+                        styles.planBtnText,
+                        {
+                          color: plan.highlight
+                            ? Colors[theme].background
+                            : Colors[theme].primary,
+                        },
                       ]}
                     >
-                      {feature}
+                      {getPlanBtnText(plan.id)}
                     </Text>
-                  </View>
-                ))}
+                  )}
+                </Pressable>
               </View>
-
-              {/* Action Button */}
-              <Pressable
-                onPress={() => handleSelectPlan(plan.id)}
-                disabled={isPurchasing !== null || signedIn?.sub_tier === plan.id}
-                style={({ pressed }) => [
-                  styles.planBtn,
-                  {
-                    backgroundColor: plan.highlight
-                      ? Colors[theme].primary
-                      : "transparent",
-                    borderColor: Colors[theme].primary,
-                    borderWidth: 1,
-                    opacity: (pressed || isPurchasing !== null || signedIn?.sub_tier === plan.id) ? 0.7 : 1,
-                  },
-                ]}
-              >
-                {isPurchasing === plan.id ? (
-                  <ActivityIndicator
-                    color={
-                      plan.highlight
-                        ? Colors[theme].background
-                        : Colors[theme].primary
-                    }
-                    size="small"
-                  />
-                ) : (
-                  <Text
-                    style={[
-                      styles.planBtnText,
-                      {
-                        color: plan.highlight
-                          ? Colors[theme].background
-                          : Colors[theme].primary,
-                      },
-                    ]}
-                  >
-                    {getPlanBtnText(plan.id)}
-                  </Text>
-                )}
-              </Pressable>
-            </View>
-          ))}
+            ))}
         </View>
 
         {/* Snoop packs / testing utilities */}

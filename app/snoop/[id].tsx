@@ -21,7 +21,7 @@ import {
   BottomSheetView,
 } from "@gorhom/bottom-sheet";
 import { useAction, useMutation, useQuery } from "convex/react";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter, useFocusEffect } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import React, {
   useCallback,
@@ -450,12 +450,14 @@ export default function SnoopDetailsScreen() {
   const detectIntent = useAction(api.chat.detect_intent);
   const sendMessage = useAction(api.chat.send_message);
 
-  useEffect(() => {
-    if (id) {
-      markLogsSeen({ watchlist_id: id as Id<"watchlist"> }).catch(() => {});
-      markChatsSeen({ watchlist_id: id as Id<"watchlist"> }).catch(() => {});
-    }
-  }, [id]);
+  useFocusEffect(
+    useCallback(() => {
+      if (id) {
+        markLogsSeen({ watchlist_id: id as Id<"watchlist"> }).catch(() => {});
+        markChatsSeen({ watchlist_id: id as Id<"watchlist"> }).catch(() => {});
+      }
+    }, [id])
+  );
 
   // Merge logs + chat into a unified timeline
   const timeline = useMemo(() => {
