@@ -8,6 +8,19 @@ import {
   query,
 } from "./_generated/server";
 
+const TIER_LABELS: Record<string, string> = {
+  pro: "Snoopa Pro",
+  supa: "Supa Snoopa",
+  max: "Snoopa Max",
+};
+
+const TIER_SNOOPS: Record<string, number> = {
+  pro: 1000,
+  supa: 4000,
+  max: 12000,
+};
+
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -319,33 +332,73 @@ export const sync_user_subscription = mutation({
     });
 
     if (args.is_premium && current_tier !== args.tier) {
-      const active_grants = await ctx.db
-        .query("snoops")
-        .withIndex("by_user", (q) => q.eq("user_id", user_id))
-        .collect();
-
-      for (const grant of active_grants) {
-        if (grant.type === "free" || grant.type === "monthly") {
-          await ctx.db.patch(grant._id, { remaining: 0 });
-        }
-      }
-
       let snoop_amount = 0;
       if (args.tier === "pro") snoop_amount = 1000;
       else if (args.tier === "supa") snoop_amount = 4000;
       else if (args.tier === "max") snoop_amount = 12000;
 
       if (snoop_amount > 0) {
-        await ctx.db.insert("snoops", {
-          user_id,
-          snoops: snoop_amount,
-          remaining: snoop_amount,
-          type: "monthly",
-          expiration_date: end_of_month_timestamp(),
-        });
+        // Prevent duplicate refills if a monthly grant for this tier & month already exists
+        const end_timestamp = end_of_month_timestamp();
+        const existing_monthly = await ctx.db
+          .query("snoops")
+          .withIndex("by_user_expiry", (q) => q.eq("user_id", user_id).eq("expiration_date", end_timestamp))
+          .filter((q) => q.eq(q.field("snoops"), snoop_amount))
+          .first();
+
+        // Also check if a reward notification with the exact same title exists to prevent duplicate notifications
+        const tier_label = TIER_LABELS[args.tier] ?? args.tier.toUpperCase();
+        const expected_title = `🎉 You've been granted ${tier_label}!`;
+        const existing_notification = await ctx.db
+          .query("notifications")
+          .withIndex("by_user", (q) => q.eq("user_id", user_id))
+          .filter((q) =>
+            q.and(
+              q.eq(q.field("type"), "reward"),
+              q.eq(q.field("title"), expected_title)
+            )
+          )
+          .first();
+
+        if (existing_monthly && existing_notification) {
+          return; // Already provisioned
+        }
+
+        const active_grants = await ctx.db
+          .query("snoops")
+          .withIndex("by_user", (q) => q.eq("user_id", user_id))
+          .collect();
+
+        for (const grant of active_grants) {
+          if (grant.type === "free" || grant.type === "monthly") {
+            await ctx.db.patch(grant._id, { remaining: 0 });
+          }
+        }
+
+        if (!existing_monthly) {
+          await ctx.db.insert("snoops", {
+            user_id,
+            snoops: snoop_amount,
+            remaining: snoop_amount,
+            type: "monthly",
+            expiration_date: end_timestamp,
+          });
+        }
+
+        if (!existing_notification) {
+          const snoop_count = TIER_SNOOPS[args.tier] ?? snoop_amount;
+          await ctx.db.insert("notifications", {
+            user_id,
+            type: "reward",
+            title: expected_title,
+            message: `Your ${tier_label} plan is now active. You've received ${snoop_count.toLocaleString()} snoops this month. Welcome to the pack! 🐾`,
+            seen: false,
+            read: false,
+            reward_claimed: false,
+          });
+        }
       }
     }
   },
 });
-
 

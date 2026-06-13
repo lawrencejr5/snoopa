@@ -106,12 +106,18 @@ const schema = defineSchema({
 
   notifications: defineTable({
     user_id: v.id("users"),
-    type: v.union(v.literal("system"), v.literal("alert"), v.literal("info")),
+    type: v.union(
+      v.literal("system"),
+      v.literal("alert"),
+      v.literal("info"),
+      v.literal("reward"),
+    ),
     title: v.string(),
     message: v.string(),
     seen: v.boolean(),
     read: v.boolean(),
     watchlist_id: v.optional(v.id("watchlist")),
+    reward_claimed: v.optional(v.boolean()),
   })
     .index("by_user", ["user_id"])
     .index("by_watchlist", ["watchlist_id"]),

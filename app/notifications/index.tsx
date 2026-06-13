@@ -34,6 +34,7 @@ export default function NotificationsScreen() {
   const notifications = useQuery(api.notifications.get_notifications);
   const markAllSeen = useMutation(api.notifications.mark_all_seen);
   const markRead = useMutation(api.notifications.mark_read);
+  const claimReward = useMutation(api.notifications.claim_reward);
 
   // Mark all as SEEN when the screen opens — clears the bell dot
   useEffect(() => {
@@ -46,6 +47,7 @@ export default function NotificationsScreen() {
     _id: Id<"notifications">;
     watchlist_id?: Id<"watchlist">;
     read: boolean;
+    type: string;
   }) => {
     // Mark this individual notification as read
     if (!item.read) {
@@ -93,69 +95,76 @@ export default function NotificationsScreen() {
         )}
 
         {!isLoading &&
-          notifications.map((item) => (
-            <Pressable
-              key={item._id}
-              onPress={() => handleNotificationPress(item)}
-              style={({ pressed }) => [
-                styles.notificationItem,
-                {
-                  // Unread = hasn't been tapped yet → highlighted
-                  backgroundColor: item.read
-                    ? "transparent"
-                    : Colors[theme].surface,
-                  borderColor: Colors[theme].border,
-                  opacity: pressed ? 0.75 : 1,
-                },
-              ]}
-            >
-              <View style={styles.notificationHeader}>
-                <View
-                  style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
-                >
+          notifications.map((item) => {
+            const is_reward = item.type === "reward";
+            const accent_color = is_reward
+              ? Colors[theme].warning
+              : item.type === "alert"
+                ? Colors[theme].success
+                : item.type === "system"
+                  ? Colors[theme].warning
+                  : Colors[theme].text_secondary;
+
+            return (
+              <Pressable
+                key={item._id}
+                onPress={() => handleNotificationPress(item)}
+                style={({ pressed }) => [
+                  styles.notificationItem,
+                  {
+                    backgroundColor: item.read
+                      ? "transparent"
+                      : Colors[theme].surface,
+                    borderColor: Colors[theme].border,
+                    opacity: pressed ? 0.75 : 1,
+                  },
+                ]}
+              >
+                <View style={styles.notificationHeader}>
                   <View
-                    style={[
-                      styles.typeIndicator,
-                      {
-                        backgroundColor:
-                          item.type === "alert"
-                            ? Colors[theme].success
-                            : item.type === "system"
-                              ? Colors[theme].warning
-                              : Colors[theme].text_secondary,
-                      },
-                    ]}
-                  />
+                    style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
+                  >
+                    <View
+                      style={[
+                        styles.typeIndicator,
+                        { backgroundColor: accent_color },
+                      ]}
+                    />
+                    <Text
+                      style={[
+                        styles.typeText,
+                        { color: Colors[theme].text_secondary },
+                      ]}
+                    >
+                      {is_reward
+                        ? "REWARD"
+                        : item.type === "alert"
+                          ? "SNOOPA"
+                          : item.type.toUpperCase()}
+                    </Text>
+                  </View>
                   <Text
                     style={[
-                      styles.typeText,
+                      styles.timestamp,
                       { color: Colors[theme].text_secondary },
                     ]}
                   >
-                    {item.type === "alert" ? "SNOOPA" : item.type.toUpperCase()}
+                    {timeAgo(item._creationTime)}
                   </Text>
                 </View>
-                <Text
-                  style={[
-                    styles.timestamp,
-                    { color: Colors[theme].text_secondary },
-                  ]}
-                >
-                  {timeAgo(item._creationTime)}
-                </Text>
-              </View>
 
-              <Text style={[styles.title, { color: Colors[theme].text }]}>
-                {item.title}
-              </Text>
-              <Text
-                style={[styles.message, { color: Colors[theme].text }]}
-                numberOfLines={2}
-              >
-                {item.message}
-              </Text>
-            </Pressable>
-          ))}
+                <Text style={[styles.title, { color: Colors[theme].text }]}>
+                  {item.title}
+                </Text>
+                <Text
+                  style={[styles.message, { color: Colors[theme].text }]}
+                  numberOfLines={2}
+                >
+                  {item.message}
+                </Text>
+              </Pressable>
+            );
+          })}
 
         {!isLoading && notifications.length === 0 && (
           <View style={{ marginTop: 100, alignItems: "center", opacity: 0.5 }}>

@@ -1,14 +1,15 @@
 import { useFonts } from "expo-font";
 import { Stack, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import "react-native-reanimated";
 import CustomSplash from "./splashscreen";
 import Purchases from "react-native-purchases";
-import { Platform } from "react-native";
+import { AppState, AppStateStatus, Platform } from "react-native";
 
 import { ConvexAuthProvider } from "@convex-dev/auth/react";
-import { ConvexReactClient, useConvexAuth } from "convex/react";
+import { ConvexReactClient, useConvexAuth, useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api";
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { StatusBar } from "expo-status-bar";
@@ -19,6 +20,7 @@ import LoadingProvider from "@/context/LoadingContext";
 import { PushNotificationProvider } from "@/context/PushNotification";
 import DeviceThemeProvider from "@/context/ThemeContext";
 import UserProvider from "@/context/UserContext";
+import RewardModal from "@/components/RewardModal";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
@@ -93,6 +95,14 @@ const WithinContext = ({ loaded }: { loaded: boolean }) => {
   const { isAuthenticated, isLoading } = useConvexAuth();
   const [showSplash, setShowSplash] = useState<boolean>(true);
   const [isFirstLaunch, setIsFirstLaunch] = useState<boolean | null>(null);
+  const [show_reward_modal, set_show_reward_modal] = useState(false);
+  const app_state_ref = useRef<AppStateStatus>(AppState.currentState);
+
+  // Query for pending (unclaimed) reward notification
+  const pending_reward = useQuery(
+    api.notifications.get_pending_reward,
+    isAuthenticated ? {} : "skip",
+  );
 
   useEffect(() => {
     const isFirstTime = async () => {
@@ -131,6 +141,40 @@ const WithinContext = ({ loaded }: { loaded: boolean }) => {
     }
   }, [isAuthenticated, isLoading, loaded, segments, isFirstLaunch]);
 
+  const dismissed_rewards_ref = useRef<string[]>([]);
+
+  // Show the reward modal as soon as a pending reward is detected
+  useEffect(() => {
+    if (
+      pending_reward &&
+      isAuthenticated &&
+      !showSplash &&
+      !dismissed_rewards_ref.current.includes(pending_reward._id)
+    ) {
+      set_show_reward_modal(true);
+    }
+  }, [pending_reward, isAuthenticated, showSplash]);
+
+  // Re-check when the app returns to foreground
+  useEffect(() => {
+    const subscription = AppState.addEventListener(
+      "change",
+      (next_state: AppStateStatus) => {
+        if (
+          app_state_ref.current.match(/inactive|background/) &&
+          next_state === "active" &&
+          pending_reward &&
+          isAuthenticated &&
+          !dismissed_rewards_ref.current.includes(pending_reward._id)
+        ) {
+          set_show_reward_modal(true);
+        }
+        app_state_ref.current = next_state;
+      },
+    );
+    return () => subscription.remove();
+  }, [pending_reward, isAuthenticated]);
+
   if (!loaded || showSplash || isFirstLaunch === null) {
     return <CustomSplash />;
   }
@@ -148,6 +192,17 @@ const WithinContext = ({ loaded }: { loaded: boolean }) => {
         <Stack.Screen name="onboarding" dangerouslySingular />
         <Stack.Screen name="welcome" dangerouslySingular />
       </Stack>
+
+      {/* Reward modal — shown when a premium grant is detected */}
+      {show_reward_modal && pending_reward && (
+        <RewardModal
+          reward={pending_reward}
+          onDismiss={() => {
+            dismissed_rewards_ref.current.push(pending_reward._id);
+            set_show_reward_modal(false);
+          }}
+        />
+      )}
     </>
   );
 };

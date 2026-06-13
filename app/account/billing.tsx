@@ -101,6 +101,7 @@ export default function BillingScreen() {
   const [packages, setPackages] = useState<any[]>([]);
   const [isPurchasing, setIsPurchasing] = useState<string | null>(null);
   const [nextBillingDate, setNextBillingDate] = useState<string | null>(null);
+  const [showAllPlans, setShowAllPlans] = useState(false);
 
   useEffect(() => {
     async function loadCustomerInfo() {
@@ -197,6 +198,8 @@ export default function BillingScreen() {
       setIsPurchasing(null);
     }
   };
+
+  const activePlanData = PLANS.find((p) => p.id === signedIn?.sub_tier);
 
   return (
     <Container>
@@ -312,177 +315,326 @@ export default function BillingScreen() {
             )}
         </View>
 
-        {/* Pricing Tiers header */}
-        <Text
-          style={[
-            styles.sectionTitle,
-            { color: Colors[theme].text, marginBottom: 16 },
-          ]}
-        >
-          {signedIn?.is_premium ? "Plans" : "Upgrade Plans"}
-        </Text>
-
-        {/* Plan Cards */}
-        <View style={styles.plansContainer}>
-          {[...PLANS]
-            .sort((a, b) => {
-              const isAActive = signedIn?.sub_tier === a.id;
-              const isBActive = signedIn?.sub_tier === b.id;
-              if (isAActive && !isBActive) return -1;
-              if (!isAActive && isBActive) return 1;
-              return 0;
-            })
-            .map((plan) => (
-              <View
-                key={plan.id}
-                style={[
-                  styles.planCard,
-                  {
-                    backgroundColor: Colors[theme].card,
-                    borderColor:
-                      plan.highlight || signedIn?.sub_tier === plan.id
-                        ? Colors[theme].primary
-                        : Colors[theme].border,
-                    borderWidth:
-                      plan.highlight || signedIn?.sub_tier === plan.id ? 2 : 1,
-                  },
-                ]}
+        {/* Active plan benefits for Premium users */}
+        {signedIn?.is_premium && !showAllPlans && activePlanData && (
+          <View style={{ marginBottom: 25 }}>
+            <Text
+              style={[
+                styles.sectionTitle,
+                { color: Colors[theme].text, marginBottom: 16 },
+              ]}
+            >
+              Your Plan Benefits
+            </Text>
+            <View
+              style={[
+                styles.benefitsCard,
+                {
+                  backgroundColor: Colors[theme].card,
+                  borderColor: Colors[theme].border,
+                },
+              ]}
+            >
+              <Text
+                style={{
+                  fontFamily: "FontBold",
+                  fontSize: 18,
+                  color: Colors[theme].text,
+                  marginBottom: 16,
+                }}
               >
-                {plan.badge || signedIn?.sub_tier === plan.id ? (
-                  <View
-                    style={[
-                      styles.badgeContainer,
-                      {
-                        backgroundColor:
-                          plan.highlight || signedIn?.sub_tier === plan.id
-                            ? Colors[theme].primary
-                            : Colors[theme].border,
-                      },
-                    ]}
-                  >
+                {activePlanData.name} Includes:
+              </Text>
+              <View style={{ gap: 14 }}>
+                {activePlanData.features.map((feature, idx) => (
+                  <View key={idx} style={styles.featureRow}>
+                    <Image
+                      source={require("@/assets/icons/check-fill.png")}
+                      style={{
+                        width: 16,
+                        height: 16,
+                        tintColor: Colors[theme].success,
+                      }}
+                    />
                     <Text
                       style={[
-                        styles.badgeText,
-                        {
-                          color:
-                            plan.highlight || signedIn?.sub_tier === plan.id
-                              ? Colors[theme].background
-                              : Colors[theme].text,
-                        },
+                        styles.featureText,
+                        { color: Colors[theme].text },
                       ]}
                     >
-                      {signedIn?.sub_tier === plan.id
-                        ? "CURRENT PLAN"
-                        : plan.badge}
+                      {feature}
                     </Text>
                   </View>
-                ) : null}
+                ))}
+              </View>
+            </View>
 
-                <Text style={[styles.planName, { color: Colors[theme].text }]}>
-                  {plan.name}
-                </Text>
-
-                <Text style={[styles.price, { color: Colors[theme].primary }]}>
-                  {plan.price}
-                  <Text
+            {/* Clickable Card to show all plans */}
+            <Pressable
+              onPress={() => {
+                haptics.impact("light");
+                setShowAllPlans(true);
+              }}
+              style={({ pressed }) => [
+                styles.showPlansCard,
+                {
+                  backgroundColor: Colors[theme].surface,
+                  borderColor: Colors[theme].border,
+                  opacity: pressed ? 0.9 : 1,
+                  marginTop: 20,
+                },
+              ]}
+            >
+              <View style={styles.showPlansCardLeft}>
+                <View
+                  style={[
+                    styles.utilityIconContainer,
+                    { backgroundColor: Colors[theme].primary + "12" },
+                  ]}
+                >
+                  <Image
+                    source={require("@/assets/icons/chevron-right.png")}
                     style={{
-                      fontSize: 16,
-                      color: Colors[theme].text_secondary,
-                      fontFamily: "FontRegular",
+                      width: 14,
+                      height: 14,
+                      tintColor: Colors[theme].primary,
+                      transform: [{ rotate: "90deg" }],
                     }}
-                  >
-                    /mo
-                  </Text>
-                </Text>
-
-                {signedIn?.sub_tier === plan.id && nextBillingDate && (
-                  <Text
-                    style={{
-                      fontFamily: "FontMedium",
-                      fontSize: 13,
-                      color: Colors[theme].text_secondary,
-                      marginBottom: 16,
-                      marginTop: -10,
-                    }}
-                  >
-                    Renews: {nextBillingDate}
-                  </Text>
-                )}
-
-                {/* Feature List */}
-                <View style={styles.featuresList}>
-                  {plan.features.map((feature, idx) => (
-                    <View key={idx} style={styles.featureRow}>
-                      <Image
-                        source={require("@/assets/icons/check-fill.png")}
-                        style={{
-                          width: 16,
-                          height: 16,
-                          tintColor: Colors[theme].primary,
-                        }}
-                      />
-                      <Text
-                        style={[
-                          styles.featureText,
-                          { color: Colors[theme].text_secondary },
-                        ]}
-                      >
-                        {feature}
-                      </Text>
-                    </View>
-                  ))}
+                  />
                 </View>
+                <View>
+                  <Text
+                    style={[
+                      styles.utilityTitle,
+                      { color: Colors[theme].text },
+                    ]}
+                  >
+                    Change Plan Tier
+                  </Text>
+                  <Text
+                    style={[
+                      styles.utilityDesc,
+                      { color: Colors[theme].text_secondary },
+                    ]}
+                  >
+                    Compare other options and pricing
+                  </Text>
+                </View>
+              </View>
+              <Image
+                source={require("@/assets/icons/chevron-right.png")}
+                style={{
+                  width: 14,
+                  height: 14,
+                  tintColor: Colors[theme].text_secondary,
+                }}
+              />
+            </Pressable>
+          </View>
+        )}
 
-                {/* Action Button */}
-                <Pressable
-                  onPress={() => handleSelectPlan(plan.id)}
-                  disabled={
-                    isPurchasing !== null || signedIn?.sub_tier === plan.id
-                  }
-                  style={({ pressed }) => [
-                    styles.planBtn,
+        {/* Pricing Tiers header */}
+        {(!signedIn?.is_premium || showAllPlans) && (
+          <View
+            style={{
+              flexDirection: "row",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: 16,
+            }}
+          >
+            <Text
+              style={[
+                styles.sectionTitle,
+                { color: Colors[theme].text, marginBottom: 0 },
+              ]}
+            >
+              {signedIn?.is_premium ? "Plans" : "Upgrade Plans"}
+            </Text>
+            {signedIn?.is_premium && (
+              <Pressable
+                onPress={() => {
+                  haptics.impact("light");
+                  setShowAllPlans(false);
+                }}
+              >
+                <Text
+                  style={{
+                    fontFamily: "FontBold",
+                    fontSize: 13,
+                    color: Colors[theme].text_secondary,
+                  }}
+                >
+                  Collapse
+                </Text>
+              </Pressable>
+            )}
+          </View>
+        )}
+
+        {/* Plan Cards */}
+        {(!signedIn?.is_premium || showAllPlans) && (
+          <View style={styles.plansContainer}>
+            {[...PLANS]
+              .sort((a, b) => {
+                const isAActive = signedIn?.sub_tier === a.id;
+                const isBActive = signedIn?.sub_tier === b.id;
+                if (isAActive && !isBActive) return -1;
+                if (!isAActive && isBActive) return 1;
+                return 0;
+              })
+              .map((plan) => (
+                <View
+                  key={plan.id}
+                  style={[
+                    styles.planCard,
                     {
-                      backgroundColor: plan.highlight
-                        ? Colors[theme].primary
-                        : "transparent",
-                      borderColor: Colors[theme].primary,
-                      borderWidth: 1,
-                      opacity:
-                        pressed ||
-                        isPurchasing !== null ||
-                        signedIn?.sub_tier === plan.id
-                          ? 0.7
-                          : 1,
+                      backgroundColor: Colors[theme].card,
+                      borderColor:
+                        plan.highlight || signedIn?.sub_tier === plan.id
+                          ? Colors[theme].primary
+                          : Colors[theme].border,
+                      borderWidth:
+                        plan.highlight || signedIn?.sub_tier === plan.id ? 2 : 1,
                     },
                   ]}
                 >
-                  {isPurchasing === plan.id ? (
-                    <ActivityIndicator
-                      color={
-                        plan.highlight
-                          ? Colors[theme].background
-                          : Colors[theme].primary
-                      }
-                      size="small"
-                    />
-                  ) : (
-                    <Text
+                  {plan.badge || signedIn?.sub_tier === plan.id ? (
+                    <View
                       style={[
-                        styles.planBtnText,
+                        styles.badgeContainer,
                         {
-                          color: plan.highlight
-                            ? Colors[theme].background
-                            : Colors[theme].primary,
+                          backgroundColor:
+                            plan.highlight || signedIn?.sub_tier === plan.id
+                              ? Colors[theme].primary
+                              : Colors[theme].border,
                         },
                       ]}
                     >
-                      {getPlanBtnText(plan.id)}
+                      <Text
+                        style={[
+                          styles.badgeText,
+                          {
+                            color:
+                              plan.highlight || signedIn?.sub_tier === plan.id
+                                ? Colors[theme].background
+                               : Colors[theme].text,
+                          },
+                        ]}
+                      >
+                        {signedIn?.sub_tier === plan.id
+                          ? "CURRENT PLAN"
+                          : plan.badge}
+                      </Text>
+                    </View>
+                  ) : null}
+
+                  <Text style={[styles.planName, { color: Colors[theme].text }]}>
+                    {plan.name}
+                  </Text>
+
+                  <Text style={[styles.price, { color: Colors[theme].primary }]}>
+                    {plan.price}
+                    <Text
+                      style={{
+                        fontSize: 16,
+                        color: Colors[theme].text_secondary,
+                        fontFamily: "FontRegular",
+                      }}
+                    >
+                      /mo
+                    </Text>
+                  </Text>
+
+                  {signedIn?.sub_tier === plan.id && nextBillingDate && (
+                    <Text
+                      style={{
+                        fontFamily: "FontMedium",
+                        fontSize: 13,
+                        color: Colors[theme].text_secondary,
+                        marginBottom: 16,
+                        marginTop: -10,
+                      }}
+                    >
+                      Renews: {nextBillingDate}
                     </Text>
                   )}
-                </Pressable>
-              </View>
-            ))}
-        </View>
+
+                  {/* Feature List */}
+                  <View style={styles.featuresList}>
+                    {plan.features.map((feature, idx) => (
+                      <View key={idx} style={styles.featureRow}>
+                        <Image
+                          source={require("@/assets/icons/check-fill.png")}
+                          style={{
+                            width: 16,
+                            height: 16,
+                            tintColor: Colors[theme].primary,
+                          }}
+                        />
+                        <Text
+                          style={[
+                            styles.featureText,
+                            { color: Colors[theme].text_secondary },
+                          ]}
+                        >
+                          {feature}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+
+                  {/* Action Button */}
+                  <Pressable
+                    onPress={() => handleSelectPlan(plan.id)}
+                    disabled={
+                      isPurchasing !== null || signedIn?.sub_tier === plan.id
+                    }
+                    style={({ pressed }) => [
+                      styles.planBtn,
+                      {
+                        backgroundColor: plan.highlight
+                          ? Colors[theme].primary
+                          : "transparent",
+                        borderColor: Colors[theme].primary,
+                        borderWidth: 1,
+                        opacity:
+                          pressed ||
+                          isPurchasing !== null ||
+                          signedIn?.sub_tier === plan.id
+                            ? 0.7
+                            : 1,
+                      },
+                    ]}
+                  >
+                    {isPurchasing === plan.id ? (
+                      <ActivityIndicator
+                        color={
+                          plan.highlight
+                            ? Colors[theme].background
+                            : Colors[theme].primary
+                        }
+                        size="small"
+                      />
+                    ) : (
+                      <Text
+                        style={[
+                          styles.planBtnText,
+                          {
+                            color: plan.highlight
+                              ? Colors[theme].background
+                              : Colors[theme].primary,
+                          },
+                        ]}
+                      >
+                        {getPlanBtnText(plan.id)}
+                      </Text>
+                    )}
+                  </Pressable>
+                </View>
+              ))}
+          </View>
+        )}
 
         {/* Snoop packs / testing utilities */}
         <Text
@@ -696,5 +848,23 @@ const styles = StyleSheet.create({
     fontFamily: "FontRegular",
     fontSize: 12,
     marginTop: 1,
+  },
+  benefitsCard: {
+    padding: 24,
+    borderRadius: 24,
+    borderWidth: 1,
+  },
+  showPlansCard: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  showPlansCardLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
   },
 });

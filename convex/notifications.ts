@@ -114,8 +114,14 @@ export const save_notification = internalMutation({
     user_id: v.id("users"),
     title: v.string(),
     message: v.string(),
-    type: v.union(v.literal("system"), v.literal("alert"), v.literal("info")),
+    type: v.union(
+      v.literal("system"),
+      v.literal("alert"),
+      v.literal("info"),
+      v.literal("reward"),
+    ),
     watchlist_id: v.optional(v.id("watchlist")),
+    reward_claimed: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     await ctx.db.insert("notifications", {
@@ -126,6 +132,7 @@ export const save_notification = internalMutation({
       seen: false,
       read: false,
       watchlist_id: args.watchlist_id,
+      reward_claimed: args.reward_claimed,
     });
   },
 });
@@ -171,3 +178,54 @@ export async function sendExpoPush(
     console.error("Expo push error:", err);
   }
 }
+
+// ---------------------------------------------------------------------------
+// Reward Notification — Claim Flow
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns the first unclaimed reward notification for the current user.
+ * Used by the app entry modal to decide whether to show the reward screen.
+ */
+export const get_pending_reward = query({
+  args: {},
+  handler: async (ctx) => {
+    const user_id = await getAuthUserId(ctx);
+    if (!user_id) return null;
+
+    const reward = await ctx.db
+      .query("notifications")
+      .withIndex("by_user", (q) => q.eq("user_id", user_id))
+      .filter((q) =>
+        q.and(
+          q.eq(q.field("type"), "reward"),
+          q.eq(q.field("reward_claimed"), false),
+        ),
+      )
+      .order("desc")
+      .first();
+
+    return reward ?? null;
+  },
+});
+
+/**
+ * Marks a reward notification as claimed, seen, and read.
+ * Called when the user taps "Claim" on the modal or from the notifications screen.
+ */
+export const claim_reward = mutation({
+  args: { notification_id: v.id("notifications") },
+  handler: async (ctx, args) => {
+    const user_id = await getAuthUserId(ctx);
+    if (!user_id) return;
+
+    const notification = await ctx.db.get(args.notification_id);
+    if (!notification || notification.user_id !== user_id) return;
+
+    await ctx.db.patch(args.notification_id, {
+      reward_claimed: true,
+      seen: true,
+      read: true,
+    });
+  },
+});
