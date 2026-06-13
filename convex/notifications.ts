@@ -24,6 +24,22 @@ export const get_notifications = query({
 });
 
 /**
+ * Get a single notification by ID.
+ */
+export const get_notification = query({
+  args: { notification_id: v.id("notifications") },
+  handler: async (ctx, args) => {
+    const user_id = await getAuthUserId(ctx);
+    if (!user_id) return null;
+
+    const notification = await ctx.db.get(args.notification_id);
+    if (!notification || notification.user_id !== user_id) return null;
+
+    return notification;
+  },
+});
+
+/**
  * Count of unseen notifications — drives the bell red dot.
  * Clears once the user opens the notifications screen (mark_all_seen).
  */

@@ -469,11 +469,20 @@ function SnoopCard({
 function BriefingCardSwipe({ item, width }: { item: any; width: number }) {
   const { theme } = useTheme();
   const router = useRouter();
+  const markRead = useMutation(api.notifications.mark_read);
 
   return (
     <Pressable
       onPress={() => {
-        if (item.watchlist_id) {
+        if (!item.read) {
+          markRead({ notification_id: item._id });
+        }
+        if (item.type === "reward") {
+          router.push({
+            pathname: "/notifications/[id]",
+            params: { id: item._id },
+          });
+        } else if (item.watchlist_id) {
           router.push({
             pathname: "/snoop/[id]",
             params: { id: item.watchlist_id },
