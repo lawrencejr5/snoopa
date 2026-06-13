@@ -298,12 +298,20 @@ async function _processMonitoredSources(
   // Parallel fetch + verify all sources
   await Promise.all(
     allMonitoredSources.map(async (source: any) => {
-      const extractResult = await ctx.runAction(
-        internal.tavily.extract_source,
+      let extractResult = await ctx.runAction(
+        internal.firecrawl.extract_source,
         {
           url: source.url,
         },
       );
+      if (!extractResult.success) {
+        console.warn(
+          `[Firehose] Firecrawl extract failed for ${source.url}, falling back to Tavily.`,
+        );
+        extractResult = await ctx.runAction(internal.tavily.extract_source, {
+          url: source.url,
+        });
+      }
       if (!extractResult.success) return;
 
       const snapshot = extractResult.content as string;

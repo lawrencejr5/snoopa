@@ -873,9 +873,13 @@ async function _handleSource(
   if (!url.startsWith("http")) url = `https://${url}`;
   url = cleanUrl(url);
 
-  const extractResult = await ctx.runAction(internal.tavily.extract_source, {
+  let extractResult = await ctx.runAction(internal.firecrawl.extract_source, {
     url,
   });
+  if (!extractResult.success) {
+    console.warn(`[Chat] Firecrawl extract failed for ${url}, falling back to Tavily.`);
+    extractResult = await ctx.runAction(internal.tavily.extract_source, { url });
+  }
 
   if (!extractResult.success) {
     if (args.watchlist_id) {
@@ -978,9 +982,13 @@ async function _gatherIntel(
 
   // Scrapes a URL and updates the stored snapshot + hash
   const scrapeAndUpdate = async (url: string): Promise<string | null> => {
-    const extractResult = await ctx.runAction(internal.tavily.extract_source, {
+    let extractResult = await ctx.runAction(internal.firecrawl.extract_source, {
       url,
     });
+    if (!extractResult.success) {
+      console.warn(`[Chat] Firecrawl scrape failed for ${url}, falling back to Tavily.`);
+      extractResult = await ctx.runAction(internal.tavily.extract_source, { url });
+    }
     if (!extractResult.success) return null;
     const raw = extractResult.content as string;
     const new_hash = await hashString(raw);
@@ -1463,10 +1471,14 @@ async function _attachInitialIntel(
     url = cleanUrl(url);
 
     try {
-      const extractResult = await ctx.runAction(
-        internal.tavily.extract_source,
+      let extractResult = await ctx.runAction(
+        internal.firecrawl.extract_source,
         { url },
       );
+      if (!extractResult.success) {
+        console.warn(`[Chat] Firecrawl extract failed on init for ${url}, falling back to Tavily.`);
+        extractResult = await ctx.runAction(internal.tavily.extract_source, { url });
+      }
       if (extractResult.success) {
         const snapshot = extractResult.content as string;
         const last_hash = await hashString(snapshot);
