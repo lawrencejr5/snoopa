@@ -1199,7 +1199,7 @@ export default function HomeScreen() {
               >
                 {signedIn?.plan} Plan
               </Text>
-              {(signedIn as any)?.plan !== "max" && (
+              {((signedIn as any)?.plan !== "max" || signedIn?.is_premium) && (
                 <Pressable
                   onPress={() => {
                     profileSheetRef.current?.dismiss();
@@ -1220,7 +1220,7 @@ export default function HomeScreen() {
                       letterSpacing: 0.3,
                     }}
                   >
-                    UPGRADE
+                    {signedIn?.is_premium ? "EXPLORE" : "UPGRADE"}
                   </Text>
                 </Pressable>
               )}
