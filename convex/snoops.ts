@@ -285,3 +285,67 @@ export const upgrade_user_tier = mutation({
   },
 });
 
+export const sync_user_subscription = mutation({
+  args: {
+    is_premium: v.boolean(),
+    tier: v.union(
+      v.literal("free"),
+      v.literal("pro"),
+      v.literal("supa"),
+      v.literal("max"),
+    ),
+  },
+  handler: async (ctx, args) => {
+    const user_id = await getAuthUserId(ctx);
+    if (!user_id) throw new ConvexError("Not authenticated");
+
+    const user = await ctx.db.get(user_id);
+    if (!user) throw new ConvexError("User not found");
+
+    const current_is_premium = user.is_premium === true;
+    const current_tier = user.sub_tier || "free";
+
+    if (current_is_premium === args.is_premium && current_tier === args.tier) {
+      return;
+    }
+
+    const plan_val = args.tier === "free" ? "free" : "pro";
+
+    await ctx.db.patch(user_id, {
+      plan: plan_val,
+      sub_tier: args.tier,
+      is_premium: args.is_premium,
+      date_of_sub: args.is_premium ? Date.now() : undefined,
+    });
+
+    if (args.is_premium && current_tier !== args.tier) {
+      const active_grants = await ctx.db
+        .query("snoops")
+        .withIndex("by_user", (q) => q.eq("user_id", user_id))
+        .collect();
+
+      for (const grant of active_grants) {
+        if (grant.type === "free" || grant.type === "monthly") {
+          await ctx.db.patch(grant._id, { remaining: 0 });
+        }
+      }
+
+      let snoop_amount = 0;
+      if (args.tier === "pro") snoop_amount = 1000;
+      else if (args.tier === "supa") snoop_amount = 4000;
+      else if (args.tier === "max") snoop_amount = 12000;
+
+      if (snoop_amount > 0) {
+        await ctx.db.insert("snoops", {
+          user_id,
+          snoops: snoop_amount,
+          remaining: snoop_amount,
+          type: "monthly",
+          expiration_date: end_of_month_timestamp(),
+        });
+      }
+    }
+  },
+});
+
+
