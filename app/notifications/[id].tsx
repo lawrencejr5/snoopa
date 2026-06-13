@@ -1,4 +1,5 @@
 import Container from "@/components/Container";
+import TopUpModal from "@/components/TopUpModal";
 import Colors from "@/constants/Colors";
 import { useHapitcs } from "@/context/HapticsContext";
 import { useTheme } from "@/context/ThemeContext";
@@ -6,7 +7,7 @@ import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { useQuery } from "convex/react";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
@@ -17,12 +18,13 @@ import {
   View,
 } from "react-native";
 
-export default function RewardDetailScreen() {
+export default function NotificationDetailScreen() {
   const { theme } = useTheme();
   const C = Colors[theme];
   const router = useRouter();
   const haptics = useHapitcs();
   const { id } = useLocalSearchParams<{ id: string }>();
+  const [topUpVisible, setTopUpVisible] = useState(false);
 
   // Fetch single notification
   const notification = useQuery(api.notifications.get_notification, {
@@ -72,6 +74,29 @@ export default function RewardDetailScreen() {
 
   const isLoading = notification === undefined;
 
+  // Compute dynamic visuals once notification is loaded
+  const is_snoops = notification?.type === "snoops";
+  const is_exhausted =
+    is_snoops &&
+    (notification?.title.toLowerCase().includes("out") ||
+      notification?.message.toLowerCase().includes("run out"));
+
+  const header_title = is_snoops ? "Snoops Info" : "Premium Gift";
+
+  const badge_text = is_snoops
+    ? is_exhausted
+      ? "SNOOPS EXHAUSTED"
+      : "SNOOPS LOW"
+    : "EXCLUSIVE REWARD";
+
+  const badge_color = is_snoops
+    ? is_exhausted
+      ? C.danger
+      : C.warning
+    : C.success;
+
+  const button_text = is_snoops ? "Upgrade or Top Up" : "Explore benefits";
+
   return (
     <Container>
       <Stack.Screen options={{ headerShown: false }} />
@@ -90,7 +115,7 @@ export default function RewardDetailScreen() {
           />
         </Pressable>
         <Text style={[styles.headerTitle, { color: C.text }]}>
-          Premium Gift
+          {header_title}
         </Text>
       </View>
 
@@ -111,7 +136,12 @@ export default function RewardDetailScreen() {
           showsVerticalScrollIndicator={false}
         >
           {/* Card Wrapper */}
-          <View style={[styles.card, { backgroundColor: C.surface, borderColor: C.border }]}>
+          <View
+            style={[
+              styles.card,
+              { backgroundColor: C.surface, borderColor: C.border },
+            ]}
+          >
             {/* Logo */}
             <Animated.Image
               source={require("@/assets/images/splash-icon.png")}
@@ -119,9 +149,11 @@ export default function RewardDetailScreen() {
             />
 
             {/* Badge */}
-            <View style={[styles.badge, { backgroundColor: C.success + "22" }]}>
-              <Text style={[styles.badgeText, { color: C.success }]}>
-                EXCLUSIVE REWARD
+            <View
+              style={[styles.badge, { backgroundColor: badge_color + "22" }]}
+            >
+              <Text style={[styles.badgeText, { color: badge_color }]}>
+                {badge_text}
               </Text>
             </View>
 
@@ -137,24 +169,71 @@ export default function RewardDetailScreen() {
 
             <View style={[styles.divider, { backgroundColor: C.border }]} />
 
-            {/* Explore Benefits Button */}
-            <Pressable
-              onPress={handle_explore}
-              style={({ pressed }) => [
-                styles.btn,
-                {
-                  backgroundColor: C.primary,
-                  opacity: pressed ? 0.85 : 1,
-                },
-              ]}
-            >
-              <Text style={[styles.btnText, { color: C.background }]}>
-                Explore benefits
-              </Text>
-            </Pressable>
+            {is_snoops ? (
+              <View style={{ width: "100%", gap: 12 }}>
+                {/* Top Up Button */}
+                <Pressable
+                  onPress={() => {
+                    haptics.impact("light");
+                    setTopUpVisible(true);
+                  }}
+                  style={({ pressed }) => [
+                    styles.btn,
+                    {
+                      backgroundColor: C.primary,
+                      opacity: pressed ? 0.85 : 1,
+                    },
+                  ]}
+                >
+                  <Text style={[styles.btnText, { color: C.background }]}>
+                    Top Up
+                  </Text>
+                </Pressable>
+
+                {/* Upgrade Button */}
+                <Pressable
+                  onPress={handle_explore}
+                  style={({ pressed }) => [
+                    styles.btn,
+                    {
+                      backgroundColor: "transparent",
+                      borderWidth: 1,
+                      borderColor: C.border,
+                      opacity: pressed ? 0.85 : 1,
+                    },
+                  ]}
+                >
+                  <Text style={[styles.btnText, { color: C.text }]}>
+                    Upgrade Plan
+                  </Text>
+                </Pressable>
+              </View>
+            ) : (
+              /* Explore Benefits Button */
+              <Pressable
+                onPress={handle_explore}
+                style={({ pressed }) => [
+                  styles.btn,
+                  {
+                    backgroundColor: C.primary,
+                    opacity: pressed ? 0.85 : 1,
+                  },
+                ]}
+              >
+                <Text style={[styles.btnText, { color: C.background }]}>
+                  {button_text}
+                </Text>
+              </Pressable>
+            )}
           </View>
         </Animated.ScrollView>
       )}
+
+      {/* Top Up Snoop Packs bottom sheet */}
+      <TopUpModal
+        visible={topUpVisible}
+        onClose={() => setTopUpVisible(false)}
+      />
     </Container>
   );
 }

@@ -53,9 +53,9 @@ export default function NotificationsScreen() {
     if (!item.read) {
       markRead({ notification_id: item._id });
     }
-    
-    // For reward notifications, navigate to the full details page
-    if (item.type === "reward") {
+
+    // For reward or snoops notifications, navigate to the full details page
+    if (item.type === "reward" || item.type === "snoops") {
       router.push({
         pathname: "/notifications/[id]",
         params: { id: item._id },
@@ -107,13 +107,18 @@ export default function NotificationsScreen() {
         {!isLoading &&
           notifications.map((item) => {
             const is_reward = item.type === "reward";
+            const is_snoops = item.type === "snoops";
             const accent_color = is_reward
-              ? Colors[theme].warning
-              : item.type === "alert"
-                ? Colors[theme].success
-                : item.type === "system"
-                  ? Colors[theme].warning
-                  : Colors[theme].text_secondary;
+              ? Colors[theme].success
+              : is_snoops
+                ? item.title.includes("out")
+                  ? Colors[theme].danger
+                  : Colors[theme].warning
+                : item.type === "alert"
+                  ? Colors[theme].success
+                  : item.type === "system"
+                    ? Colors[theme].warning
+                    : Colors[theme].text_secondary;
 
             return (
               <Pressable
@@ -132,7 +137,11 @@ export default function NotificationsScreen() {
               >
                 <View style={styles.notificationHeader}>
                   <View
-                    style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 8,
+                    }}
                   >
                     <View
                       style={[
@@ -148,9 +157,11 @@ export default function NotificationsScreen() {
                     >
                       {is_reward
                         ? "REWARD"
-                        : item.type === "alert"
-                          ? "SNOOPA"
-                          : item.type.toUpperCase()}
+                        : is_snoops
+                          ? "SNOOPS"
+                          : item.type === "alert"
+                            ? "SNOOPA"
+                            : item.type.toUpperCase()}
                     </Text>
                   </View>
                   <Text

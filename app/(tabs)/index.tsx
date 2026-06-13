@@ -477,7 +477,7 @@ function BriefingCardSwipe({ item, width }: { item: any; width: number }) {
         if (!item.read) {
           markRead({ notification_id: item._id });
         }
-        if (item.type === "reward") {
+        if (item.type === "reward" || item.type === "snoops") {
           router.push({
             pathname: "/notifications/[id]",
             params: { id: item._id },

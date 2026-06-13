@@ -111,6 +111,7 @@ const schema = defineSchema({
       v.literal("alert"),
       v.literal("info"),
       v.literal("reward"),
+      v.literal("snoops"),
     ),
     title: v.string(),
     message: v.string(),

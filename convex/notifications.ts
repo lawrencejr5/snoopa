@@ -1,7 +1,12 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
-import { internalAction, internalMutation, mutation, query } from "./_generated/server";
 import { internal } from "./_generated/api";
+import {
+  internalAction,
+  internalMutation,
+  mutation,
+  query,
+} from "./_generated/server";
 
 // ---------------------------------------------------------------------------
 // Queries
@@ -136,6 +141,7 @@ export const save_notification = internalMutation({
       v.literal("alert"),
       v.literal("info"),
       v.literal("reward"),
+      v.literal("snoops"),
     ),
     watchlist_id: v.optional(v.id("watchlist")),
     reward_claimed: v.optional(v.boolean()),
@@ -264,12 +270,12 @@ export const send_snoop_alert_push = internalAction({
 
     const title =
       args.alert_type === "low"
-        ? "Running Low on Snoops 🐾"
-        : "You're out of Snoops 🐾";
+        ? "Running Low on Snoops 🪫"
+        : "You're out of Snoops 💀";
 
     const message =
       args.alert_type === "low"
-        ? "You've used 95% of your snoops this month. Top up or upgrade your plan to keep tracking!"
+        ? "You've used up to 95% of your snoops this month. Top up or upgrade your plan to keep tracking!"
         : "You've run out of snoops for this period. Top up or upgrade your plan to keep investigating.";
 
     await sendExpoPush(push_tokens, title, message);

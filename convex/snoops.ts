@@ -53,13 +53,14 @@ export async function check_and_trigger_snoop_alerts(ctx: any, user_id: Id<"user
   const start_time = start_of_month_timestamp();
 
   if (remaining_total === 0) {
+    const expected_title = "You're out of Snoops 💀";
     // Check if we already alerted this month
     const existing_exhausted = await ctx.db
       .query("notifications")
       .withIndex("by_user", (q: any) => q.eq("user_id", user_id))
       .filter((q: any) =>
         q.and(
-          q.eq(q.field("title"), "You're out of Snoops 🐾"),
+          q.eq(q.field("title"), expected_title),
           q.gt(q.field("_creationTime"), start_time)
         )
       )
@@ -68,9 +69,9 @@ export async function check_and_trigger_snoop_alerts(ctx: any, user_id: Id<"user
     if (!existing_exhausted) {
       await ctx.db.insert("notifications", {
         user_id,
-        type: "system",
-        title: "You're out of Snoops 🐾",
-        message: "You've used all your snoops for this period. Top up or upgrade your plan to keep tracking.",
+        type: "snoops",
+        title: expected_title,
+        message: "You've run out of snoops for this period. Top up or upgrade your plan to keep investigating.",
         seen: false,
         read: false,
       });
@@ -81,13 +82,14 @@ export async function check_and_trigger_snoop_alerts(ctx: any, user_id: Id<"user
       });
     }
   } else if (remaining_total / allocated_total <= 0.05) {
+    const expected_title = "Running Low on Snoops 🪫";
     // Check if we already alerted this month
     const existing_low = await ctx.db
       .query("notifications")
       .withIndex("by_user", (q: any) => q.eq("user_id", user_id))
       .filter((q: any) =>
         q.and(
-          q.eq(q.field("title"), "Running Low on Snoops 🐾"),
+          q.eq(q.field("title"), expected_title),
           q.gt(q.field("_creationTime"), start_time)
         )
       )
@@ -96,9 +98,9 @@ export async function check_and_trigger_snoop_alerts(ctx: any, user_id: Id<"user
     if (!existing_low) {
       await ctx.db.insert("notifications", {
         user_id,
-        type: "info",
-        title: "Running Low on Snoops 🐾",
-        message: `You've used 95% of your snoops this month (${remaining_total} remaining). Top up or upgrade your plan to keep tracking.`,
+        type: "snoops",
+        title: expected_title,
+        message: `You've used up to 95% of your snoops this month (${remaining_total} remaining). Top up or upgrade your plan to keep tracking.`,
         seen: false,
         read: false,
       });
