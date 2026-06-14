@@ -34,6 +34,13 @@ if (process.env.RUN_CRONS === "true") {
     internal.firehose.run_firehose,
     { tier: 4 },
   );
+
+  // Monthly refill of free snoops for all free users (at midnight on the 1st of every month)
+  crons.cron(
+    "refill-free-snoops",
+    "0 0 1 * *",
+    internal.migrations.seed_free_snoops,
+  );
 }
 
 export default crons;

@@ -399,39 +399,48 @@ export const sync_user_subscription = mutation({
     }
 
     const plan_val = args.tier === "free" ? "free" : "pro";
+    const is_new_sub_cycle = (args.is_premium && !current_is_premium) || (args.is_premium && current_tier !== args.tier);
+    const date_of_sub_val = args.is_premium
+      ? (is_new_sub_cycle ? Date.now() : (user.date_of_sub || Date.now()))
+      : undefined;
 
     await ctx.db.patch(user_id, {
       plan: plan_val,
       sub_tier: args.tier,
       is_premium: args.is_premium,
-      date_of_sub: args.is_premium ? Date.now() : undefined,
+      date_of_sub: date_of_sub_val,
     });
 
-    if (args.is_premium && current_tier !== args.tier) {
+    if (args.is_premium && (current_tier !== args.tier || !current_is_premium)) {
       let snoop_amount = 0;
       if (args.tier === "pro") snoop_amount = 1000;
       else if (args.tier === "supa") snoop_amount = 4000;
       else if (args.tier === "max") snoop_amount = 12000;
 
       if (snoop_amount > 0) {
-        // Prevent duplicate refills if a monthly grant for this tier & month already exists
-        const end_timestamp = end_of_month_timestamp();
+        // Prevent duplicate refills if a monthly grant for this subscription cycle already exists
         const existing_monthly = await ctx.db
           .query("snoops")
-          .withIndex("by_user_expiry", (q) => q.eq("user_id", user_id).eq("expiration_date", end_timestamp))
-          .filter((q) => q.eq(q.field("snoops"), snoop_amount))
+          .withIndex("by_user", (q: any) => q.eq("user_id", user_id))
+          .filter((q: any) =>
+            q.and(
+              q.eq(q.field("type"), "monthly"),
+              q.gte(q.field("_creationTime"), date_of_sub_val || 0)
+            )
+          )
           .first();
 
-        // Also check if a reward notification with the exact same title exists to prevent duplicate notifications
+        // Also check if a reward notification for this cycle already exists to prevent duplicate notifications
         const tier_label = TIER_LABELS[args.tier] ?? args.tier.toUpperCase();
         const expected_title = `🎉 You've been granted ${tier_label}!`;
         const existing_notification = await ctx.db
           .query("notifications")
-          .withIndex("by_user", (q) => q.eq("user_id", user_id))
-          .filter((q) =>
+          .withIndex("by_user", (q: any) => q.eq("user_id", user_id))
+          .filter((q: any) =>
             q.and(
               q.eq(q.field("type"), "reward"),
-              q.eq(q.field("title"), expected_title)
+              q.eq(q.field("title"), expected_title),
+              q.gte(q.field("_creationTime"), date_of_sub_val || 0)
             )
           )
           .first();
@@ -440,18 +449,20 @@ export const sync_user_subscription = mutation({
           return; // Already provisioned
         }
 
-        const active_grants = await ctx.db
-          .query("snoops")
-          .withIndex("by_user", (q) => q.eq("user_id", user_id))
-          .collect();
-
-        for (const grant of active_grants) {
-          if (grant.type === "free" || grant.type === "monthly") {
-            await ctx.db.patch(grant._id, { remaining: 0 });
-          }
-        }
-
         if (!existing_monthly) {
+          // Deplete previous monthly or free snoop grants
+          const active_grants = await ctx.db
+            .query("snoops")
+            .withIndex("by_user", (q) => q.eq("user_id", user_id))
+            .collect();
+
+          for (const grant of active_grants) {
+            if (grant.type === "free" || grant.type === "monthly") {
+              await ctx.db.patch(grant._id, { remaining: 0 });
+            }
+          }
+
+          const end_timestamp = end_of_month_timestamp();
           await ctx.db.insert("snoops", {
             user_id,
             snoops: snoop_amount,
@@ -473,6 +484,32 @@ export const sync_user_subscription = mutation({
             reward_claimed: false,
           });
         }
+      }
+    }
+
+    if (!args.is_premium && args.tier === "free") {
+      // Free user: check if they have a free snoop grant for this month
+      const start_timestamp = start_of_month_timestamp();
+      const existing_free = await ctx.db
+        .query("snoops")
+        .withIndex("by_user", (q: any) => q.eq("user_id", user_id))
+        .filter((q: any) =>
+          q.and(
+            q.eq(q.field("type"), "free"),
+            q.gte(q.field("expiration_date"), start_timestamp)
+          )
+        )
+        .first();
+
+      if (!existing_free) {
+        // Provision 30 free snoops expiring at the end of the month
+        await ctx.db.insert("snoops", {
+          user_id,
+          snoops: 30,
+          remaining: 30,
+          type: "free",
+          expiration_date: end_of_month_timestamp(),
+        });
       }
     }
   },
