@@ -20,6 +20,7 @@ const UserProvider: FC<{ children: ReactNode }> = ({ children }) => {
 
   useEffect(() => {
     if (Platform.OS === "web") return;
+    if (currentUser === undefined) return; // Wait until currentUser query finishes loading
 
     const handleCustomerInfo = async (customerInfo: any) => {
       try {
@@ -69,7 +70,7 @@ const UserProvider: FC<{ children: ReactNode }> = ({ children }) => {
     return () => {
       Purchases.removeCustomerInfoUpdateListener(handleCustomerInfo);
     };
-  }, [signedIn?._id]);
+  }, [signedIn?._id, currentUser === undefined]);
 
   return (
     <UserContext.Provider value={{ signedIn }}>{children}</UserContext.Provider>
