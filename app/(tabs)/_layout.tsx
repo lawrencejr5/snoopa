@@ -4,21 +4,31 @@ import React from "react";
 import Colors from "@/constants/Colors";
 import { useTheme } from "@/context/ThemeContext";
 import { Image, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function TabLayout() {
   const { theme } = useTheme();
+  const insets = useSafeAreaInsets();
 
   return (
-    <View style={{ flex: 1, backgroundColor: Colors[theme].background }}>
+    <View
+      style={{
+        flex: 1,
+        backgroundColor: Colors[theme].background,
+      }}
+    >
       <Tabs
         screenOptions={{
           tabBarActiveTintColor: Colors[theme].text,
           tabBarInactiveTintColor: Colors[theme].text_secondary,
+
           headerShown: false,
           tabBarStyle: {
+            height: 80,
             elevation: 0,
             borderTopWidth: 0,
             backgroundColor: Colors[theme].background,
+            marginTop: -20,
           },
           tabBarLabelStyle: {
             fontFamily: "FontMedium",
