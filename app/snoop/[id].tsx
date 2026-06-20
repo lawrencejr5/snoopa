@@ -450,14 +450,37 @@ export default function SnoopDetailsScreen() {
   const detectIntent = useAction(api.chat.detect_intent);
   const sendMessage = useAction(api.chat.send_message);
 
+  const [isScreenFocused, setIsScreenFocused] = useState(false);
+
   useFocusEffect(
     useCallback(() => {
+      setIsScreenFocused(true);
       if (id) {
         markLogsSeen({ watchlist_id: id as Id<"watchlist"> }).catch(() => {});
         markChatsSeen({ watchlist_id: id as Id<"watchlist"> }).catch(() => {});
       }
+      return () => {
+        setIsScreenFocused(false);
+      };
     }, [id])
   );
+
+  // Automatically mark new messages and logs as seen while the screen is focused
+  useEffect(() => {
+    if (!isScreenFocused || !id) return;
+
+    const hasUnseenChats = chatMessages?.some(
+      (msg) => msg.role === "snoopa" && !msg.seen
+    );
+    const hasUnseenLogs = logs?.some((log) => !log.seen);
+
+    if (hasUnseenChats) {
+      markChatsSeen({ watchlist_id: id as Id<"watchlist"> }).catch(() => {});
+    }
+    if (hasUnseenLogs) {
+      markLogsSeen({ watchlist_id: id as Id<"watchlist"> }).catch(() => {});
+    }
+  }, [chatMessages, logs, isScreenFocused, id]);
 
   // Merge logs + chat into a unified timeline
   const timeline = useMemo(() => {
