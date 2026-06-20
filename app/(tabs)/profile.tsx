@@ -45,7 +45,8 @@ export default function ProfileScreen() {
   // Snoop balance
   const snoop_balance = useQuery(api.snoops.get_snoop_balance) ?? 0;
   const snoop_grants = useQuery(api.snoops.get_snoop_grants) ?? [];
-  const snoop_total = (snoop_grants as any[]).reduce((sum, g) => sum + g.snoops, 0) || 30;
+  const snoop_total =
+    (snoop_grants as any[]).reduce((sum, g) => sum + g.snoops, 0) || 30;
   const snoops_used = snoop_total - snoop_balance;
   const snoop_pct = snoop_total > 0 ? snoops_used / snoop_total : 0;
   const is_low = snoop_balance <= snoop_total * 0.3;
@@ -148,7 +149,7 @@ export default function ProfileScreen() {
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 50 }}
+        contentContainerStyle={{ paddingBottom: 100 }}
       >
         {/* User & Snoop Card */}
         <Animated.View
@@ -189,7 +190,9 @@ export default function ProfileScreen() {
                   { color: Colors[theme].text, textTransform: "capitalize" },
                 ]}
               >
-                {signedIn?.sub_tier === "supa" ? "Supa Snoopa" : `${signedIn?.sub_tier || "free"} Plan`}
+                {signedIn?.sub_tier === "supa"
+                  ? "Supa Snoopa"
+                  : `${signedIn?.sub_tier || "free"} Plan`}
               </Text>
             </View>
           </View>
@@ -280,7 +283,10 @@ export default function ProfileScreen() {
           {snoop_pct >= 0.75 && (
             <Text
               style={{
-                color: snoop_pct >= 1.0 ? Colors[theme].danger : Colors[theme].warning,
+                color:
+                  snoop_pct >= 1.0
+                    ? Colors[theme].danger
+                    : Colors[theme].warning,
                 fontFamily: "FontMedium",
                 fontSize: 11,
                 marginTop: 8,
@@ -314,8 +320,8 @@ export default function ProfileScreen() {
             <Text
               style={[styles.upgradeDescription, { color: Colors[theme].text }]}
             >
-              Unlock unlimited tracking, deeper insights, and faster updates with
-              Pro.
+              Unlock unlimited tracking, deeper insights, and faster updates
+              with Pro.
             </Text>
             <Pressable
               style={[
