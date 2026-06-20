@@ -1,7 +1,7 @@
 import AddWatchlistModal from "@/components/AddWatchlistModal";
-import PremiumFeatureModal from "@/components/PremiumFeatureModal";
 import Container from "@/components/Container";
 import Loading from "@/components/Loading";
+import PremiumFeatureModal from "@/components/PremiumFeatureModal";
 import {
   CommandsModal,
   ConfirmationModal,
@@ -407,7 +407,8 @@ export default function WatchlistScreen() {
   const is_locked = watchlistData.length >= 2 && signedIn?.is_premium !== true;
   const snoop_balance = useQuery(api.snoops.get_snoop_balance) ?? 0;
   const snoop_grants = useQuery(api.snoops.get_snoop_grants) ?? [];
-  const snoop_total = (snoop_grants as any[]).reduce((sum, g) => sum + g.snoops, 0) || 30;
+  const snoop_total =
+    (snoop_grants as any[]).reduce((sum, g) => sum + g.snoops, 0) || 30;
   const snoops_used = snoop_total - snoop_balance;
 
   const activeSnoops = watchlistData.filter((i) => i.status === "active");
@@ -705,11 +706,7 @@ export default function WatchlistScreen() {
         ]}
       >
         {is_locked ? (
-          <Octicons
-            name="lock"
-            size={18}
-            color={Colors[theme].background}
-          />
+          <Octicons name="lock" size={18} color={Colors[theme].background} />
         ) : (
           <Text
             style={{
@@ -867,7 +864,7 @@ const styles = StyleSheet.create({
   },
   fab: {
     position: "absolute",
-    bottom: 30,
+    bottom: 120,
     right: 20,
     width: 56,
     height: 56,
