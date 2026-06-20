@@ -167,6 +167,11 @@ const schema = defineSchema({
   })
     .index("by_user", ["user_id"])
     .index("by_user_expiry", ["user_id", "expiration_date"]),
+
+  ad_views: defineTable({
+    user_id: v.id("users"),
+    viewed_at: v.number(), // Unix timestamp (ms) when the ad was watched
+  }).index("by_user", ["user_id"]),
 });
 
 export default schema;

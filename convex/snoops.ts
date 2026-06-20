@@ -1,5 +1,6 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { ConvexError, v } from "convex/values";
+import { internal } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
 import {
   internalMutation,
@@ -7,7 +8,6 @@ import {
   mutation,
   query,
 } from "./_generated/server";
-import { internal } from "./_generated/api";
 
 const TIER_LABELS: Record<string, string> = {
   pro: "Snoopa Pro",
@@ -20,7 +20,6 @@ const TIER_SNOOPS: Record<string, number> = {
   supa: 4000,
   max: 12000,
 };
-
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -38,15 +37,26 @@ export function end_of_month_timestamp(): number {
 /** Returns the timestamp for the very start of the current calendar month (UTC). */
 export function start_of_month_timestamp(): number {
   const now = new Date();
-  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0, 0));
+  const start = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0, 0),
+  );
   return start.getTime();
 }
 
 /** Checks user snoop limits and triggers Low or Exhausted alerts if needed. */
-export async function check_and_trigger_snoop_alerts(ctx: any, user_id: Id<"users">) {
+export async function check_and_trigger_snoop_alerts(
+  ctx: any,
+  user_id: Id<"users">,
+) {
   const grants = await _fetch_active_grants(ctx, user_id);
-  const remaining_total = grants.reduce((sum: number, g: any) => sum + g.remaining, 0);
-  const allocated_total = grants.reduce((sum: number, g: any) => sum + g.snoops, 0);
+  const remaining_total = grants.reduce(
+    (sum: number, g: any) => sum + g.remaining,
+    0,
+  );
+  const allocated_total = grants.reduce(
+    (sum: number, g: any) => sum + g.snoops,
+    0,
+  );
 
   if (allocated_total <= 0) return;
 
@@ -61,8 +71,8 @@ export async function check_and_trigger_snoop_alerts(ctx: any, user_id: Id<"user
       .filter((q: any) =>
         q.and(
           q.eq(q.field("title"), expected_title),
-          q.gt(q.field("_creationTime"), start_time)
-        )
+          q.gt(q.field("_creationTime"), start_time),
+        ),
       )
       .first();
 
@@ -71,15 +81,20 @@ export async function check_and_trigger_snoop_alerts(ctx: any, user_id: Id<"user
         user_id,
         type: "snoops",
         title: expected_title,
-        message: "You've run out of snoops for this period. Top up or upgrade your plan to keep investigating.",
+        message:
+          "You've run out of snoops for this period. Top up or upgrade your plan to keep investigating.",
         seen: false,
         read: false,
       });
 
-      await ctx.scheduler.runAfter(0, internal.notifications.send_snoop_alert_push, {
-        user_id,
-        alert_type: "exhausted",
-      });
+      await ctx.scheduler.runAfter(
+        0,
+        internal.notifications.send_snoop_alert_push,
+        {
+          user_id,
+          alert_type: "exhausted",
+        },
+      );
     }
   } else if (remaining_total / allocated_total <= 0.05) {
     const expected_title = "Running Low on Snoops 🪫";
@@ -90,8 +105,8 @@ export async function check_and_trigger_snoop_alerts(ctx: any, user_id: Id<"user
       .filter((q: any) =>
         q.and(
           q.eq(q.field("title"), expected_title),
-          q.gt(q.field("_creationTime"), start_time)
-        )
+          q.gt(q.field("_creationTime"), start_time),
+        ),
       )
       .first();
 
@@ -105,10 +120,14 @@ export async function check_and_trigger_snoop_alerts(ctx: any, user_id: Id<"user
         read: false,
       });
 
-      await ctx.scheduler.runAfter(0, internal.notifications.send_snoop_alert_push, {
-        user_id,
-        alert_type: "low",
-      });
+      await ctx.scheduler.runAfter(
+        0,
+        internal.notifications.send_snoop_alert_push,
+        {
+          user_id,
+          alert_type: "low",
+        },
+      );
     }
   }
 }
@@ -374,6 +393,102 @@ export const upgrade_user_tier = mutation({
   },
 });
 
+// ---------------------------------------------------------------------------
+// Ad Reward — helpers
+// ---------------------------------------------------------------------------
+
+/** Returns the UTC midnight timestamp (ms) for the start of today. */
+function start_of_today_utc(): number {
+  const now = new Date();
+  return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+}
+
+/** Snoops rewarded per completed ad, keyed by sub_tier. */
+const AD_REWARD_BY_TIER: Record<string, number> = {
+  free: 2,
+  pro: 3,
+  supa: 5,
+  max: 10,
+};
+
+const AD_DAILY_LIMIT = 3;
+
+// ---------------------------------------------------------------------------
+// Ad Reward — Public Query
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns the number of rewarded ads the current user has watched today (UTC day).
+ * Used by the frontend to render the "X/3 today" counter.
+ */
+export const get_ad_views_today = query({
+  args: {},
+  handler: async (ctx) => {
+    const user_id = await getAuthUserId(ctx);
+    if (!user_id) return 0;
+
+    const today_start = start_of_today_utc();
+
+    const views = await ctx.db
+      .query("ad_views")
+      .withIndex("by_user", (q) => q.eq("user_id", user_id))
+      .filter((q) => q.gte(q.field("viewed_at"), today_start))
+      .collect();
+
+    return views.length;
+  },
+});
+
+// ---------------------------------------------------------------------------
+// Ad Reward — Public Mutation
+// ---------------------------------------------------------------------------
+
+/**
+ * Called after the client confirms the user has fully watched a rewarded ad.
+ * Enforces the daily 3-ad cap server-side and grants tier-appropriate snoops.
+ */
+export const claim_ad_reward = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const user_id = await getAuthUserId(ctx);
+    if (!user_id) throw new ConvexError("Not authenticated");
+
+    const today_start = start_of_today_utc();
+
+    // Check daily cap
+    const views_today = await ctx.db
+      .query("ad_views")
+      .withIndex("by_user", (q) => q.eq("user_id", user_id))
+      .filter((q) => q.gte(q.field("viewed_at"), today_start))
+      .collect();
+
+    if (views_today.length >= AD_DAILY_LIMIT) {
+      throw new ConvexError("AD_DAILY_LIMIT_REACHED");
+    }
+
+    // Determine reward based on user tier
+    const user = await ctx.db.get(user_id);
+    const sub_tier = user?.sub_tier ?? "free";
+    const reward_amount = AD_REWARD_BY_TIER[sub_tier] ?? 2;
+
+    // Grant snoops (top_up type — never expire)
+    await ctx.db.insert("snoops", {
+      user_id,
+      snoops: reward_amount,
+      remaining: reward_amount,
+      type: "top_up",
+    });
+
+    // Log the view
+    await ctx.db.insert("ad_views", {
+      user_id,
+      viewed_at: Date.now(),
+    });
+
+    return { reward_amount };
+  },
+});
+
 export const sync_user_subscription = mutation({
   args: {
     is_premium: v.boolean(),
@@ -399,9 +514,13 @@ export const sync_user_subscription = mutation({
     }
 
     const plan_val = args.tier === "free" ? "free" : "pro";
-    const is_new_sub_cycle = (args.is_premium && !current_is_premium) || (args.is_premium && current_tier !== args.tier);
+    const is_new_sub_cycle =
+      (args.is_premium && !current_is_premium) ||
+      (args.is_premium && current_tier !== args.tier);
     const date_of_sub_val = args.is_premium
-      ? (is_new_sub_cycle ? Date.now() : (user.date_of_sub || Date.now()))
+      ? is_new_sub_cycle
+        ? Date.now()
+        : user.date_of_sub || Date.now()
       : undefined;
 
     await ctx.db.patch(user_id, {
@@ -411,7 +530,10 @@ export const sync_user_subscription = mutation({
       date_of_sub: date_of_sub_val,
     });
 
-    if (args.is_premium && (current_tier !== args.tier || !current_is_premium)) {
+    if (
+      args.is_premium &&
+      (current_tier !== args.tier || !current_is_premium)
+    ) {
       let snoop_amount = 0;
       if (args.tier === "pro") snoop_amount = 1000;
       else if (args.tier === "supa") snoop_amount = 4000;
@@ -425,8 +547,8 @@ export const sync_user_subscription = mutation({
           .filter((q: any) =>
             q.and(
               q.eq(q.field("type"), "monthly"),
-              q.gte(q.field("_creationTime"), date_of_sub_val || 0)
-            )
+              q.gte(q.field("_creationTime"), date_of_sub_val || 0),
+            ),
           )
           .first();
 
@@ -440,8 +562,8 @@ export const sync_user_subscription = mutation({
             q.and(
               q.eq(q.field("type"), "reward"),
               q.eq(q.field("title"), expected_title),
-              q.gte(q.field("_creationTime"), date_of_sub_val || 0)
-            )
+              q.gte(q.field("_creationTime"), date_of_sub_val || 0),
+            ),
           )
           .first();
 
@@ -496,8 +618,8 @@ export const sync_user_subscription = mutation({
         .filter((q: any) =>
           q.and(
             q.eq(q.field("type"), "free"),
-            q.gte(q.field("expiration_date"), start_timestamp)
-          )
+            q.gte(q.field("expiration_date"), start_timestamp),
+          ),
         )
         .first();
 
@@ -514,4 +636,3 @@ export const sync_user_subscription = mutation({
     }
   },
 });
-
