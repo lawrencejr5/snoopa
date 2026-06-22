@@ -109,7 +109,29 @@ export default function TermsPage() {
             </li>
           </ul>
 
-          <h2>4. Intellectual Property</h2>
+          <h2>4. Snoops (Virtual Currency)</h2>
+          <p>
+            Snoopa uses an internal virtual currency called "Snoops" to fund interactions, intelligence gathering, and active monitoring tasks.
+          </p>
+          <ul>
+            <li>
+              Every query, chat message, or background tracking action consumes one or more Snoops.
+            </li>
+            <li>
+              Free users receive a limited monthly allowance of Snoops (e.g., 30 per month). Unused free Snoops expire at the end of the calendar month and do not roll over.
+            </li>
+            <li>
+              Premium subscribers (Snoopa Pro, Supa Snoopa, Snoopa Max) receive a larger monthly allowance of Snoops. These reset periodically according to your active subscription cycle.
+            </li>
+            <li>
+              Users may earn additional Snoops by engaging with rewarded advertisements (subject to daily limits).
+            </li>
+            <li>
+              Snoops have no real-world cash value, cannot be redeemed for fiat currency, and are non-transferable between accounts.
+            </li>
+          </ul>
+
+          <h2>5. Intellectual Property</h2>
           <p>
             The Snoopa mobile application, brand names, the Greyhound mascot
             logo, graphics, design assets, and underlying Convex database
@@ -117,7 +139,7 @@ export default function TermsPage() {
             and are protected by applicable trademark and copyright laws.
           </p>
 
-          <h2>5. Limitation of Liability</h2>
+          <h2>6. Limitation of Liability</h2>
           <p>
             Snoopa is provided on an "as-is" and "as-available" basis. In no
             event shall Lawjun Labs, its affiliates, or its developers be liable
@@ -127,7 +149,7 @@ export default function TermsPage() {
             of the possibility of such damage.
           </p>
 
-          <h2>6. Modifications to Terms</h2>
+          <h2>7. Modifications to Terms</h2>
           <p>
             We reserves the right, at our sole discretion, to modify or replace
             these Terms & Conditions at any time. Your continued use of the app
@@ -135,7 +157,7 @@ export default function TermsPage() {
             updated terms.
           </p>
 
-          <h2>7. Contact Information</h2>
+          <h2>8. Contact Information</h2>
           <p>
             For any questions regarding these terms, please contact us at{" "}
             <strong>snoopa@lawjun.com</strong>.
