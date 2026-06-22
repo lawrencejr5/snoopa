@@ -1,5 +1,6 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { v } from "convex/values";
+import OpenAI from "openai";
 import { internal } from "./_generated/api";
 import { action, internalAction, internalQuery } from "./_generated/server";
 import { sendExpoPush } from "./notifications";
@@ -66,7 +67,9 @@ async function verifyHeadlineWithGemini(
     const text = result.response.text().trim().toLowerCase();
     return text === "true";
   } catch (err) {
-    console.warn("Primary verification model failed, falling back to gemini-3.1-flash-lite");
+    console.warn(
+      "Primary verification model failed, falling back to gemini-3.1-flash-lite",
+    );
     try {
       const fallbackModel = genAI.getGenerativeModel({
         model: "gemini-3.1-flash-lite",
@@ -100,7 +103,9 @@ async function verifySourceWithGemini(
     const text = result.response.text().trim().toLowerCase();
     return text === "true";
   } catch (err) {
-    console.warn("Primary source verification model failed, falling back to gemini-3.1-flash-lite");
+    console.warn(
+      "Primary source verification model failed, falling back to gemini-3.1-flash-lite",
+    );
     try {
       const fallbackModel = genAI.getGenerativeModel({
         model: "gemini-3.1-flash-lite",
@@ -134,9 +139,14 @@ async function generateBrief(
   condition: string,
   headlines: VerifiedHeadline[],
   geminiKey: string,
+  deepseekKey: string,
   recentBriefs: string[] = [],
 ): Promise<string> {
   const genAI = new GoogleGenerativeAI(geminiKey);
+  const openai = new OpenAI({
+    baseURL: "https://api.deepseek.com",
+    apiKey: deepseekKey,
+  });
 
   const headlineList = headlines
     .map(
@@ -149,25 +159,38 @@ async function generateBrief(
       ? `IMPORTANT — What the user already knows (do NOT repeat this):\n${recentBriefs.map((b) => `- "${b}"`).join("\n")}\n\n`
       : "";
 
-  const prompt = `You are Snoopa, a sharp AI intelligence agent.
-${priorKnowledgeSection}Given these NEW verified headlines about "${watchlistTitle}" (tracking condition: "${condition}"):
-${headlineList}
+  const systemInstructions = `You are Snoopa, a sharp AI intelligence agent.
+    Your task is to review new verified headlines and write a 1-2 sentence casual briefing covering ONLY what is genuinely new compared to what the user already knows.
+    Sound natural, like you're briefing a friend.
+    Return ONLY the brief or ${NO_NEW_INFO_SENTINEL}. No quotes, no markdown.`;
 
-If ALL of the above is already covered by what the user already knows, reply with exactly: ${NO_NEW_INFO_SENTINEL}
-Otherwise, write a 1-2 sentence casual briefing covering ONLY what is genuinely new. Sound natural, like you're briefing a friend.
-Return ONLY the brief or ${NO_NEW_INFO_SENTINEL}. No quotes, no markdown.`;
+  const userPrompt = `Watchlist Topic: "${watchlistTitle}"
+    Tracking Condition: "${condition}"
+
+    ${priorKnowledgeSection}NEW verified headlines:
+    ${headlineList}
+
+    If ALL of the above is already covered by what the user already knows, reply with exactly: ${NO_NEW_INFO_SENTINEL}`;
 
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
-    const result = await model.generateContent(prompt);
-    return result.response.text().trim();
+    const response = await openai.chat.completions.create({
+      model: "deepseek-chat",
+      messages: [
+        { role: "system", content: systemInstructions },
+        { role: "user", content: userPrompt },
+      ],
+    });
+    return response.choices[0].message.content?.trim() ?? headlines[0].title;
   } catch (err) {
-    console.warn("Primary model failed, falling back to gemini-3.1-flash-lite");
+    console.warn(
+      "DeepSeek primary model failed, falling back to gemini-2.5-flash-lite",
+    );
     try {
       const fallbackModel = genAI.getGenerativeModel({
-        model: "gemini-3.1-flash-lite",
+        model: "gemini-2.5-flash-lite",
+        systemInstruction: systemInstructions,
       });
-      const result = await fallbackModel.generateContent(prompt);
+      const result = await fallbackModel.generateContent(userPrompt);
       return result.response.text().trim();
     } catch (fallbackErr) {
       console.error("Gemini brief generation error:", fallbackErr);
@@ -256,10 +279,9 @@ export const get_monitored_sources_for_items = internalQuery({
 
 /** Phase 1 — loads active items for the tier and filters out recently-checked ones. */
 async function _loadDueItems(ctx: any, tier: number): Promise<any[]> {
-  return await ctx.runQuery(
-    internal.firehose.get_active_watchlist_items,
-    { tier },
-  );
+  return await ctx.runQuery(internal.firehose.get_active_watchlist_items, {
+    tier,
+  });
 }
 
 /**
@@ -510,6 +532,7 @@ async function _dispatchAlerts(
   ctx: any,
   verifiedByItem: Map<string, { item: any; headlines: VerifiedHeadline[] }>,
   geminiKey: string,
+  deepseekKey: string,
 ): Promise<number> {
   const PUSH_PREFIXES = [
     "New intel on",
@@ -535,12 +558,15 @@ async function _dispatchAlerts(
       item.condition,
       headlines,
       geminiKey,
+      deepseekKey,
       recent_briefs,
     );
 
     // If everything in the new headlines is already known — skip dispatch
     if (brief === NO_NEW_INFO_SENTINEL) {
-      console.log(`Firehose: "${item.title}" — no new info, skipping dispatch.`);
+      console.log(
+        `Firehose: "${item.title}" — no new info, skipping dispatch.`,
+      );
       continue;
     }
 
@@ -603,8 +629,9 @@ export const run_firehose = internalAction({
   args: { tier: v.number() },
   handler: async (ctx, args) => {
     const geminiKey = process.env.GOOGLE_GEMINI_API_KEY;
-    if (!geminiKey) {
-      console.error("Missing GOOGLE_GEMINI_API_KEY");
+    const deepseekKey = process.env.DEEPSEEK_API_KEY;
+    if (!geminiKey || !deepseekKey) {
+      console.error("Missing GOOGLE_GEMINI_API_KEY or DEEPSEEK_API_KEY");
       return;
     }
 
@@ -628,9 +655,12 @@ export const run_firehose = internalAction({
       const balance = userSnoopBalances.get(item.user_id);
       let actualBalance: number;
       if (balance === undefined) {
-        const dbBalance = await ctx.runQuery(internal.snoops.get_total_remaining, {
-          user_id: item.user_id,
-        });
+        const dbBalance = await ctx.runQuery(
+          internal.snoops.get_total_remaining,
+          {
+            user_id: item.user_id,
+          },
+        );
         actualBalance = dbBalance ?? 0;
         userSnoopBalances.set(item.user_id, actualBalance);
       } else {
@@ -639,12 +669,16 @@ export const run_firehose = internalAction({
 
       if (actualBalance < 1) {
         // Trigger check_and_deduct mutation to log error and create notification
-        await ctx.runMutation(internal.snoops.check_and_deduct, {
-          user_id: item.user_id,
-          watchlist_id: item._id,
-        }).catch((err) => {
-          console.log(`Firehose: User ${item.user_id} has exhausted their snoops. Warning created.`);
-        });
+        await ctx
+          .runMutation(internal.snoops.check_and_deduct, {
+            user_id: item.user_id,
+            watchlist_id: item._id,
+          })
+          .catch((err) => {
+            console.log(
+              `Firehose: User ${item.user_id} has exhausted their snoops. Warning created.`,
+            );
+          });
         continue;
       }
 
@@ -714,7 +748,12 @@ export const run_firehose = internalAction({
     }
 
     // 7. Generate briefs + dispatch alerts (chat, notification, push)
-    const totalAlerts = await _dispatchAlerts(ctx, verifiedByItem, geminiKey);
+    const totalAlerts = await _dispatchAlerts(
+      ctx,
+      verifiedByItem,
+      geminiKey,
+      deepseekKey,
+    );
 
     // 8. Deduct 1 snoop for each successfully processed item
     for (const item of itemsToProcess) {
