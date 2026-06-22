@@ -174,7 +174,7 @@ async function generateBrief(
 
   try {
     const response = await openai.chat.completions.create({
-      model: "deepseek-chat",
+      model: "deepseek-v4-flash",
       messages: [
         { role: "system", content: systemInstructions },
         { role: "user", content: userPrompt },

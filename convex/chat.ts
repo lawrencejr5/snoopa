@@ -200,7 +200,6 @@ export const save_gate_message = mutation({
   },
 });
 
-
 /**
  * Get sources for all chats in a watchlist (and legacy session).
  */
@@ -494,7 +493,9 @@ async function _generateSourceBrief(
       });
       result = await model.generateContent(prompt);
     } catch (e) {
-      console.warn("Primary model failed, falling back to gemini-3.1-flash-lite");
+      console.warn(
+        "Primary model failed, falling back to gemini-3.1-flash-lite",
+      );
       const fallbackModel = gen_ai.getGenerativeModel({
         model: "gemini-3.1-flash-lite",
       });
@@ -539,7 +540,9 @@ async function _generateInitialBrief(
       });
       result = await model.generateContent(prompt);
     } catch (e) {
-      console.warn("Primary model failed, falling back to gemini-3.1-flash-lite");
+      console.warn(
+        "Primary model failed, falling back to gemini-3.1-flash-lite",
+      );
       const fallbackModel = gen_ai.getGenerativeModel({
         model: "gemini-3.1-flash-lite",
       });
@@ -702,7 +705,7 @@ async function _runAI(
   try {
     const result: any = await Promise.race([
       openai.chat.completions.create({
-        model: "deepseek-chat",
+        model: "deepseek-v4-flash",
         messages: openaiMessages,
       }),
       timeout(20_000),
@@ -877,8 +880,12 @@ async function _handleSource(
     url,
   });
   if (!extractResult.success) {
-    console.warn(`[Chat] Firecrawl extract failed for ${url}, falling back to Tavily.`);
-    extractResult = await ctx.runAction(internal.tavily.extract_source, { url });
+    console.warn(
+      `[Chat] Firecrawl extract failed for ${url}, falling back to Tavily.`,
+    );
+    extractResult = await ctx.runAction(internal.tavily.extract_source, {
+      url,
+    });
   }
 
   if (!extractResult.success) {
@@ -986,8 +993,12 @@ async function _gatherIntel(
       url,
     });
     if (!extractResult.success) {
-      console.warn(`[Chat] Firecrawl scrape failed for ${url}, falling back to Tavily.`);
-      extractResult = await ctx.runAction(internal.tavily.extract_source, { url });
+      console.warn(
+        `[Chat] Firecrawl scrape failed for ${url}, falling back to Tavily.`,
+      );
+      extractResult = await ctx.runAction(internal.tavily.extract_source, {
+        url,
+      });
     }
     if (!extractResult.success) return null;
     const raw = extractResult.content as string;
@@ -1134,7 +1145,10 @@ export const send_message = action({
         watchlist_id: args.watchlist_id,
       });
     } catch (err: any) {
-      if (err?.data === "SNOOPS_EXHAUSTED" || err?.message?.includes("SNOOPS_EXHAUSTED")) {
+      if (
+        err?.data === "SNOOPS_EXHAUSTED" ||
+        err?.message?.includes("SNOOPS_EXHAUSTED")
+      ) {
         // Save the user's incoming message first
         await ctx.runMutation(internal.chat.save_message, {
           watchlist_id: args.watchlist_id,
@@ -1190,7 +1204,9 @@ export const send_message = action({
     // AI-detected intents (e.g. user chatting "update my condition to X").
     // -------------------------------------------------------------------------
     if (intent === "SOURCE" || intent === "EDIT_CONDITION") {
-      const user_record = await ctx.runQuery(internal.users.get_user_internal, { user_id });
+      const user_record = await ctx.runQuery(internal.users.get_user_internal, {
+        user_id,
+      });
       const is_premium = user_record?.is_premium === true;
       if (!is_premium) {
         const gate_message =
@@ -1378,7 +1394,7 @@ async function _parseAndCreateWatchlist(
   try {
     const result: any = await Promise.race([
       openai.chat.completions.create({
-        model: "deepseek-chat",
+        model: "deepseek-v4-flash",
         messages: [
           { role: "system", content: instructions },
           { role: "user", content: prompt },
@@ -1476,8 +1492,12 @@ async function _attachInitialIntel(
         { url },
       );
       if (!extractResult.success) {
-        console.warn(`[Chat] Firecrawl extract failed on init for ${url}, falling back to Tavily.`);
-        extractResult = await ctx.runAction(internal.tavily.extract_source, { url });
+        console.warn(
+          `[Chat] Firecrawl extract failed on init for ${url}, falling back to Tavily.`,
+        );
+        extractResult = await ctx.runAction(internal.tavily.extract_source, {
+          url,
+        });
       }
       if (extractResult.success) {
         const snapshot = extractResult.content as string;
@@ -1604,12 +1624,16 @@ export const initialize_watchlist = action({
     if (!user_id) throw new Error("Not authenticated");
 
     // Watchlist limit check for free users (max 2 watchlists)
-    const user_record = await ctx.runQuery(internal.users.get_user_internal, { user_id });
+    const user_record = await ctx.runQuery(internal.users.get_user_internal, {
+      user_id,
+    });
     const is_premium = user_record?.is_premium === true;
     if (!is_premium) {
       const existing = await ctx.runQuery(api.watchlist.get_watchlists);
       if (existing.length >= 2) {
-        throw new Error("FREE_LIMIT_REACHED: You have reached the maximum limit of 2 watchlists on a free account. Upgrade to Pro for unlimited watchlists! 🔒");
+        throw new Error(
+          "FREE_LIMIT_REACHED: You have reached the maximum limit of 2 watchlists on a free account. Upgrade to Pro for unlimited watchlists! 🔒",
+        );
       }
     }
 
