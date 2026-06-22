@@ -39,14 +39,14 @@ if (process.env.RUN_CRONS === "true") {
   crons.cron(
     "refill-free-snoops",
     "0 0 1 * *",
-    internal.migrations.seed_free_snoops,
+    internal.snoops.seed_free_snoops,
   );
 
   // Monthly refill of premium snoops for all active premium users (at midnight on the 1st)
   crons.cron(
     "refill-premium-snoops",
     "0 0 1 * *",
-    internal.migrations.refill_premium_snoops,
+    internal.snoops.refill_premium_snoops,
   );
 }
 
