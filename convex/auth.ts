@@ -29,12 +29,21 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
     Google({
       allowDangerousEmailAccountLinking: true,
       profile(googleProfile) {
+        const avatars: Array<"chill" | "gay" | "relax" | "shy" | "swaga"> = [
+          "chill",
+          "gay",
+          "relax",
+          "shy",
+          "swaga",
+        ];
+        const randomAvatar = avatars[Math.floor(Math.random() * avatars.length)];
         return {
           id: googleProfile.sub,
           email: googleProfile.email,
           fullname: googleProfile.name,
           username: googleProfile.name.split(" ")[1],
           plan: "free",
+          avatar: randomAvatar,
         };
       },
     }),
@@ -120,6 +129,15 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
 
         const username = (credentials.givenName as string) || email_address.split("@")[0];
 
+        const avatars: Array<"chill" | "gay" | "relax" | "shy" | "swaga"> = [
+          "chill",
+          "gay",
+          "relax",
+          "shy",
+          "swaga",
+        ];
+        const randomAvatar = avatars[Math.floor(Math.random() * avatars.length)];
+
         const created = await createAccount(ctx, {
           provider: "apple",
           account: { id: apple_user_id },
@@ -128,6 +146,7 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
             fullname: full_name,
             username: username,
             plan: "free",
+            avatar: randomAvatar,
           },
           shouldLinkViaEmail: true,
         });
