@@ -11,7 +11,7 @@ import {
   mutation,
   query,
 } from "./_generated/server";
-import { cleanUrl, hashString } from "./utils";
+import { cleanUrl, getCurrentDateTime, hashString } from "./utils";
 
 /**
  * Get all messages mapping to a watchlist (or its legacy session).
@@ -294,21 +294,6 @@ const timeout = (ms: number) =>
     setTimeout(() => reject(new Error("TIMEOUT_ERROR")), ms),
   );
 
-// Fetching current date and time
-
-function getCurrentDateTime() {
-  return new Date().toLocaleString("en-US", {
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    hour: "numeric",
-    minute: "numeric",
-    hour12: true,
-    timeZoneName: "short",
-  });
-}
-
 // Function to detect intention
 type Intent =
   | "SEARCH"
@@ -327,10 +312,7 @@ async function _detectIntent(
 
   try {
     const gen_ai = new GoogleGenerativeAI(api_key);
-    const prompt = `Analyze this user message and classify the intent.
-      ${history ? `RECENT HISTORY:\n${history}\n` : ""}
-      USER MESSAGE: "${content}"
-
+    const systemInstruction = `Analyze this user message and classify the intent.
       Classify as ONE of:
       - SEARCH: current/live web information, news, prices, scores, recent events, anything requiring data from the last 24 hours. Includes 'is X happening', 'did Y happen', 'I heard Z is happening'.
       - WATCHLIST: user wants to track, monitor, save, or be notified about something. E.g. 'track Bitcoin', 'watch for iPhone deals', 'notify me when Z happens', 'snoop on X'.
@@ -341,21 +323,24 @@ async function _detectIntent(
       - CHAT: conversational, general knowledge, opinions, or greetings.
 
       Reply with ONLY one word: SEARCH, WATCHLIST, SOURCE, PAUSE, RESUME, EDIT_CONDITION, or CHAT.`;
+    const userPrompt = `${history ? `RECENT HISTORY:\n${history}\n` : ""}USER MESSAGE: "${content}"`;
 
     let result;
     try {
       const model = gen_ai.getGenerativeModel({
         model: "gemini-2.5-flash-lite",
+        systemInstruction,
       });
-      result = await model.generateContent(prompt);
+      result = await model.generateContent(userPrompt);
     } catch (e) {
       console.warn(
         "Primary model failed, falling back to gemini-3.1-flash-lite",
       );
       const fallbackModel = gen_ai.getGenerativeModel({
         model: "gemini-3.1-flash-lite",
+        systemInstruction,
       });
-      result = await fallbackModel.generateContent(prompt);
+      result = await fallbackModel.generateContent(userPrompt);
     }
     const text = result.response.text().trim().toUpperCase();
     console.log(`🔍 Intent: "${content.substring(0, 50)}" → ${text}`);
@@ -385,10 +370,7 @@ async function _extractConditionFromMessage(
 
   try {
     const gen_ai = new GoogleGenerativeAI(api_key);
-    const prompt = `You are helping update a watchlist alert condition.
-      CURRENT CONDITION: "${current_condition}"
-      USER REQUEST: "${content}"
-
+    const systemInstruction = `You are helping update a watchlist alert condition.
       Extract and rewrite a clean, specific condition string from the user's request.
       Rules:
       - Be precise and actionable (e.g. "Alert when Bitcoin price drops below $80,000")
@@ -398,18 +380,22 @@ async function _extractConditionFromMessage(
       - Do NOT include any preamble, just output the condition string itself.
 
       Reply with ONLY the new condition string or the word MISSING.`;
+    const userPrompt = `CURRENT CONDITION: "${current_condition}"
+      USER REQUEST: "${content}"`;
 
     let result;
     try {
       const model = gen_ai.getGenerativeModel({
         model: "gemini-2.5-flash-lite",
+        systemInstruction,
       });
-      result = await model.generateContent(prompt);
+      result = await model.generateContent(userPrompt);
     } catch (e) {
       const fallback = gen_ai.getGenerativeModel({
         model: "gemini-3.1-flash-lite",
+        systemInstruction,
       });
-      result = await fallback.generateContent(prompt);
+      result = await fallback.generateContent(userPrompt);
     }
     return result.response.text().trim();
   } catch (err) {
@@ -427,30 +413,31 @@ async function _determineSourceWeight(
 
   try {
     const gen_ai = new GoogleGenerativeAI(api_key);
-    const prompt = `Analyze this user's request to track a specific URL for their watchlist.
-      WATCHLIST CONDITION: "${condition}"
-      USER MESSAGE: "${content}"
-
+    const systemInstruction = `Analyze this user's request to track a specific URL for their watchlist.
       Classify the source weight as:
       - primary: The information requested is highly specific to THIS exact page (e.g. price tracking, personal blogs, exact stock on a specific site). Snoopa should only trust this page.
       - secondary: The information is more general news or public facts that could exist elsewhere (e.g. sports news, celeb injury, broad announcements). This site is just a starting point/suggestion.
 
       Reply with ONLY one word: primary or secondary.`;
+    const userPrompt = `WATCHLIST CONDITION: "${condition}"
+      USER MESSAGE: "${content}"`;
 
     let result;
     try {
       const model = gen_ai.getGenerativeModel({
         model: "gemini-2.5-flash-lite",
+        systemInstruction,
       });
-      result = await model.generateContent(prompt);
+      result = await model.generateContent(userPrompt);
     } catch (e) {
       console.warn(
         "Primary model failed, falling back to gemini-3.1-flash-lite",
       );
       const fallbackModel = gen_ai.getGenerativeModel({
         model: "gemini-3.1-flash-lite",
+        systemInstruction,
       });
-      result = await fallbackModel.generateContent(prompt);
+      result = await fallbackModel.generateContent(userPrompt);
     }
     const text = result.response.text().trim().toLowerCase();
     return text.includes("primary") ? "primary" : "secondary";
@@ -469,13 +456,11 @@ async function _generateSourceBrief(
     return "Source saved successfully! I'll keep a close eye on it.";
 
   try {
+    const currentDateTime = getCurrentDateTime();
     const gen_ai = new GoogleGenerativeAI(api_key);
-    const prompt = `You are Snoopa, a proactive AI agent (Greyhound mascot). 
-      The user just added a source to monitor for: "${condition}"
+    const systemInstruction = `You are Snoopa, a proactive AI agent (Greyhound mascot). 
+      The user just added a source to monitor for a condition.
       
-      PAGE CONTENT SNAPSHOT:
-      "${snapshot.substring(0, 20000)}"
-
       Provide a single, high-tempo 2-sentence brief.
       1. Immediate intel: Summarize the current state relevant to the condition.
       2. Operational status: Confirm you are tracking it.
@@ -486,20 +471,30 @@ async function _generateSourceBrief(
       - Example flow: "Currently, [intel summary]. I'm keeping a close watch for any deviations."
       - Reply with ONLY the response text.`;
 
+    const userPrompt = `WATCHLIST CONDITION: "${condition}"
+      
+      OPERATIONAL CONTEXT:
+      - Current Date and Time: ${currentDateTime}
+      
+      PAGE CONTENT SNAPSHOT:
+      "${snapshot.substring(0, 20000)}"`;
+
     let result;
     try {
       const model = gen_ai.getGenerativeModel({
         model: "gemini-2.5-flash-lite",
+        systemInstruction,
       });
-      result = await model.generateContent(prompt);
+      result = await model.generateContent(userPrompt);
     } catch (e) {
       console.warn(
         "Primary model failed, falling back to gemini-3.1-flash-lite",
       );
       const fallbackModel = gen_ai.getGenerativeModel({
         model: "gemini-3.1-flash-lite",
+        systemInstruction,
       });
-      result = await fallbackModel.generateContent(prompt);
+      result = await fallbackModel.generateContent(userPrompt);
     }
     return result.response.text().trim();
   } catch (err) {
@@ -515,14 +510,11 @@ async function _generateInitialBrief(
   const api_key = process.env.GOOGLE_GEMINI_API_KEY;
   if (!api_key) return "";
 
-  try {
-    const gen_ai = new GoogleGenerativeAI(api_key);
-    const prompt = `You are Snoopa, a proactive AI agent (Greyhound mascot). 
-      The user just created a new watchlist to monitor for: "${condition}"
+  const currentDateTime = getCurrentDateTime();
+  const gen_ai = new GoogleGenerativeAI(api_key);
+  const systemInstruction = `You are Snoopa, a proactive AI agent (Greyhound mascot). 
+      The user just created a new watchlist to monitor for a condition.
       
-      INITIAL INTELLIGENCE GATHERING (SEARCH RESULTS):
-      "${searchResults.substring(0, 20000)}"
-
       Provide a high-tempo 2-sentence brief.
       1. Immediate intel: Summarize the most relevant current state based on the search results, keep it very brief.
       2. Operational status: Confirm you are now monitoring for changes.
@@ -533,20 +525,31 @@ async function _generateInitialBrief(
       - If search results don't contain enough info, state that broadly and confirm tracking.
       - Reply with ONLY the response text.`;
 
+  const userPrompt = `WATCHLIST CONDITION: "${condition}"
+      
+      OPERATIONAL CONTEXT:
+      - Current Date and Time: ${currentDateTime}
+      
+      INITIAL INTELLIGENCE GATHERING (SEARCH RESULTS):
+      "${searchResults.substring(0, 20000)}"`;
+
+  try {
     let result;
     try {
       const model = gen_ai.getGenerativeModel({
         model: "gemini-2.5-flash-lite",
+        systemInstruction,
       });
-      result = await model.generateContent(prompt);
+      result = await model.generateContent(userPrompt);
     } catch (e) {
       console.warn(
         "Primary model failed, falling back to gemini-3.1-flash-lite",
       );
       const fallbackModel = gen_ai.getGenerativeModel({
         model: "gemini-3.1-flash-lite",
+        systemInstruction,
       });
-      result = await fallbackModel.generateContent(prompt);
+      result = await fallbackModel.generateContent(userPrompt);
     }
     return result.response.text().trim();
   } catch (err) {
@@ -642,7 +645,7 @@ function _buildSystemPrompt(intent: Intent, user: any): string {
 
     # OPERATIONAL CONTEXT
     - Current DateTime: ${currentDateTime}
-    - App Framework: DeepSeek V3.2 Logic Engine
+    - App Framework: DeepSeek V4 Logic Engine
     - Built by: Lawjun Labs
 
     # USER PROFILE & MEMORY

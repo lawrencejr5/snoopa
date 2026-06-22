@@ -1602,6 +1602,20 @@ export default function SnoopDetailsScreen() {
               </Text>
             </View>
           )}
+
+          <Text
+            style={{
+              color: Colors[theme].text_secondary,
+              fontFamily: "FontRegular",
+              fontSize: 11,
+              textAlign: "center",
+              marginTop: 20,
+              marginBottom: 10,
+              opacity: 0.7,
+            }}
+          >
+            Snoopa is AI and can make mistakes
+          </Text>
         </ScrollView>
       </View>
 

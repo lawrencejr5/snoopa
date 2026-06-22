@@ -19,3 +19,20 @@ export function cleanUrl(url: string): string {
   }
   return url;
 }
+
+/**
+ * Get the current date and time in a human-readable format.
+ */
+export function getCurrentDateTime(): string {
+  return new Date().toLocaleString("en-US", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    hour: "numeric",
+    minute: "numeric",
+    hour12: true,
+    timeZoneName: "short",
+  });
+}
+

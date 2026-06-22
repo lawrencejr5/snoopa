@@ -33,10 +33,6 @@ export const search = internalAction({
 
     try {
       const genAI = new GoogleGenerativeAI(geminiKey);
-      const model = genAI.getGenerativeModel({
-        model: "gemini-2.5-flash-lite",
-      });
-
       let prunedForTavily: any[] = [];
       if (args.history && args.history.length > 0) {
         if (args.history.length <= 4) {
@@ -54,14 +50,7 @@ export const search = internalAction({
             .join("\n")
         : "No history. This is the start of the conversation.";
 
-      const prompt = `
-        Current Conversation:
-        ${historySummary}
-        
-        New User Message: ${args.query}
-        ${args.source ? `Target Source/URL: ${args.source}` : ""}
-        
-        Analyze the user's request. You must output exactly two lines:
+      const systemInstruction = `Analyze the user's request. You must output exactly two lines:
         Line 1: A standalone, descriptive search query optimized for a news search engine.
         Line 2: The classified freshness/time range of the query, which must be exactly one of: "day", "month", or "any_time".
         
@@ -72,10 +61,20 @@ export const search = internalAction({
         
         Format the output EXACTLY like this:
         QUERY: <refined query>
-        TIME_RANGE: <day | month | any_time>
-      `;
+        TIME_RANGE: <day | month | any_time>`;
 
-      const result = await model.generateContent(prompt);
+      const userPrompt = `Current Conversation:
+        ${historySummary}
+        
+        New User Message: ${args.query}
+        ${args.source ? `Target Source/URL: ${args.source}` : ""}`;
+
+      const model = genAI.getGenerativeModel({
+        model: "gemini-2.5-flash-lite",
+        systemInstruction,
+      });
+
+      const result = await model.generateContent(userPrompt);
       const text = result.response.text().trim();
 
       if (result.response.usageMetadata) {

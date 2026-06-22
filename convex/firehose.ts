@@ -4,7 +4,7 @@ import OpenAI from "openai";
 import { internal } from "./_generated/api";
 import { action, internalAction, internalQuery } from "./_generated/server";
 import { sendExpoPush } from "./notifications";
-import { hashString } from "./utils";
+import { hashString, getCurrentDateTime } from "./utils";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -159,10 +159,13 @@ async function generateBrief(
       ? `IMPORTANT — What the user already knows (do NOT repeat this):\n${recentBriefs.map((b) => `- "${b}"`).join("\n")}\n\n`
       : "";
 
+  const currentDateTime = getCurrentDateTime();
   const systemInstructions = `You are Snoopa, a sharp AI intelligence agent.
     Your task is to review new verified headlines and write a 1-2 sentence casual briefing covering ONLY what is genuinely new compared to what the user already knows.
     Sound natural, like you're briefing a friend.
-    Return ONLY the brief or ${NO_NEW_INFO_SENTINEL}. No quotes, no markdown.`;
+    Return ONLY the brief or ${NO_NEW_INFO_SENTINEL}. No quotes, no markdown.
+
+    Current Date and Time: ${currentDateTime}`;
 
   const userPrompt = `Watchlist Topic: "${watchlistTitle}"
     Tracking Condition: "${condition}"
