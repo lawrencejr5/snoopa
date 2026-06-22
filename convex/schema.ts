@@ -20,6 +20,7 @@ const schema = defineSchema({
     ),
     date_of_sub: v.optional(v.number()),
     sub_end_date: v.optional(v.number()),
+    last_refill_at: v.optional(v.number()),
     is_premium: v.optional(v.boolean()),
     avatar: v.optional(
       v.union(

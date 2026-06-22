@@ -43,6 +43,16 @@ export function start_of_month_timestamp(): number {
   return start.getTime();
 }
 
+/** Returns the timestamp for the end of next calendar month from the given base date (UTC). */
+export function end_of_next_month_from(base_ms: number): number {
+  const base = new Date(base_ms);
+  // End of the month that is one month after base
+  const end = new Date(
+    Date.UTC(base.getUTCFullYear(), base.getUTCMonth() + 2, 0, 23, 59, 59, 999),
+  );
+  return end.getTime();
+}
+
 /** Checks user snoop limits and triggers Low or Exhausted alerts if needed. */
 export async function check_and_trigger_snoop_alerts(
   ctx: any,
@@ -384,13 +394,18 @@ export const upgrade_user_tier = mutation({
     else if (args.tier === "max") snoop_amount = 12000;
 
     if (snoop_amount > 0) {
+      const now = Date.now();
       await ctx.db.insert("snoops", {
         user_id,
         snoops: snoop_amount,
         remaining: snoop_amount,
         type: "monthly",
+        // For long subs, expiry = end of this calendar month (cron will top up next month).
+        // For short subs (< 1 month), expiry = their actual sub_end_date.
         expiration_date: args.sub_end_date ?? end_of_month_timestamp(),
       });
+      // Stamp the refill time so the monthly cron knows when we last provisioned
+      await ctx.db.patch(user_id, { last_refill_at: now });
     }
   },
 });
@@ -604,6 +619,8 @@ export const sync_user_subscription = mutation({
             type: "monthly",
             expiration_date: args.sub_end_date ?? end_of_month_timestamp(),
           });
+          // Stamp the refill time so the monthly cron knows when we last provisioned
+          await ctx.db.patch(user_id, { last_refill_at: Date.now() });
         }
 
         if (!existing_notification) {

@@ -1,4 +1,5 @@
 import { internalMutation } from "./_generated/server";
+import { end_of_month_timestamp } from "./snoops";
 
 export const migrateWatchlist = internalMutation({
   args: {},
@@ -355,5 +356,109 @@ export const migrate_snoop_expirations = internalMutation({
     }
 
     return `Migrated ${migrated_count} monthly snoops expiration dates, patched ${users_patched_count} users with computed subscription end date.`;
+  },
+});
+
+// ---------------------------------------------------------------------------
+// Monthly premium snoop refill
+// ---------------------------------------------------------------------------
+
+/**
+ * Refills monthly snoops for every premium user whose subscription is still
+ * active and who has not been refilled in the last 28 days.
+ *
+ * Designed to run once a month (1st at midnight UTC via cron).
+ * Handles weekly, 3-month, annual, and lifetime subscribers correctly:
+ *   - Weekly subs expire before the next cron fires — no refill issued.
+ *   - Multi-month / annual / lifetime subs receive a fresh monthly batch.
+ *   - sub_end_date === undefined is treated as lifetime (always refill).
+ */
+export const refill_premium_snoops = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const now = Date.now();
+    // Gate: do not refill if last refill was fewer than 28 days ago
+    const twenty_eight_days_ms = 28 * 24 * 60 * 60 * 1000;
+    const refill_cutoff = now - twenty_eight_days_ms;
+
+    // Collect all premium users
+    const premium_users = await ctx.db
+      .query("users")
+      .filter((q) => q.eq(q.field("is_premium"), true))
+      .collect();
+
+    let refilled_count = 0;
+    let skipped_expired = 0;
+    let skipped_recent = 0;
+
+    for (const user of premium_users) {
+      // Skip if subscription has already expired
+      if (user.sub_end_date !== undefined && user.sub_end_date < now) {
+        skipped_expired++;
+        continue;
+      }
+
+      // Skip if already refilled within the last 28 days
+      if (user.last_refill_at !== undefined && user.last_refill_at > refill_cutoff) {
+        skipped_recent++;
+        continue;
+      }
+
+      const tier = user.sub_tier ?? "pro";
+      const snoop_amount =
+        tier === "max" ? 12000 : tier === "supa" ? 4000 : 1000;
+
+      // Deplete the previous monthly grant so we don't stack up old allowances
+      const old_grants = await ctx.db
+        .query("snoops")
+        .withIndex("by_user", (q) => q.eq("user_id", user._id))
+        .collect();
+
+      for (const grant of old_grants) {
+        if (grant.type === "monthly" && grant.remaining > 0) {
+          await ctx.db.patch(grant._id, { remaining: 0 });
+        }
+      }
+
+      // Provision the new monthly batch — expires at end of next calendar month
+      // (or at sub_end_date if that comes first)
+      const next_month_expiry = end_of_month_timestamp();
+      const expiration_date =
+        user.sub_end_date !== undefined
+          ? Math.min(user.sub_end_date, next_month_expiry)
+          : next_month_expiry;
+
+      await ctx.db.insert("snoops", {
+        user_id: user._id,
+        snoops: snoop_amount,
+        remaining: snoop_amount,
+        type: "monthly",
+        expiration_date,
+      });
+
+      // Stamp the refill time and notify the user
+      await ctx.db.patch(user._id, { last_refill_at: now });
+
+      const tier_label =
+        tier === "max"
+          ? "Snoopa Max"
+          : tier === "supa"
+            ? "Supa Snoopa"
+            : "Snoopa Pro";
+
+      await ctx.db.insert("notifications", {
+        user_id: user._id,
+        type: "reward",
+        title: "🐾 Monthly Snoops Refilled!",
+        message: `Your ${tier_label} allowance has been topped up with ${snoop_amount.toLocaleString()} snoops for this month. Happy snooping!`,
+        seen: false,
+        read: false,
+        reward_claimed: false,
+      });
+
+      refilled_count++;
+    }
+
+    return `Refilled snoops for ${refilled_count} premium users. Skipped ${skipped_expired} expired subs, ${skipped_recent} recently refilled.`;
   },
 });
