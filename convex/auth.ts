@@ -76,10 +76,17 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
         const apple_user_id = payload.sub;
 
         // Try to retrieve existing account linked to Apple
-        const retrieved = await retrieveAccount(ctx, {
-          provider: "apple",
-          account: { id: apple_user_id },
-        });
+        let retrieved = null;
+        try {
+          retrieved = await retrieveAccount(ctx, {
+            provider: "apple",
+            account: { id: apple_user_id },
+          });
+        } catch (error: any) {
+          if (error.message !== "InvalidAccountId") {
+            throw error;
+          }
+        }
 
         if (retrieved !== null) {
           return { userId: retrieved.user._id };

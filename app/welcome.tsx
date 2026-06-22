@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   Image,
   Modal,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -153,6 +154,10 @@ const WelcomePage = () => {
   const handleAppleLogin = async () => {
     setAppleLoading(true);
     try {
+      if (Platform.OS !== "ios") {
+        showCustomAlert("Fuck off you android user", "danger");
+        return;
+      }
       const credential = await AppleAuthentication.signInAsync({
         requestedScopes: [
           AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
@@ -300,8 +305,12 @@ const WelcomePage = () => {
             style={[
               styles.googleButton,
               {
-                backgroundColor: Colors[theme].text,
-                opacity: appleLoading ? 0.7 : 1,
+                backgroundColor: !appleAvailable
+                  ? Colors[theme].surface
+                  : Colors[theme].text,
+                borderWidth: !appleAvailable ? 2 : 0,
+                borderColor: Colors[theme].border,
+                opacity: googleLoading ? 0.7 : 1,
               },
             ]}
             onPress={handleAppleLogin}
@@ -309,7 +318,11 @@ const WelcomePage = () => {
             {appleLoading ? (
               <ActivityIndicator
                 size={"small"}
-                color={Colors[theme].background}
+                color={
+                  !appleAvailable
+                    ? Colors[theme].text
+                    : Colors[theme].background
+                }
               />
             ) : (
               <>
@@ -318,13 +331,19 @@ const WelcomePage = () => {
                   style={{
                     width: 25,
                     height: 25,
-                    tintColor: Colors[theme].background,
+                    tintColor: !appleAvailable
+                      ? Colors[theme].text
+                      : Colors[theme].background,
                   }}
                 />
                 <Text
                   style={[
                     styles.buttonText,
-                    { color: Colors[theme].background },
+                    {
+                      color: !appleAvailable
+                        ? Colors[theme].text
+                        : Colors[theme].background,
+                    },
                   ]}
                 >
                   Continue with Apple
@@ -341,7 +360,7 @@ const WelcomePage = () => {
                 backgroundColor: appleAvailable
                   ? Colors[theme].surface
                   : Colors[theme].text,
-                borderWidth: appleAvailable ? 1 : 0,
+                borderWidth: appleAvailable ? 2 : 0,
                 borderColor: Colors[theme].border,
                 opacity: googleLoading ? 0.7 : 1,
               },
