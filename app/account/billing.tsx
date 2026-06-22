@@ -497,11 +497,11 @@ export default function BillingScreen() {
                     {
                       backgroundColor: Colors[theme].card,
                       borderColor:
-                        plan.highlight || signedIn?.sub_tier === plan.id
+                        ((plan.highlight && !signedIn?.is_premium) || signedIn?.sub_tier === plan.id)
                           ? Colors[theme].primary
                           : Colors[theme].border,
                       borderWidth:
-                        plan.highlight || signedIn?.sub_tier === plan.id ? 2 : 1,
+                        ((plan.highlight && !signedIn?.is_premium) || signedIn?.sub_tier === plan.id) ? 2 : 1,
                     },
                   ]}
                 >
@@ -511,7 +511,7 @@ export default function BillingScreen() {
                         styles.badgeContainer,
                         {
                           backgroundColor:
-                            plan.highlight || signedIn?.sub_tier === plan.id
+                            ((plan.highlight && !signedIn?.is_premium) || signedIn?.sub_tier === plan.id)
                               ? Colors[theme].primary
                               : Colors[theme].border,
                         },
@@ -522,7 +522,7 @@ export default function BillingScreen() {
                           styles.badgeText,
                           {
                             color:
-                              plan.highlight || signedIn?.sub_tier === plan.id
+                              ((plan.highlight && !signedIn?.is_premium) || signedIn?.sub_tier === plan.id)
                                 ? Colors[theme].background
                                : Colors[theme].text,
                           },
