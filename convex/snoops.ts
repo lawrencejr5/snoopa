@@ -344,6 +344,7 @@ export const upgrade_user_tier = mutation({
       v.literal("supa"),
       v.literal("max"),
     ),
+    sub_end_date: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const user_id = await getAuthUserId(ctx);
@@ -361,6 +362,7 @@ export const upgrade_user_tier = mutation({
       sub_tier: args.tier,
       is_premium,
       date_of_sub: Date.now(),
+      sub_end_date: is_premium ? args.sub_end_date : undefined,
     });
 
     // Deplete previous monthly or free snoop grants
@@ -387,7 +389,7 @@ export const upgrade_user_tier = mutation({
         snoops: snoop_amount,
         remaining: snoop_amount,
         type: "monthly",
-        expiration_date: end_of_month_timestamp(),
+        expiration_date: args.sub_end_date ?? end_of_month_timestamp(),
       });
     }
   },
@@ -498,6 +500,7 @@ export const sync_user_subscription = mutation({
       v.literal("supa"),
       v.literal("max"),
     ),
+    sub_end_date: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const user_id = await getAuthUserId(ctx);
@@ -509,14 +512,23 @@ export const sync_user_subscription = mutation({
     const current_is_premium = user.is_premium === true;
     const current_tier = user.sub_tier || "free";
 
-    if (current_is_premium === args.is_premium && current_tier === args.tier) {
+    const is_new_sub_cycle =
+      (args.is_premium && !current_is_premium) ||
+      (args.is_premium && current_tier !== args.tier) ||
+      (args.is_premium &&
+        args.sub_end_date !== undefined &&
+        user.sub_end_date !== undefined &&
+        args.sub_end_date > user.sub_end_date);
+
+    if (
+      current_is_premium === args.is_premium &&
+      current_tier === args.tier &&
+      !is_new_sub_cycle
+    ) {
       return;
     }
 
     const plan_val = args.tier === "free" ? "free" : "pro";
-    const is_new_sub_cycle =
-      (args.is_premium && !current_is_premium) ||
-      (args.is_premium && current_tier !== args.tier);
     const date_of_sub_val = args.is_premium
       ? is_new_sub_cycle
         ? Date.now()
@@ -528,11 +540,12 @@ export const sync_user_subscription = mutation({
       sub_tier: args.tier,
       is_premium: args.is_premium,
       date_of_sub: date_of_sub_val,
+      sub_end_date: args.is_premium ? args.sub_end_date : undefined,
     });
 
     if (
       args.is_premium &&
-      (current_tier !== args.tier || !current_is_premium)
+      (current_tier !== args.tier || !current_is_premium || is_new_sub_cycle)
     ) {
       let snoop_amount = 0;
       if (args.tier === "pro") snoop_amount = 1000;
@@ -584,13 +597,12 @@ export const sync_user_subscription = mutation({
             }
           }
 
-          const end_timestamp = end_of_month_timestamp();
           await ctx.db.insert("snoops", {
             user_id,
             snoops: snoop_amount,
             remaining: snoop_amount,
             type: "monthly",
-            expiration_date: end_timestamp,
+            expiration_date: args.sub_end_date ?? end_of_month_timestamp(),
           });
         }
 

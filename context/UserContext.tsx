@@ -35,7 +35,10 @@ const UserProvider: FC<{ children: ReactNode }> = ({ children }) => {
           } else if (prodId.includes("pro") || prodId === "rc_pro") {
             tier = "pro";
           }
-          await syncSubscription({ is_premium: true, tier });
+          const sub_end_date = entitlement.expirationDate
+            ? new Date(entitlement.expirationDate).getTime()
+            : undefined;
+          await syncSubscription({ is_premium: true, tier, sub_end_date });
         } else {
           await syncSubscription({ is_premium: false, tier: "free" });
         }

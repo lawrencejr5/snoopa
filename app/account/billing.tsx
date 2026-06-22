@@ -179,7 +179,13 @@ export default function BillingScreen() {
       const entitlement =
         customerInfo.entitlements.active["snoopa_premium_monthly"];
       if (entitlement) {
-        await upgradeUserTier({ tier: planId as "pro" | "supa" | "max" });
+        const sub_end_date = entitlement.expirationDate
+          ? new Date(entitlement.expirationDate).getTime()
+          : undefined;
+        await upgradeUserTier({
+          tier: planId as "pro" | "supa" | "max",
+          sub_end_date,
+        });
         showCustomAlert(
           `Successfully upgraded to Snoopa ${planId.toUpperCase()}!`,
           "success",

@@ -319,3 +319,41 @@ export const seed_user_avatars = internalMutation({
     return `Assigned random avatars to ${count} users.`;
   },
 });
+
+export const migrate_snoop_expirations = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const monthly_snoops = await ctx.db
+      .query("snoops")
+      .filter((q) => q.eq(q.field("type"), "monthly"))
+      .collect();
+
+    let migrated_count = 0;
+    let users_patched_count = 0;
+
+    for (const snoop of monthly_snoops) {
+      const user = await ctx.db.get(snoop.user_id);
+      if (!user) continue;
+
+      let sub_end_date = user.sub_end_date;
+
+      if (sub_end_date === undefined && user.date_of_sub !== undefined) {
+        // Calculate subscription end date: add exactly 1 month to date_of_sub
+        const start_date = new Date(user.date_of_sub);
+        start_date.setUTCMonth(start_date.getUTCMonth() + 1);
+        sub_end_date = start_date.getTime();
+
+        // Save sub_end_date to user
+        await ctx.db.patch(user._id, { sub_end_date });
+        users_patched_count++;
+      }
+
+      if (sub_end_date !== undefined) {
+        await ctx.db.patch(snoop._id, { expiration_date: sub_end_date });
+        migrated_count++;
+      }
+    }
+
+    return `Migrated ${migrated_count} monthly snoops expiration dates, patched ${users_patched_count} users with computed subscription end date.`;
+  },
+});
