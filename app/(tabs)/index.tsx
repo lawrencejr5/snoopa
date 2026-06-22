@@ -682,7 +682,8 @@ export default function HomeScreen() {
   const unreadCount = useQuery(api.notifications.unread_count) ?? 0;
   const snoop_balance = useQuery(api.snoops.get_snoop_balance) ?? 0;
   const snoop_grants = useQuery(api.snoops.get_snoop_grants) ?? [];
-  const snoop_total = snoop_grants.reduce((sum: number, g: any) => sum + g.snoops, 0) || 30;
+  const snoop_total =
+    snoop_grants.reduce((sum: number, g: any) => sum + g.snoops, 0) || 30;
   const snoops_used = snoop_total - snoop_balance;
   const snoop_pct = snoop_total > 0 ? snoops_used / snoop_total : 0;
   const is_locked = watchlistData.length >= 2 && signedIn?.is_premium !== true;
@@ -1458,7 +1459,7 @@ const styles = StyleSheet.create({
   },
   fab: {
     position: "absolute",
-    bottom: 30,
+    bottom: 40,
     right: 20,
     width: 56,
     height: 56,

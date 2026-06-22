@@ -21,7 +21,7 @@ import {
   BottomSheetView,
 } from "@gorhom/bottom-sheet";
 import { useAction, useMutation, useQuery } from "convex/react";
-import { useLocalSearchParams, useRouter, useFocusEffect } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import React, {
   useCallback,
@@ -462,7 +462,7 @@ export default function SnoopDetailsScreen() {
       return () => {
         setIsScreenFocused(false);
       };
-    }, [id])
+    }, [id]),
   );
 
   // Automatically mark new messages and logs as seen while the screen is focused
@@ -470,7 +470,7 @@ export default function SnoopDetailsScreen() {
     if (!isScreenFocused || !id) return;
 
     const hasUnseenChats = chatMessages?.some(
-      (msg) => msg.role === "snoopa" && !msg.seen
+      (msg) => msg.role === "snoopa" && !msg.seen,
     );
     const hasUnseenLogs = logs?.some((log) => !log.seen);
 
@@ -1455,7 +1455,9 @@ export default function SnoopDetailsScreen() {
                         >
                           <Pressable
                             onPress={() => handleFeedback(entry.id, "like")}
-                            disabled={submittingFeedback[entry.id] !== undefined}
+                            disabled={
+                              submittingFeedback[entry.id] !== undefined
+                            }
                             style={({ pressed }) => [
                               {
                                 paddingHorizontal: 10,
@@ -1494,7 +1496,9 @@ export default function SnoopDetailsScreen() {
 
                           <Pressable
                             onPress={() => handleFeedback(entry.id, "dislike")}
-                            disabled={submittingFeedback[entry.id] !== undefined}
+                            disabled={
+                              submittingFeedback[entry.id] !== undefined
+                            }
                             style={({ pressed }) => [
                               {
                                 paddingHorizontal: 10,

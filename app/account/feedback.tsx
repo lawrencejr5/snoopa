@@ -9,6 +9,7 @@ import { useState } from "react";
 import {
   ActivityIndicator,
   Image,
+  Keyboard,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -127,7 +128,10 @@ export default function FeedbackScreen() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 20 }}
+        keyboardDismissMode="on-drag"
+        keyboardShouldPersistTaps="handled"
       >
+        <Pressable onPress={Keyboard.dismiss} style={{ flex: 1 }}>
         <Text
           style={{
             fontFamily: "FontRegular",
@@ -263,6 +267,7 @@ export default function FeedbackScreen() {
             </View>
           </ScrollView>
         </View>
+        </Pressable>
       </ScrollView>
 
       {/* Fixed Footer */}

@@ -83,6 +83,7 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
   const handleSheetChanges = useCallback(
     (index: number) => {
       if (index === -1) {
+        Keyboard.dismiss();
         onClose();
         setIsProcessing(false);
       }
@@ -178,156 +179,156 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
       handleIndicatorStyle={{ backgroundColor: Colors[theme].border }}
       enablePanDownToClose
     >
-      <BottomSheetView
-        style={{ flex: 1, paddingHorizontal: 24, paddingBottom: 24 }}
-      >
-        <View style={styles.sheetHeader}>
-          <Text
-            style={{
-              color: Colors[theme].text_secondary,
-              fontFamily: "FontBold",
-              fontSize: 12,
-              letterSpacing: 1,
-            }}
-          >
-            NEW SNOOP
-          </Text>
-          <Pressable onPress={handleClose} disabled={isProcessing}>
-            <Image
-              source={require("@/assets/icons/times.png")}
-              style={{
-                width: 16,
-                height: 16,
-                tintColor: Colors[theme].text_secondary,
-              }}
-            />
-          </Pressable>
-        </View>
-
-        {/* Content Centered Stack analogous to earlier design */}
-        <View style={{ alignItems: "center", marginTop: 10 }}>
-          <View
-            style={[
-              styles.iconContainer,
-              { backgroundColor: Colors[theme].primary + "12" },
-            ]}
-          >
-            <Image
-              source={require("@/assets/icons/eyes.png")}
-              style={{
-                width: 22,
-                height: 22,
-                tintColor: Colors[theme].primary,
-              }}
-            />
-          </View>
-          <Text
-            style={[styles.subtitle, { color: Colors[theme].text_secondary }]}
-          >
-            What do you want me to track?
-          </Text>
-        </View>
-
-        {/* Prompt Input */}
-        <View style={{ width: "100%" }}>
-          <TextInput
-            value={prompt}
-            onChangeText={handleInputChange}
-            onFocus={() => {
-              setIsFocused(true);
-              bottomSheetRef.current?.snapToIndex(1);
-            }}
-            onBlur={() => {
-              setIsFocused(false);
-              if (visible && !isProcessing) {
-                bottomSheetRef.current?.snapToIndex(0);
-              }
-            }}
-            multiline
-            maxLength={500}
-            placeholder={`e.g. "${placeholder}"`}
-            placeholderTextColor={Colors[theme].text_secondary + "80"}
-            editable={!isProcessing}
-            style={[
-              styles.input,
-              {
-                color: Colors[theme].text,
-                backgroundColor: Colors[theme].surface,
-                borderColor: Colors[theme].border,
-              },
-            ]}
-          />
-          <Text
-            style={{
-              alignSelf: "flex-end",
-              fontSize: 11,
-              fontFamily: "FontMedium",
-              color: Colors[theme].text_secondary + "80",
-              marginBottom: 14,
-              marginRight: 4,
-            }}
-          >
-            {prompt.length}/500
-          </Text>
-        </View>
-
-        {/* Actions */}
-        <View style={styles.actions}>
-          <Pressable
-            onPress={handleClose}
-            disabled={isProcessing}
-            style={[styles.cancelBtn, { borderColor: Colors[theme].border }]}
-          >
+      <BottomSheetView style={{ flex: 1 }}>
+        <Pressable onPress={Keyboard.dismiss} style={{ flex: 1, paddingHorizontal: 24, paddingBottom: 24 }}>
+          <View style={styles.sheetHeader}>
             <Text
               style={{
                 color: Colors[theme].text_secondary,
-                fontFamily: "FontMedium",
-                fontSize: 14,
+                fontFamily: "FontBold",
+                fontSize: 12,
+                letterSpacing: 1,
               }}
             >
-              Cancel
+              NEW SNOOP
             </Text>
-          </Pressable>
-
-          <Pressable
-            onPress={handleProceed}
-            disabled={!prompt.trim() || isProcessing}
-            style={[
-              styles.proceedBtn,
-              {
-                backgroundColor: Colors[theme].primary,
-                opacity: !prompt.trim() || isProcessing ? 0.5 : 1,
-              },
-            ]}
-          >
-            {isProcessing ? (
-              <ActivityIndicator
-                size="small"
-                color={Colors[theme].background}
+            <Pressable onPress={handleClose} disabled={isProcessing}>
+              <Image
+                source={require("@/assets/icons/times.png")}
+                style={{
+                  width: 16,
+                  height: 16,
+                  tintColor: Colors[theme].text_secondary,
+                }}
               />
-            ) : (
-              <>
-                <Text
-                  style={{
-                    color: Colors[theme].background,
-                    fontFamily: "FontBold",
-                    fontSize: 14,
-                  }}
-                >
-                  Start tracking
-                </Text>
-                <Image
-                  source={require("@/assets/icons/tracked.png")}
-                  style={{
-                    width: 14,
-                    height: 14,
-                    tintColor: Colors[theme].background,
-                  }}
+            </Pressable>
+          </View>
+
+          {/* Content Centered Stack analogous to earlier design */}
+          <View style={{ alignItems: "center", marginTop: 10 }}>
+            <View
+              style={[
+                styles.iconContainer,
+                { backgroundColor: Colors[theme].primary + "12" },
+              ]}
+            >
+              <Image
+                source={require("@/assets/icons/eyes.png")}
+                style={{
+                  width: 22,
+                  height: 22,
+                  tintColor: Colors[theme].primary,
+                }}
+              />
+            </View>
+            <Text
+              style={[styles.subtitle, { color: Colors[theme].text_secondary }]}
+            >
+              What do you want me to track?
+            </Text>
+          </View>
+
+          {/* Prompt Input */}
+          <View style={{ width: "100%" }}>
+            <TextInput
+              value={prompt}
+              onChangeText={handleInputChange}
+              onFocus={() => {
+                setIsFocused(true);
+                bottomSheetRef.current?.snapToIndex(1);
+              }}
+              onBlur={() => {
+                setIsFocused(false);
+                if (visible && !isProcessing) {
+                  bottomSheetRef.current?.snapToIndex(0);
+                }
+              }}
+              multiline
+              maxLength={500}
+              placeholder={`e.g. "${placeholder}"`}
+              placeholderTextColor={Colors[theme].text_secondary + "80"}
+              editable={!isProcessing}
+              style={[
+                styles.input,
+                {
+                  color: Colors[theme].text,
+                  backgroundColor: Colors[theme].surface,
+                  borderColor: Colors[theme].border,
+                },
+              ]}
+            />
+            <Text
+              style={{
+                alignSelf: "flex-end",
+                fontSize: 11,
+                fontFamily: "FontMedium",
+                color: Colors[theme].text_secondary + "80",
+                marginBottom: 14,
+                marginRight: 4,
+              }}
+            >
+              {prompt.length}/500
+            </Text>
+          </View>
+
+          {/* Actions */}
+          <View style={styles.actions}>
+            <Pressable
+              onPress={handleClose}
+              disabled={isProcessing}
+              style={[styles.cancelBtn, { borderColor: Colors[theme].border }]}
+            >
+              <Text
+                style={{
+                  color: Colors[theme].text_secondary,
+                  fontFamily: "FontMedium",
+                  fontSize: 14,
+                }}
+              >
+                Cancel
+              </Text>
+            </Pressable>
+
+            <Pressable
+              onPress={handleProceed}
+              disabled={!prompt.trim() || isProcessing}
+              style={[
+                styles.proceedBtn,
+                {
+                  backgroundColor: Colors[theme].primary,
+                  opacity: !prompt.trim() || isProcessing ? 0.5 : 1,
+                },
+              ]}
+            >
+              {isProcessing ? (
+                <ActivityIndicator
+                  size="small"
+                  color={Colors[theme].background}
                 />
-              </>
-            )}
-          </Pressable>
-        </View>
+              ) : (
+                <>
+                  <Text
+                    style={{
+                      color: Colors[theme].background,
+                      fontFamily: "FontBold",
+                      fontSize: 14,
+                    }}
+                  >
+                    Start tracking
+                  </Text>
+                  <Image
+                    source={require("@/assets/icons/tracked.png")}
+                    style={{
+                      width: 14,
+                      height: 14,
+                      tintColor: Colors[theme].background,
+                    }}
+                  />
+                </>
+              )}
+            </Pressable>
+          </View>
+        </Pressable>
       </BottomSheetView>
     </BottomSheet>
   );

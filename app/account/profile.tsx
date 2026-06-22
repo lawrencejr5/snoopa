@@ -10,6 +10,7 @@ import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   Image,
+  Keyboard,
   Modal,
   Pressable,
   ScrollView,
@@ -100,8 +101,11 @@ export default function ProfileScreen() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 20 }}
+        keyboardDismissMode="on-drag"
+        keyboardShouldPersistTaps="handled"
       >
-        {/* Form */}
+        <Pressable onPress={Keyboard.dismiss} style={{ flex: 1 }}>
+          {/* Form */}
         <View style={styles.formGroup}>
           <Text style={[styles.label, { color: Colors[theme].text_secondary }]}>
             Full Name
@@ -197,11 +201,15 @@ export default function ProfileScreen() {
         {/* Delete Account */}
         <Pressable
           style={{ marginTop: 20, marginBottom: 20, alignItems: "center" }}
-          onPress={() => setModalVisible(true)}
+          onPress={() => {
+            Keyboard.dismiss();
+            setModalVisible(true);
+          }}
         >
           <Text style={{ color: Colors[theme].danger, fontFamily: "FontBold" }}>
             Delete Account
           </Text>
+        </Pressable>
         </Pressable>
       </ScrollView>
 
@@ -238,7 +246,10 @@ export default function ProfileScreen() {
         animationType="fade"
         transparent={true}
         visible={modalVisible}
-        onRequestClose={() => setModalVisible(false)}
+        onRequestClose={() => {
+          Keyboard.dismiss();
+          setModalVisible(false);
+        }}
       >
         <View style={styles.modalOverlay}>
           <View
@@ -278,7 +289,10 @@ export default function ProfileScreen() {
                   styles.modalButton,
                   { backgroundColor: Colors[theme].surface },
                 ]}
-                onPress={() => setModalVisible(false)}
+                onPress={() => {
+                  Keyboard.dismiss();
+                  setModalVisible(false);
+                }}
               >
                 <Text
                   style={{ color: Colors[theme].text, fontFamily: "FontBold" }}
