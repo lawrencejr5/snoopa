@@ -2,6 +2,8 @@ import Google from "@auth/core/providers/google";
 import { ConvexCredentials } from "@convex-dev/auth/providers/ConvexCredentials";
 import { convexAuth, createAccount, retrieveAccount } from "@convex-dev/auth/server";
 import { api } from "./_generated/api";
+import { MutationCtx } from "./_generated/server";
+import { end_of_month_timestamp } from "./snoops";
 
 const decode_base64 = (str: string): string => {
   if (typeof atob === "function") {
@@ -169,6 +171,23 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
 
       // 3. Block everything else
       throw new Error(`Security Block: Invalid redirect to ${redirectTo}`);
+    },
+    async afterUserCreatedOrUpdated(ctx: MutationCtx, args) {
+      const existing_free_grant = await ctx.db
+        .query("snoops")
+        .withIndex("by_user", (q) => q.eq("user_id", args.userId))
+        .filter((q) => q.eq(q.field("type"), "free"))
+        .first();
+
+      if (!existing_free_grant) {
+        await ctx.db.insert("snoops", {
+          user_id: args.userId,
+          snoops: 30,
+          remaining: 30,
+          type: "free",
+          expiration_date: end_of_month_timestamp(),
+        });
+      }
     },
   },
 });
