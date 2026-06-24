@@ -46,6 +46,12 @@
       "expo-secure-store",
       "@react-native-community/datetimepicker",
       [
+        "expo-tracking-transparency",
+        {
+          "userTrackingPermission": "Snoopa uses your device identifier to deliver personalized ads and relevant notifications."
+        }
+      ],
+      [
         "expo-notifications",
         {
           "icon": "./assets/images/notification-icon.png",
@@ -62,7 +68,8 @@
           "androidAppId": "ca-app-pub-7078901325871517~7314635387",
           "iosAppId": "ca-app-pub-7078901325871517~9953396692"
         }
-      ]
+      ],
+      "expo-tracking-transparency"
     ],
     "experiments": {
       "typedRoutes": true
