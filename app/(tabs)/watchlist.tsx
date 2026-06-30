@@ -14,10 +14,10 @@ import { useTheme } from "@/context/ThemeContext";
 import { useUser } from "@/context/UserContext";
 import { api } from "@/convex/_generated/api";
 import { Octicons } from "@expo/vector-icons";
-import { useNavigation } from "@react-navigation/native";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
-import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useFocusEffect, useNavigation, useRouter } from "expo-router";
+import { getLastFocusedTab, setLastFocusedTab } from "@/utils/navigationState";
+import { useCallback, useEffect, useState } from "react";
 import {
   Image,
   Pressable,
@@ -29,9 +29,9 @@ import {
 } from "react-native";
 import Animated, {
   Easing,
-  FadeInDown,
   useAnimatedStyle,
   useSharedValue,
+  withDelay,
   withRepeat,
   withSequence,
   withTiming,
@@ -398,13 +398,6 @@ export default function WatchlistScreen() {
     }
   };
 
-  useEffect(() => {
-    const unsubscribe = navigation.addListener("tabPress" as any, (e: any) => {
-      setAnimationKey((prev) => prev + 1);
-    });
-    return unsubscribe;
-  }, [navigation]);
-
   const watchlistData = useQuery(api.watchlist.get_watchlists) || [];
   const is_locked = watchlistData.length >= 2 && signedIn?.is_premium !== true;
   const snoop_balance = useQuery(api.snoops.get_snoop_balance) ?? 0;
@@ -418,12 +411,46 @@ export default function WatchlistScreen() {
     (i) => i.status === "completed" || i.status === "inactive",
   );
 
+  const isLoaded = !isLoading && !!signedIn && !appLoading && !!watchlistData;
+
+  // Staggered section animations (opacity + slide-up)
+  const s1 = useSharedValue(0); // header
+  const s2 = useSharedValue(0); // stats/empty
+  const s3 = useSharedValue(0); // active watchlists
+  const s4 = useSharedValue(0); // inactive watchlists
+
+  const DURATION = 400;
+  const SLIDE = 18;
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!isLoaded) return;
+
+      const lastTab = getLastFocusedTab();
+      if (lastTab !== "watchlist") {
+        s1.value = 0; s2.value = 0; s3.value = 0; s4.value = 0;
+        s1.value = withTiming(1, { duration: DURATION });
+        s2.value = withDelay(80,  withTiming(1, { duration: DURATION }));
+        s3.value = withDelay(160, withTiming(1, { duration: DURATION }));
+        s4.value = withDelay(240, withTiming(1, { duration: DURATION }));
+      } else {
+        s1.value = 1; s2.value = 1; s3.value = 1; s4.value = 1;
+      }
+      setLastFocusedTab("watchlist");
+    }, [isLoaded]),
+  );
+
+  const style1 = useAnimatedStyle(() => ({ opacity: s1.value, transform: [{ translateY: (1 - s1.value) * SLIDE }] }));
+  const style2 = useAnimatedStyle(() => ({ opacity: s2.value, transform: [{ translateY: (1 - s2.value) * SLIDE }] }));
+  const style3 = useAnimatedStyle(() => ({ opacity: s3.value, transform: [{ translateY: (1 - s3.value) * SLIDE }] }));
+  const style4 = useAnimatedStyle(() => ({ opacity: s4.value, transform: [{ translateY: (1 - s4.value) * SLIDE }] }));
+
   if (isLoading || !signedIn || appLoading || !watchlistData)
     return <Loading />;
 
   return (
     <Container>
-      <View style={styles.header}>
+      <Animated.View style={[styles.header, style1]}>
         <Text style={[styles.headerTitle, { color: Colors[theme].text }]}>
           Watchlist
         </Text>
@@ -450,7 +477,7 @@ export default function WatchlistScreen() {
             LIVE
           </Text>
         </View>
-      </View>
+      </Animated.View>
 
       <ScrollView
         contentContainerStyle={{ paddingBottom: 100, flexGrow: 1 }}
@@ -459,14 +486,12 @@ export default function WatchlistScreen() {
         {watchlistData.length === 0 ? (
           /* Empty State */
           <Animated.View
-            key={`empty-${animationKey}`}
-            entering={FadeInDown.duration(500)}
-            style={{
+            style={[{
               flex: 1,
               justifyContent: "center",
               alignItems: "center",
               paddingHorizontal: 20,
-            }}
+            }, style2]}
           >
             <View
               style={[
@@ -534,9 +559,7 @@ export default function WatchlistScreen() {
           <>
             {/* Stats Section */}
             <Animated.View
-              key={`stats-${animationKey}`}
-              entering={FadeInDown.delay(100).duration(400)}
-              style={styles.statsContainer}
+              style={[styles.statsContainer, style2]}
             >
               <View
                 style={[
@@ -642,9 +665,7 @@ export default function WatchlistScreen() {
             {/* Active Snoops */}
             {activeSnoops.length > 0 && (
               <Animated.View
-                key={`active-${animationKey}`}
-                entering={FadeInDown.delay(200).duration(400)}
-                style={styles.section}
+                style={[styles.section, style3]}
               >
                 <Text
                   style={[styles.sectionTitle, { color: Colors[theme].text }]}
@@ -666,9 +687,7 @@ export default function WatchlistScreen() {
             {/* Closed/Confirmed Snoops */}
             {closedSnoops.length > 0 && (
               <Animated.View
-                key={`closed-${animationKey}`}
-                entering={FadeInDown.delay(300).duration(400)}
-                style={styles.section}
+                style={[styles.section, style4]}
               >
                 <Text
                   style={[styles.sectionTitle, { color: Colors[theme].text }]}

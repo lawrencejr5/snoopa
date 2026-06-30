@@ -22,9 +22,10 @@ import {
   BottomSheetModal,
   BottomSheetView,
 } from "@gorhom/bottom-sheet";
-import { useNavigation } from "@react-navigation/native";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
-import { useRouter } from "expo-router";
+import { useNavigation, useRouter } from "expo-router";
+import { useFocusEffect } from "expo-router";
+import { getLastFocusedTab, setLastFocusedTab } from "@/utils/navigationState";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Image,
@@ -38,10 +39,9 @@ import {
 } from "react-native";
 import Animated, {
   Easing,
-  FadeIn,
-  FadeInDown,
   useAnimatedStyle,
   useSharedValue,
+  withDelay,
   withRepeat,
   withSequence,
   withTiming,
@@ -561,15 +561,42 @@ export default function HomeScreen() {
     Platform.OS === "ios" && parseInt(String(Platform.Version), 10) >= 26;
   const { signedIn } = useUser();
   const navigation = useNavigation();
-  const [animationKey, setAnimationKey] = useState(0);
-  const [activeBriefIndex, setActiveBriefIndex] = useState(0);
+  const isLoaded = !isLoading && !!signedIn && !appLoading;
 
-  useEffect(() => {
-    const unsubscribe = navigation.addListener("tabPress" as any, (e: any) => {
-      setAnimationKey((prev) => prev + 1);
-    });
-    return unsubscribe;
-  }, [navigation]);
+  // Staggered section animations (opacity + slide-up)
+  const s1 = useSharedValue(0); // header
+  const s2 = useSharedValue(0); // trending / briefing
+  const s3 = useSharedValue(0); // briefing / active snoops
+  const s4 = useSharedValue(0); // active snoops / locked
+
+  const DURATION = 400;
+  const SLIDE = 18;
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!isLoaded) return;
+
+      const lastTab = getLastFocusedTab();
+      if (lastTab !== "index") {
+        s1.value = 0;
+        s2.value = 0;
+        s3.value = 0;
+        s4.value = 0;
+        s1.value = withTiming(1, { duration: DURATION });
+        s2.value = withDelay(80, withTiming(1, { duration: DURATION }));
+        s3.value = withDelay(160, withTiming(1, { duration: DURATION }));
+        s4.value = withDelay(240, withTiming(1, { duration: DURATION }));
+      } else {
+        s1.value = 1;
+        s2.value = 1;
+        s3.value = 1;
+        s4.value = 1;
+      }
+      setLastFocusedTab("index");
+    }, [isLoaded]),
+  );
+
+  const [activeBriefIndex, setActiveBriefIndex] = useState(0);
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [showTrackModal, setShowTrackModal] = useState(false);
@@ -699,6 +726,23 @@ export default function HomeScreen() {
   const notifications = useQuery(api.notifications.get_notifications) || [];
   const latestBriefings = notifications.slice(0, 5); // Show up to 5 briefs in swiper
 
+  const style1 = useAnimatedStyle(() => ({
+    opacity: s1.value,
+    transform: [{ translateY: (1 - s1.value) * SLIDE }],
+  }));
+  const style2 = useAnimatedStyle(() => ({
+    opacity: s2.value,
+    transform: [{ translateY: (1 - s2.value) * SLIDE }],
+  }));
+  const style3 = useAnimatedStyle(() => ({
+    opacity: s3.value,
+    transform: [{ translateY: (1 - s3.value) * SLIDE }],
+  }));
+  const style4 = useAnimatedStyle(() => ({
+    opacity: s4.value,
+    transform: [{ translateY: (1 - s4.value) * SLIDE }],
+  }));
+
   if (isLoading || !signedIn || appLoading) return <Loading />;
 
   const currentDate = new Date().toLocaleDateString("en-US", {
@@ -710,7 +754,7 @@ export default function HomeScreen() {
   return (
     <Container>
       {/* Header */}
-      <Animated.View entering={FadeIn.duration(400)} style={styles.header}>
+      <Animated.View style={[styles.header, style1]}>
         {/* Left — Avatar ring + title */}
         <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
           <Pressable onPress={handleOpenProfileSheet}>
@@ -779,15 +823,15 @@ export default function HomeScreen() {
       </Animated.View>
 
       <ScrollView
-        contentContainerStyle={{ paddingBottom: isIOS26OrAbove ? 160 : 100, flexGrow: 1 }}
+        contentContainerStyle={{
+          paddingBottom: isIOS26OrAbove ? 160 : 100,
+          flexGrow: 1,
+        }}
         showsVerticalScrollIndicator={false}
       >
         {/* Trending Topics */}
         {trendingTopics.length > 0 && (
-          <Animated.View
-            key={`trending-${animationKey}`}
-            entering={FadeInDown.delay(100).duration(500)}
-          >
+          <Animated.View style={style2}>
             <View style={styles.sectionHeader}>
               <Text
                 style={[
@@ -847,13 +891,8 @@ export default function HomeScreen() {
             </ScrollView>
           </Animated.View>
         )}
-        {/* Briefing Section */}
         {activeSnoops.length > 0 && (
-          <Animated.View
-            key={`briefing-${animationKey}`}
-            entering={FadeInDown.delay(200).duration(500)}
-            style={styles.section}
-          >
+          <Animated.View style={[styles.section, style3]}>
             <View style={styles.sectionHeader}>
               <View
                 style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
@@ -972,11 +1011,7 @@ export default function HomeScreen() {
         )}
 
         {/* Active Snoops List */}
-        <Animated.View
-          key={`active-snoops-${animationKey}`}
-          entering={FadeInDown.delay(300).duration(500)}
-          style={styles.section}
-        >
+        <Animated.View style={[styles.section, style4]}>
           <View style={styles.sectionHeader}>
             <View
               style={{ flexDirection: "row", alignItems: "center", gap: 8 }}

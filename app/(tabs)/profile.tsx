@@ -9,11 +9,11 @@ import { useUser } from "@/context/UserContext";
 import { api } from "@/convex/_generated/api";
 import { registerForPushNotificationsAsync } from "@/utils/reg_push_notifications";
 import { useAuthActions } from "@convex-dev/auth/react";
-import { useNavigation } from "@react-navigation/native";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
+import { getLastFocusedTab, setLastFocusedTab } from "@/utils/navigationState";
 import * as WebBrowser from "expo-web-browser";
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -24,7 +24,12 @@ import {
   Text,
   View,
 } from "react-native";
-import Animated, { FadeInDown } from "react-native-reanimated";
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withTiming,
+} from "react-native-reanimated";
 
 export default function ProfileScreen() {
   const { theme, toggleTheme } = useTheme();
@@ -122,26 +127,64 @@ export default function ProfileScreen() {
     }
   };
 
-  const navigation = useNavigation();
-  const [animationKey, setAnimationKey] = useState(0);
+  const isLoaded = !isLoading && !!signedIn && !appLoading;
 
-  useEffect(() => {
-    const unsubscribe = navigation.addListener("tabPress" as any, (e: any) => {
-      setAnimationKey((prev) => prev + 1);
-    });
-    return unsubscribe;
-  }, [navigation]);
+  // Staggered section animations (opacity + slide-up)
+  const s1 = useSharedValue(0); // header
+  const s2 = useSharedValue(0); // user/snoop card
+  const s3 = useSharedValue(0); // upgrade card
+  const s4 = useSharedValue(0); // menu
+
+  const DURATION = 400;
+  const SLIDE = 18;
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!isLoaded) return;
+
+      const lastTab = getLastFocusedTab();
+      if (lastTab !== "profile") {
+        s1.value = 0;
+        s2.value = 0;
+        s3.value = 0;
+        s4.value = 0;
+        s1.value = withTiming(1, { duration: DURATION });
+        s2.value = withDelay(80, withTiming(1, { duration: DURATION }));
+        s3.value = withDelay(160, withTiming(1, { duration: DURATION }));
+        s4.value = withDelay(240, withTiming(1, { duration: DURATION }));
+      } else {
+        s1.value = 1;
+        s2.value = 1;
+        s3.value = 1;
+        s4.value = 1;
+      }
+      setLastFocusedTab("profile");
+    }, [isLoaded]),
+  );
+
+  const style1 = useAnimatedStyle(() => ({
+    opacity: s1.value,
+    transform: [{ translateY: (1 - s1.value) * SLIDE }],
+  }));
+  const style2 = useAnimatedStyle(() => ({
+    opacity: s2.value,
+    transform: [{ translateY: (1 - s2.value) * SLIDE }],
+  }));
+  const style3 = useAnimatedStyle(() => ({
+    opacity: s3.value,
+    transform: [{ translateY: (1 - s3.value) * SLIDE }],
+  }));
+  const style4 = useAnimatedStyle(() => ({
+    opacity: s4.value,
+    transform: [{ translateY: (1 - s4.value) * SLIDE }],
+  }));
 
   if (isLoading || !signedIn || appLoading) return <Loading />;
 
   return (
     <Container>
       {/* Header */}
-      <Animated.View
-        key={`profile-header-${animationKey}`}
-        entering={FadeInDown.duration(400)}
-        style={styles.header}
-      >
+      <Animated.View style={[styles.header, style1]}>
         <Text style={[styles.headerTitle, { color: Colors[theme].text }]}>
           Profile
         </Text>
@@ -153,14 +196,13 @@ export default function ProfileScreen() {
       >
         {/* User & Snoop Card */}
         <Animated.View
-          key={`profile-user-snoop-${animationKey}`}
-          entering={FadeInDown.delay(100).duration(400)}
           style={[
             styles.userSnoopCard,
             {
               backgroundColor: Colors[theme].surface,
               borderColor: Colors[theme].border,
             },
+            style2,
           ]}
         >
           {/* User Details & Plan Row */}
@@ -302,8 +344,6 @@ export default function ProfileScreen() {
         {/* Upgrade Card */}
         {signedIn?.is_premium !== true && (
           <Animated.View
-            key={`profile-upgrade-${animationKey}`}
-            entering={FadeInDown.delay(200).duration(400)}
             style={[
               styles.upgradeCard,
               {
@@ -312,6 +352,7 @@ export default function ProfileScreen() {
                 borderRadius: 20,
                 borderColor: Colors[theme].border,
               },
+              style3,
             ]}
           >
             <Text style={[styles.upgradeTitle, { color: Colors[theme].text }]}>
@@ -347,11 +388,7 @@ export default function ProfileScreen() {
         )}
 
         {/* Settings List */}
-        <Animated.View
-          key={`profile-menu-${animationKey}`}
-          entering={FadeInDown.delay(300).duration(400)}
-          style={styles.menuContainer}
-        >
+        <Animated.View style={[styles.menuContainer, style4]}>
           {menuItems.map((item, index) => (
             <Pressable
               key={index}
