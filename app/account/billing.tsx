@@ -80,7 +80,6 @@ export default function BillingScreen() {
   const haptics = useHapitcs();
   const { showCustomAlert } = useCustomAlert();
   const { signedIn } = useUser();
-  const upgradeUserTier = useMutation(api.snoops.upgrade_user_tier);
 
   const getPlanBtnText = (planId: string) => {
     const currentTier = signedIn?.sub_tier || "free";
@@ -182,10 +181,6 @@ export default function BillingScreen() {
         const sub_end_date = entitlement.expirationDate
           ? new Date(entitlement.expirationDate).getTime()
           : undefined;
-        await upgradeUserTier({
-          tier: planId as "pro" | "supa" | "max",
-          sub_end_date,
-        });
         showCustomAlert(
           `Successfully upgraded to Snoopa ${planId.toUpperCase()}!`,
           "success",
