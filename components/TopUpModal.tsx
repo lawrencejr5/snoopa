@@ -19,21 +19,8 @@ import {
   Text,
   View,
 } from "react-native";
-import {
-  AdEventType,
-  RewardedAd,
-  RewardedAdEventType,
-  TestIds,
-} from "react-native-google-mobile-ads";
+import { isAdSupported, showRewardedAd } from "@/utils/adHelper";
 import Purchases, { PURCHASE_TYPE } from "react-native-purchases";
-
-// ---------------------------------------------------------------------------
-// Ad Unit IDs  (swap for real ones before release)
-// ---------------------------------------------------------------------------
-const AD_UNIT_ID = Platform.select({
-  android: TestIds.REWARDED,
-  ios: TestIds.REWARDED,
-}) as string;
 
 const AD_DAILY_LIMIT = 3;
 
@@ -189,7 +176,7 @@ export default function TopUpModal({ visible, onClose }: TopUpModalProps) {
   // Watch Ad
   // ---------------------------------------------------------------------------
   const handleWatchAd = () => {
-    if (Platform.OS === "web") {
+    if (!isAdSupported) {
       showCustomAlert("Ads are not supported on web.", "danger");
       return;
     }
@@ -198,47 +185,15 @@ export default function TopUpModal({ visible, onClose }: TopUpModalProps) {
     haptics.impact("success");
     setIsLoadingAd(true);
 
-    const rewarded = RewardedAd.createForAdRequest(AD_UNIT_ID, {
-      requestNonPersonalizedAdsOnly: false,
-    });
-
-    let earnedRewardAmount: number | null = null;
-    let claimError: string | null = null;
-
-    const unsubscribeLoaded = rewarded.addAdEventListener(
-      RewardedAdEventType.LOADED,
-      () => {
+    showRewardedAd({
+      onAdLoaded: () => {
         setIsLoadingAd(false);
-        rewarded.show();
       },
-    );
-
-    const unsubscribeEarned = rewarded.addAdEventListener(
-      RewardedAdEventType.EARNED_REWARD,
-      async () => {
-        try {
-          const result = await claimAdReward({});
-          earnedRewardAmount = result?.reward_amount ?? 2;
-        } catch (e: any) {
-          const msg = e?.message ?? "";
-          if (msg.includes("AD_DAILY_LIMIT_REACHED")) {
-            claimError = "limit";
-          } else {
-            claimError = "failed";
-          }
-        }
+      onRewardEarned: async () => {
+        const result = await claimAdReward({});
+        return result?.reward_amount ?? 2;
       },
-    );
-
-    const unsubscribeClosed = rewarded.addAdEventListener(
-      AdEventType.CLOSED,
-      () => {
-        // Clean up listeners
-        unsubscribeLoaded();
-        unsubscribeEarned();
-        unsubscribeClosed();
-
-        // Show the alert now that the ad screen is closed
+      onAdClosed: (earnedRewardAmount, claimError) => {
         if (earnedRewardAmount !== null) {
           haptics.impact("success");
           showCustomAlert(
@@ -251,24 +206,11 @@ export default function TopUpModal({ visible, onClose }: TopUpModalProps) {
           showCustomAlert("Could not grant snoops. Try again.", "danger");
         }
       },
-    );
-
-    rewarded.load();
-
-    // Safety timeout in case the ad never loads
-    const timeout = setTimeout(() => {
-      setIsLoadingAd(false);
-      unsubscribeLoaded();
-      unsubscribeEarned();
-      unsubscribeClosed();
-      showCustomAlert("Ad failed to load. Please try again.", "danger");
-    }, 15000);
-
-    // Clear timeout once loaded
-    const unsubscribeForTimeout = rewarded.addAdEventListener(
-      RewardedAdEventType.LOADED,
-      () => clearTimeout(timeout),
-    );
+      onAdFailedToLoad: () => {
+        setIsLoadingAd(false);
+        showCustomAlert("Ad failed to load. Please try again.", "danger");
+      },
+    });
   };
 
   // ---------------------------------------------------------------------------
