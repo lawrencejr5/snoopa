@@ -3,12 +3,78 @@ import React from "react";
 
 import Colors from "@/constants/Colors";
 import { useTheme } from "@/context/ThemeContext";
-import { Image, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import * as Haptics from "expo-haptics";
+import { Icon, Label, NativeTabs } from "expo-router/unstable-native-tabs";
+import { Image, Platform, View } from "react-native";
 
-export default function TabLayout() {
+const TABS = [
+  {
+    name: "index",
+    label: "Home",
+    sf: { default: "house" as const, selected: "house.fill" as const },
+  },
+  {
+    name: "watchlist",
+    label: "Watchlist",
+    sf: {
+      default: "binoculars" as const,
+      selected: "binoculars.fill" as const,
+    },
+  },
+  {
+    name: "profile",
+    label: "Profile",
+    sf: { default: "person" as const, selected: "person.fill" as const },
+  },
+];
+
+const IOSTabsLayout = () => {
   const { theme } = useTheme();
-  const insets = useSafeAreaInsets();
+
+  return (
+    <View style={{ backgroundColor: Colors[theme].background, flex: 1 }}>
+      <NativeTabs
+        tintColor={Colors[theme].milker}
+        iconColor={{
+          default: Colors[theme].text_secondary,
+          selected: Colors[theme].milker,
+        }}
+        labelStyle={{
+          default: {
+            color: Colors[theme].text_secondary,
+            fontFamily: "FontMedium",
+            fontSize: 10,
+          },
+          selected: {
+            color: Colors[theme].milker,
+            fontFamily: "FontMedium",
+            fontSize: 10,
+          },
+        }}
+        backgroundColor={Colors[theme].background}
+        blurEffect="systemChromeMaterialDark"
+        shadowColor="transparent"
+        {...({
+          screenListeners: {
+            tabPress: () => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            },
+          },
+        } as any)}
+      >
+        {TABS.map((tab) => (
+          <NativeTabs.Trigger key={tab.name} name={tab.name}>
+            <Label>{tab.label}</Label>
+            <Icon sf={tab.sf} />
+          </NativeTabs.Trigger>
+        ))}
+      </NativeTabs>
+    </View>
+  );
+};
+
+const DefaultTabsLayout = () => {
+  const { theme } = useTheme();
 
   return (
     <View
@@ -97,4 +163,15 @@ export default function TabLayout() {
       </Tabs>
     </View>
   );
+};
+
+export default function TabLayout() {
+  const isIOS26OrAbove =
+    Platform.OS === "ios" && parseInt(String(Platform.Version), 10) >= 26;
+
+  if (isIOS26OrAbove) {
+    return <IOSTabsLayout />;
+  }
+
+  return <DefaultTabsLayout />;
 }

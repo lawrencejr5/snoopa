@@ -25,6 +25,7 @@ import {
   StyleSheet,
   Text,
   View,
+  Platform,
 } from "react-native";
 import Animated, {
   Easing,
@@ -309,6 +310,7 @@ function InactiveSnoopCard({
 export default function WatchlistScreen() {
   const { theme } = useTheme();
   const router = useRouter();
+  const isIOS26OrAbove = Platform.OS === "ios" && parseInt(String(Platform.Version), 10) >= 26;
 
   const { isLoading } = useConvexAuth();
   const { appLoading } = useLoadingContext();
@@ -702,6 +704,7 @@ export default function WatchlistScreen() {
             backgroundColor: Colors[theme].primary,
             opacity: pressed ? 0.82 : 1,
             transform: [{ scale: pressed ? 0.96 : 1 }],
+            bottom: isIOS26OrAbove ? 100 : 40,
           },
         ]}
       >

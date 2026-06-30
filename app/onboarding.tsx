@@ -34,7 +34,12 @@ const ONBOARDING_DATA = [
   {
     id: 4,
     image: require("@/assets/onboarding/onboarding_4.png"),
-    title: "Data You Can Trust,\nSources You Can See.",
+    title: "Back To Back Updates",
+  },
+  {
+    id: 5,
+    image: require("@/assets/onboarding/onboarding_5.png"),
+    title: "Personalize Snoopa.",
   },
 ];
 
