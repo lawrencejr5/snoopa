@@ -557,7 +557,8 @@ export default function HomeScreen() {
   const { width } = useWindowDimensions();
   const { isLoading } = useConvexAuth();
   const { appLoading } = useLoadingContext();
-  const isIOS26OrAbove = Platform.OS === "ios" && parseInt(String(Platform.Version), 10) >= 26;
+  const isIOS26OrAbove =
+    Platform.OS === "ios" && parseInt(String(Platform.Version), 10) >= 26;
   const { signedIn } = useUser();
   const navigation = useNavigation();
   const [animationKey, setAnimationKey] = useState(0);
@@ -778,7 +779,7 @@ export default function HomeScreen() {
       </Animated.View>
 
       <ScrollView
-        contentContainerStyle={{ paddingBottom: 100, flexGrow: 1 }}
+        contentContainerStyle={{ paddingBottom: isIOS26OrAbove ? 160 : 100, flexGrow: 1 }}
         showsVerticalScrollIndicator={false}
       >
         {/* Trending Topics */}

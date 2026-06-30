@@ -4,8 +4,8 @@ import { useTheme } from "@/context/ThemeContext";
 import { useUser } from "@/context/UserContext";
 import { api } from "@/convex/_generated/api";
 import {
-  default as BottomSheet,
   BottomSheetBackdrop,
+  BottomSheetModal,
   BottomSheetView,
 } from "@gorhom/bottom-sheet";
 import { useAction } from "convex/react";
@@ -32,7 +32,7 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
   const router = useRouter();
   const { signedIn } = useUser();
   const { showCustomAlert, hideAlert } = useCustomAlert();
-  const bottomSheetRef = useRef<BottomSheet>(null);
+  const bottomSheetRef = useRef<BottomSheetModal>(null);
 
   const [prompt, setPrompt] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
@@ -44,23 +44,20 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
   // Directly initialize native watchlist instead of parsing text client-side
   const initializeWatchlist = useAction(api.chat.initialize_watchlist);
 
-  // Typewriter Placeholder Logic
+  // Watchlist Placeholder Examples
   const EXAMPLES = useMemo(
     () =>
       [
-        "Track price drops on https://apple.com/iphone-15",
-        "Monitor https://news.ycombinator.com for ai news",
-        "Tell me when NVIDIA hits $1000 on https://bloomberg.com",
+        "Track price drops for the iPhone 15 on https://apple.com/iphone-15",
         "Keep me updated on Real Madrid injury news",
-        "Watch https://tesla.com for Cybertruck updates",
-        "Notify me when Bitcoin hits $100k",
-        "Watch for job openings at https://google.com/careers",
-        "Track PS5 Pro availability on https://bestbuy.com",
+        "Alert me when the continuation date for the Boruto anime is announced, also engange me with the rumors too",
+        "Watch for job openings for software engineers at https://google.com/careers",
+        "Let me know when the PS5 Pro is available on https://bestbuy.com",
         "Follow news about the next OpenAI release",
-        "Snoop on music festivals at https://coachella.com",
-        "Alert me when Chelsea FC wins a match",
-        "Track flight prices on https://skyscanner.com",
-        "Monitor https://techcrunch.com for startup news",
+        "Track the Entain Bribery case and keep me posted on the court preceedings",
+        "Track the VDM vs Blord saga on twitter and keep me updated with the latest gist",
+        "Monitor https://www.promogen.app/ and alert me the moment their pricing changes",
+        "Let me know when the listing date for the Dangote Refinery is announced",
       ].sort(() => Math.random() - 0.5),
     [],
   );
@@ -70,12 +67,12 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
   // Sync visibility with modal state and pick a random placeholder
   useEffect(() => {
     if (visible) {
-      bottomSheetRef.current?.snapToIndex(0);
+      bottomSheetRef.current?.present();
       const randomExample =
         EXAMPLES[Math.floor(Math.random() * EXAMPLES.length)];
       setPlaceholder(randomExample);
     } else {
-      bottomSheetRef.current?.snapToIndex(-1);
+      bottomSheetRef.current?.dismiss();
       setPrompt("");
     }
   }, [visible, EXAMPLES]);
@@ -146,9 +143,8 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
 
   const handleClose = () => {
     Keyboard.dismiss();
-    bottomSheetRef.current?.close();
+    bottomSheetRef.current?.dismiss();
   };
-
 
   const handleInputChange = (text: string) => {
     const urlRegex =
@@ -165,14 +161,14 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
   };
 
   return (
-    <BottomSheet
+    <BottomSheetModal
       ref={bottomSheetRef}
       snapPoints={snapPoints}
       enableContentPanningGesture={true}
       enableHandlePanningGesture={true}
       enableDynamicSizing={false}
       enableOverDrag={false}
-      index={-1}
+      index={0}
       onChange={handleSheetChanges}
       backdropComponent={renderBackdrop}
       backgroundStyle={{ backgroundColor: Colors[theme].card }}
@@ -180,7 +176,10 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
       enablePanDownToClose
     >
       <BottomSheetView style={{ flex: 1 }}>
-        <Pressable onPress={Keyboard.dismiss} style={{ flex: 1, paddingHorizontal: 24, paddingBottom: 24 }}>
+        <Pressable
+          onPress={Keyboard.dismiss}
+          style={{ flex: 1, paddingHorizontal: 24, paddingBottom: 24 }}
+        >
           <View style={styles.sheetHeader}>
             <Text
               style={{
@@ -190,9 +189,9 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
                 letterSpacing: 1,
               }}
             >
-              NEW SNOOP
+              NEW WATCHLIST
             </Text>
-            <Pressable onPress={handleClose} disabled={isProcessing}>
+            {/* <Pressable onPress={handleClose} disabled={isProcessing}>
               <Image
                 source={require("@/assets/icons/times.png")}
                 style={{
@@ -201,7 +200,7 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
                   tintColor: Colors[theme].text_secondary,
                 }}
               />
-            </Pressable>
+            </Pressable> */}
           </View>
 
           {/* Content Centered Stack analogous to earlier design */}
@@ -330,7 +329,7 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
           </View>
         </Pressable>
       </BottomSheetView>
-    </BottomSheet>
+    </BottomSheetModal>
   );
 }
 
