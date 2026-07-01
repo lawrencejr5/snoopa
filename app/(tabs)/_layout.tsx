@@ -34,10 +34,10 @@ const IOSTabsLayout = () => {
   return (
     <View style={{ backgroundColor: Colors[theme].background, flex: 1 }}>
       <NativeTabs
-        tintColor={Colors[theme].milker}
+        tintColor={Colors[theme].milk}
         iconColor={{
           default: Colors[theme].text_secondary,
-          selected: Colors[theme].milker,
+          selected: Colors[theme].milk,
         }}
         labelStyle={{
           default: {
@@ -46,7 +46,7 @@ const IOSTabsLayout = () => {
             fontSize: 10,
           },
           selected: {
-            color: Colors[theme].milker,
+            color: Colors[theme].milk,
             fontFamily: "FontMedium",
             fontSize: 10,
           },
@@ -130,8 +130,8 @@ const DefaultTabsLayout = () => {
               <Image
                 source={require("../../assets/icons/watchlist.png")}
                 style={{
-                  height: 22,
-                  width: 22,
+                  height: 28,
+                  width: 28,
                   tintColor: focused
                     ? Colors[theme].primary
                     : Colors[theme].text_secondary,
@@ -149,8 +149,8 @@ const DefaultTabsLayout = () => {
               <Image
                 source={require("../../assets/icons/user.png")}
                 style={{
-                  height: 22,
-                  width: 22,
+                  height: 23,
+                  width: 23,
                   tintColor: focused
                     ? Colors[theme].primary
                     : Colors[theme].text_secondary,
