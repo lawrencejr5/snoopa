@@ -69,6 +69,17 @@ export async function showRewardedAd({
     },
   );
 
+  const unsubscribeError = rewarded.addAdEventListener(
+    AdEventType.ERROR,
+    (error) => {
+      console.warn("Google Mobile Ads error loading/showing ad:", error);
+      if (hasClosed) return;
+      hasClosed = true;
+      cleanup();
+      onAdFailedToLoad();
+    },
+  );
+
   const timeout = setTimeout(() => {
     if (hasClosed) return;
     hasClosed = true;
@@ -87,6 +98,7 @@ export async function showRewardedAd({
     unsubscribeEarned();
     unsubscribeClosed();
     unsubscribeForTimeout();
+    unsubscribeError();
   }
 
   rewarded.load();
