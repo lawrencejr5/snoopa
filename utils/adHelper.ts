@@ -3,12 +3,11 @@ import {
   AdEventType,
   RewardedAd,
   RewardedAdEventType,
-  TestIds,
 } from "react-native-google-mobile-ads";
 
 const AD_UNIT_ID = Platform.select({
-  android: TestIds.REWARDED,
-  ios: TestIds.REWARDED,
+  android: "ca-app-pub-7078901325871517/4361854748",
+  ios: "ca-app-pub-7078901325871517/4067140038",
   default: "",
 });
 

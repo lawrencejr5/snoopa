@@ -328,14 +328,16 @@ export const get_snoop_grants = query({
 // Mutation to manually add a top-up grant (placeholder — no RevenueCat yet)
 // ---------------------------------------------------------------------------
 
-export const add_top_up = internalMutation({
+export const add_top_up = mutation({
   args: {
-    user_id: v.id("users"),
     amount: v.number(),
   },
   handler: async (ctx, args) => {
+    const user_id = await getAuthUserId(ctx);
+    if (!user_id) throw new ConvexError("Not authenticated");
+
     await ctx.db.insert("snoops", {
-      user_id: args.user_id,
+      user_id,
       snoops: args.amount,
       remaining: args.amount,
       type: "top_up",
