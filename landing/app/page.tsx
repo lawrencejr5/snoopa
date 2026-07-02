@@ -177,7 +177,7 @@ export default function Home() {
             </p>
             <div className={styles.heroDownloadButtons}>
               <a
-                href="https://apps.apple.com/app-store/"
+                href="https://apps.apple.com/us/app/snoopa-ai-web-tracker/id6777933354"
                 className={styles.storeButton}
                 target="_blank"
                 rel="noopener noreferrer"
