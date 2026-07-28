@@ -1348,7 +1348,7 @@ async function _buildWatchlistPrompt(
     The user wants to add something to their watchlist. Extract the watchlist item details and respond in two parts:
 
     PART 1: A friendly 1-2 sentence confirmation message in Snoopa's voice.
-    PART 2: On a new line, write the exact separator text WATCHLIST-DATA-SEPARATOR (surrounded by three dashes on each side), then on the next line output a single JSON object with these fields: title, keywords, condition, canonical_topic, tier, search_type, time_range.
+    PART 2: On a new line, write EXACTLY this separator (copy it character-for-character, no spaces, no markdown): ---WATCHLIST-DATA-SEPARATOR--- then on the next line output a single JSON object with these fields: title, keywords, condition, canonical_topic, tier, search_type, time_range.
 
     Example JSON shape (fill in real values):
     {"title": "Bitcoin Price Movement", "keywords": ["Bitcoin", "BTC", "price", "drop", "crash"], "condition": "Alert when Bitcoin drops below $80,000", "canonical_topic": "Bitcoin price", "tier": 1, "search_type": "general", "time_range": "day"}
@@ -1430,16 +1430,18 @@ async function _parseAndCreateWatchlist(
     }
   }
 
-  // Parse the WATCHLIST_DATA separator (described as WATCHLIST-DATA-SEPARATOR in the prompt)
-  const DELIMITER = "---WATCHLIST-DATA-SEPARATOR---";
-  const delimiterIndex = response_text.indexOf(DELIMITER);
-  if (delimiterIndex === -1)
+  // Parse the WATCHLIST_DATA separator — use a regex to tolerate any spacing
+  // the AI may insert around the dashes (e.g. "--- WATCHLIST-DATA-SEPARATOR ---")
+  const DELIMITER_REGEX =
+    /---\s*WATCHLIST-DATA-SEPARATOR\s*---/;
+  const delimiterMatch = response_text.match(DELIMITER_REGEX);
+  if (!delimiterMatch || delimiterMatch.index === undefined)
     throw new Error("Could not map WATCHLIST_DATA dynamically.");
+  const delimiterIndex = delimiterMatch.index;
+  const delimiterEnd = delimiterIndex + delimiterMatch[0].length;
 
   const final_snoop_text = response_text.substring(0, delimiterIndex).trim();
-  const jsonBody = response_text
-    .substring(delimiterIndex + DELIMITER.length)
-    .trim();
+  const jsonBody = response_text.substring(delimiterEnd).trim();
   const payload = JSON.parse(jsonBody);
 
   // Create the watchlist record
