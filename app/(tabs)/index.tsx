@@ -712,7 +712,7 @@ export default function HomeScreen() {
   const watchlistData = useQuery(api.watchlist.get_watchlists) || [];
   const trendingTopics = (
     useQuery(api.watchlist.get_trending_topics) || []
-  ).slice(0, 7);
+  ).slice(0, 10);
   const unreadCount = useQuery(api.notifications.unread_count) ?? 0;
   const snoop_balance = useQuery(api.snoops.get_snoop_balance) ?? 0;
   const snoop_grants = useQuery(api.snoops.get_snoop_grants) ?? [];
