@@ -174,6 +174,15 @@ const schema = defineSchema({
     user_id: v.id("users"),
     viewed_at: v.number(), // Unix timestamp (ms) when the ad was watched
   }).index("by_user", ["user_id"]),
+
+  trending_cache: defineTable({
+    topic: v.string(),
+    category: v.string(),
+    summary: v.string(),
+    suggested_condition: v.string(),
+    keywords: v.array(v.string()),
+    refreshed_at: v.number(),
+  }),
 });
 
 export default schema;

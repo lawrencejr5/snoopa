@@ -23,10 +23,11 @@ import {
 interface Props {
   visible: boolean;
   topic: string;
+  suggestedCondition?: string;
   onClose: () => void;
 }
 
-export default function TrackTopicModal({ visible, topic, onClose }: Props) {
+export default function TrackTopicModal({ visible, topic, suggestedCondition, onClose }: Props) {
   const { theme } = useTheme();
   const router = useRouter();
   const { signedIn } = useUser();
@@ -44,12 +45,18 @@ export default function TrackTopicModal({ visible, topic, onClose }: Props) {
   // Sync visibility with modal state
   useEffect(() => {
     if (visible && topic) {
+      // Pre-fill the suggested condition if provided (from trending topics)
+      if (suggestedCondition) {
+        setPrompt(suggestedCondition);
+      } else {
+        setPrompt("");
+      }
       bottomSheetRef.current?.snapToIndex(0);
     } else {
       bottomSheetRef.current?.snapToIndex(-1);
       setPrompt("");
     }
-  }, [visible, topic]);
+  }, [visible, topic, suggestedCondition]);
 
   const handleSheetChanges = useCallback(
     (index: number) => {

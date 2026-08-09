@@ -298,37 +298,74 @@ export const reactivate_watchlist = mutation({
 });
 
 /**
- * Get trending topics across all users with tracker counts.
- * Returns the top 15 canonical topics sorted by number of active trackers.
+ * Read trending topics from the cache table.
+ * Populated by refresh_trending_topics (internalAction).
+ * Returns up to 10 topics sorted newest-first.
  */
 export const get_trending_topics = query({
   args: {},
   handler: async (ctx) => {
-    const active_items = await ctx.db
-      .query("watchlist")
-      .filter((q) => q.eq(q.field("status"), "active"))
+    const cached = await ctx.db
+      .query("trending_cache")
+      .order("desc")
       .collect();
 
-    // Count unique users per canonical_topic
-    const topic_map = new Map<string, Set<string>>();
-    for (const item of active_items) {
-      if (!item.canonical_topic) continue;
-      if (!topic_map.has(item.canonical_topic)) {
-        topic_map.set(item.canonical_topic, new Set());
+    // Deduplicate by topic name (keep newest), cap at 10
+    const seen = new Set<string>();
+    const results: typeof cached = [];
+    for (const row of cached) {
+      if (!seen.has(row.topic)) {
+        seen.add(row.topic);
+        results.push(row);
       }
-      topic_map.get(item.canonical_topic)!.add(item.user_id);
+      if (results.length === 10) break;
     }
 
-    // Convert to array, sort by count, take top 15
-    const trending = [...topic_map.entries()]
-      .map(([topic, users]) => ({
-        topic,
-        tracker_count: users.size,
-      }))
-      .sort((a, b) => b.tracker_count - a.tracker_count)
-      .slice(0, 15);
+    return results.map((r) => ({
+      topic: r.topic,
+      category: r.category,
+      summary: r.summary,
+      suggested_condition: r.suggested_condition,
+      keywords: r.keywords,
+      tracker_count: 0, // kept for UI compatibility; real trackers come from watchlist
+      refreshed_at: r.refreshed_at,
+    }));
+  },
+});
 
-    return trending;
+/**
+ * Internal: clear the trending_cache table.
+ * Called by trending.refresh_trending_topics before inserting fresh data.
+ */
+export const clear_trending_cache = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const all = await ctx.db.query("trending_cache").collect();
+    await Promise.all(all.map((r) => ctx.db.delete(r._id)));
+  },
+});
+
+/**
+ * Internal: insert a batch of trending topic rows into the cache.
+ * Called by trending.refresh_trending_topics after clearing old data.
+ */
+export const insert_trending_topics = internalMutation({
+  args: {
+    topics: v.array(
+      v.object({
+        topic: v.string(),
+        category: v.string(),
+        summary: v.string(),
+        suggested_condition: v.string(),
+        keywords: v.array(v.string()),
+        refreshed_at: v.number(),
+      }),
+    ),
+  },
+  handler: async (ctx, args) => {
+    await Promise.all(
+      args.topics.map((t) => ctx.db.insert("trending_cache", t)),
+    );
   },
 });
 

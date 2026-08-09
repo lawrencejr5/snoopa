@@ -48,6 +48,14 @@ if (process.env.RUN_CRONS === "true") {
     "0 0 1 * *",
     internal.snoops.refill_premium_snoops,
   );
+
+  // Refresh trending topics every 3 hours (scrapes Google News → DeepSeek)
+  crons.interval(
+    "refresh-trending-topics",
+    { hours: 3 },
+    internal.trending.refresh_trending_topics,
+    {},
+  );
 }
 
 export default crons;

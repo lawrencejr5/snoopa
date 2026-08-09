@@ -16,6 +16,7 @@ import { useTheme } from "@/context/ThemeContext";
 import { useUser } from "@/context/UserContext";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
+import { getLastFocusedTab, setLastFocusedTab } from "@/utils/navigationState";
 import { Octicons } from "@expo/vector-icons";
 import {
   BottomSheetBackdrop,
@@ -23,19 +24,17 @@ import {
   BottomSheetView,
 } from "@gorhom/bottom-sheet";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
-import { useNavigation, useRouter } from "expo-router";
-import { useFocusEffect } from "expo-router";
-import { getLastFocusedTab, setLastFocusedTab } from "@/utils/navigationState";
+import { useFocusEffect, useNavigation, useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Image,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
   useWindowDimensions,
-  Platform,
 } from "react-native";
 import Animated, {
   Easing,
@@ -220,14 +219,18 @@ const formatTimeAgo = (timestamp: number) => {
 // ---------------------------------------------------------------------------
 const TopicPill = ({
   topic,
-  trackerCount,
+  category,
+  summary,
   onTrack,
 }: {
   topic: string;
-  trackerCount: number;
+  category: string;
+  summary: string;
   onTrack: () => void;
 }) => {
   const { theme } = useTheme();
+  const cat_color = Colors[theme].primary;
+
   return (
     <View
       style={[
@@ -239,38 +242,35 @@ const TopicPill = ({
       ]}
     >
       <View style={{ flex: 1 }}>
+        {/* Category badge */}
+        <View
+          style={{
+            alignSelf: "flex-start",
+            backgroundColor: cat_color + "20",
+            borderRadius: 4,
+            paddingHorizontal: 6,
+            paddingVertical: 2,
+            marginBottom: 6,
+          }}
+        >
+          <Text
+            style={{
+              color: cat_color,
+              fontFamily: "FontBold",
+              fontSize: 9,
+              letterSpacing: 0.8,
+              textTransform: "uppercase",
+            }}
+          >
+            {category}
+          </Text>
+        </View>
         <Text
           style={[styles.topicName, { color: Colors[theme].text }]}
-          numberOfLines={1}
+          numberOfLines={2}
         >
           {topic}
         </Text>
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 4,
-            marginTop: 4,
-          }}
-        >
-          <Image
-            source={require("@/assets/icons/tracked.png")}
-            style={{
-              width: 10,
-              height: 10,
-              tintColor: Colors[theme].text_secondary,
-            }}
-          />
-          <Text
-            style={{
-              color: Colors[theme].text_secondary,
-              fontFamily: "FontMedium",
-              fontSize: 11,
-            }}
-          >
-            {trackerCount} tracking
-          </Text>
-        </View>
       </View>
       <Pressable
         onPress={onTrack}
@@ -601,6 +601,10 @@ export default function HomeScreen() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showTrackModal, setShowTrackModal] = useState(false);
   const [selectedTopic, setSelectedTopic] = useState("");
+  const [selectedTopicCondition, setSelectedTopicCondition] = useState("");
+  const [selectedTopicKeywords, setSelectedTopicKeywords] = useState<string[]>(
+    [],
+  );
   const [showTopUp, setShowTopUp] = useState(false);
   const [showPremiumModal, setShowPremiumModal] = useState(false);
 
@@ -839,7 +843,7 @@ export default function HomeScreen() {
                   { color: Colors[theme].text_secondary },
                 ]}
               >
-                WHAT PEOPLE ARE TRACKING...
+                TRENDING WORLDWIDE
               </Text>
               <View
                 style={{
@@ -865,7 +869,7 @@ export default function HomeScreen() {
                     opacity: 0.6,
                   }}
                 >
-                  {trendingTopics.length} topics
+                  {trendingTopics.length} topics · live
                 </Text>
               </View>
             </View>
@@ -881,9 +885,14 @@ export default function HomeScreen() {
                 <TopicPill
                   key={t.topic}
                   topic={t.topic}
-                  trackerCount={t.tracker_count}
+                  category={(t as any).category ?? "World"}
+                  summary={(t as any).summary ?? ""}
                   onTrack={() => {
                     setSelectedTopic(t.topic);
+                    setSelectedTopicCondition(
+                      (t as any).suggested_condition ?? "",
+                    );
+                    setSelectedTopicKeywords((t as any).keywords ?? []);
                     setShowTrackModal(true);
                   }}
                 />
@@ -1167,6 +1176,7 @@ export default function HomeScreen() {
       <TrackTopicModal
         visible={showTrackModal}
         topic={selectedTopic}
+        suggestedCondition={selectedTopicCondition}
         onClose={() => setShowTrackModal(false)}
       />
 
