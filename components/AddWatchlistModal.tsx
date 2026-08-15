@@ -6,6 +6,7 @@ import { api } from "@/convex/_generated/api";
 import {
   BottomSheetBackdrop,
   BottomSheetModal,
+  BottomSheetTextInput,
   BottomSheetView,
 } from "@gorhom/bottom-sheet";
 import { useAction } from "convex/react";
@@ -18,7 +19,6 @@ import {
   Pressable,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from "react-native";
 
@@ -33,6 +33,7 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
   const { signedIn } = useUser();
   const { showCustomAlert, hideAlert } = useCustomAlert();
   const bottomSheetRef = useRef<BottomSheetModal>(null);
+  const inputRef = useRef<any>(null);
 
   const [prompt, setPrompt] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
@@ -71,8 +72,11 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
       const randomExample =
         EXAMPLES[Math.floor(Math.random() * EXAMPLES.length)];
       setPlaceholder(randomExample);
+      inputRef.current?.clear();
+      setPrompt("");
     } else {
       bottomSheetRef.current?.dismiss();
+      inputRef.current?.clear();
       setPrompt("");
     }
   }, [visible, EXAMPLES]);
@@ -116,6 +120,7 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
       });
 
       if (result?.watchlist_id) {
+        inputRef.current?.clear();
         setPrompt("");
         onClose();
 
@@ -144,20 +149,22 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
   const handleClose = () => {
     Keyboard.dismiss();
     bottomSheetRef.current?.dismiss();
+    inputRef.current?.clear();
+    setPrompt("");
   };
 
   const handleInputChange = (text: string) => {
-    const urlRegex =
-      /(?:https?:\/\/)?([a-zA-Z0-9][-a-zA-Z0-9]*\.[a-zA-Z][-a-zA-Z0-9.]*[a-zA-Z]{2,}(?:\/[^\s]*)?)/g;
+    // const urlRegex =
+    //   /(?:https?:\/\/)?([a-zA-Z0-9][-a-zA-Z0-9]*\.[a-zA-Z][-a-zA-Z0-9.]*[a-zA-Z]{2,}(?:\/[^\s]*)?)/g;
 
-    const cleanedText = text.replace(urlRegex, (match) => {
-      if (match.length > 200 && match.includes("?")) {
-        return match.split("?")[0];
-      }
-      return match;
-    });
+    // const cleanedText = text.replace(urlRegex, (match) => {
+    //   if (match.length > 200 && match.includes("?")) {
+    //     return match.split("?")[0];
+    //   }
+    //   return match;
+    // });
 
-    setPrompt(cleanedText);
+    setPrompt(text);
   };
 
   return (
@@ -229,8 +236,8 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
 
           {/* Prompt Input */}
           <View style={{ width: "100%" }}>
-            <TextInput
-              value={prompt}
+            <BottomSheetTextInput
+              ref={inputRef}
               onChangeText={handleInputChange}
               onFocus={() => {
                 setIsFocused(true);
@@ -256,6 +263,7 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
                 },
               ]}
             />
+
             <Text
               style={{
                 alignSelf: "flex-end",
