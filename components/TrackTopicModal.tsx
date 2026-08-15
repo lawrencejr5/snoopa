@@ -1,10 +1,12 @@
 import Colors from "@/constants/Colors";
+import { useCustomAlert } from "@/context/CustomAlertContext";
 import { useTheme } from "@/context/ThemeContext";
 import { useUser } from "@/context/UserContext";
 import { api } from "@/convex/_generated/api";
 import {
-  default as BottomSheet,
   BottomSheetBackdrop,
+  BottomSheetModal,
+  BottomSheetTextInput,
   BottomSheetView,
 } from "@gorhom/bottom-sheet";
 import { useAction } from "convex/react";
@@ -13,10 +15,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Image,
+  Keyboard,
   Pressable,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from "react-native";
 
@@ -27,11 +29,18 @@ interface Props {
   onClose: () => void;
 }
 
-export default function TrackTopicModal({ visible, topic, suggestedCondition, onClose }: Props) {
+export default function TrackTopicModal({
+  visible,
+  topic,
+  suggestedCondition,
+  onClose,
+}: Props) {
   const { theme } = useTheme();
   const router = useRouter();
   const { signedIn } = useUser();
-  const bottomSheetRef = useRef<BottomSheet>(null);
+  const { showCustomAlert, hideAlert } = useCustomAlert();
+  const bottomSheetRef = useRef<BottomSheetModal>(null);
+  const inputRef = useRef<any>(null);
 
   const [prompt, setPrompt] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
@@ -51,9 +60,10 @@ export default function TrackTopicModal({ visible, topic, suggestedCondition, on
       } else {
         setPrompt("");
       }
-      bottomSheetRef.current?.snapToIndex(0);
+      bottomSheetRef.current?.present();
     } else {
-      bottomSheetRef.current?.snapToIndex(-1);
+      bottomSheetRef.current?.dismiss();
+      inputRef.current?.clear();
       setPrompt("");
     }
   }, [visible, topic, suggestedCondition]);
@@ -61,6 +71,7 @@ export default function TrackTopicModal({ visible, topic, suggestedCondition, on
   const handleSheetChanges = useCallback(
     (index: number) => {
       if (index === -1) {
+        Keyboard.dismiss();
         onClose();
         setIsProcessing(false);
       }
@@ -85,7 +96,10 @@ export default function TrackTopicModal({ visible, topic, suggestedCondition, on
   const handleProceed = async () => {
     if (!prompt.trim() || isProcessing || !signedIn?._id) return;
 
+    handleClose();
+
     setIsProcessing(true);
+    showCustomAlert("Generating watchlist, redirecting...", "success", 0);
 
     try {
       // Combine topic context with user prompt
@@ -96,6 +110,7 @@ export default function TrackTopicModal({ visible, topic, suggestedCondition, on
       });
 
       if (result?.watchlist_id) {
+        inputRef.current?.clear();
         setPrompt("");
         onClose();
 
@@ -103,28 +118,38 @@ export default function TrackTopicModal({ visible, topic, suggestedCondition, on
           pathname: "/snoop/[id]",
           params: { id: result.watchlist_id },
         });
+
+        setTimeout(() => {
+          hideAlert();
+        }, 1500);
       }
     } catch (error) {
       console.error("Failed to create watchlist from topic:", error);
+      showCustomAlert(
+        "Failed to create watchlist. Please try again.",
+        "danger",
+      );
     } finally {
       setIsProcessing(false);
     }
   };
 
   const handleClose = () => {
-    bottomSheetRef.current?.close();
-    onClose();
+    Keyboard.dismiss();
+    bottomSheetRef.current?.dismiss();
+    inputRef.current?.clear();
+    setPrompt("");
   };
 
   return (
-    <BottomSheet
+    <BottomSheetModal
       ref={bottomSheetRef}
       snapPoints={snapPoints}
       enableContentPanningGesture={true}
       enableHandlePanningGesture={true}
       enableDynamicSizing={false}
       enableOverDrag={false}
-      index={-1}
+      index={0}
       onChange={handleSheetChanges}
       backdropComponent={renderBackdrop}
       backgroundStyle={{ backgroundColor: Colors[theme].card }}
@@ -145,16 +170,6 @@ export default function TrackTopicModal({ visible, topic, suggestedCondition, on
           >
             TRACK TOPIC
           </Text>
-          <Pressable onPress={handleClose} disabled={isProcessing}>
-            <Image
-              source={require("@/assets/icons/times.png")}
-              style={{
-                width: 16,
-                height: 16,
-                tintColor: Colors[theme].text_secondary,
-              }}
-            />
-          </Pressable>
         </View>
 
         {/* Content Centered Stack */}
@@ -186,8 +201,10 @@ export default function TrackTopicModal({ visible, topic, suggestedCondition, on
 
         {/* Prompt Input */}
         <View style={{ width: "100%" }}>
-          <TextInput
-            value={prompt}
+          <BottomSheetTextInput
+            ref={inputRef}
+            key={`${topic}-${suggestedCondition}`}
+            defaultValue={suggestedCondition || ""}
             onChangeText={setPrompt}
             onFocus={() => {
               setIsFocused(true);
@@ -195,7 +212,9 @@ export default function TrackTopicModal({ visible, topic, suggestedCondition, on
             }}
             onBlur={() => {
               setIsFocused(false);
-              bottomSheetRef.current?.snapToIndex(0);
+              if (visible && !isProcessing) {
+                bottomSheetRef.current?.snapToIndex(0);
+              }
             }}
             multiline
             maxLength={500}
@@ -283,7 +302,7 @@ export default function TrackTopicModal({ visible, topic, suggestedCondition, on
           </Pressable>
         </View>
       </BottomSheetView>
-    </BottomSheet>
+    </BottomSheetModal>
   );
 }
 

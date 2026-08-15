@@ -154,15 +154,15 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
   };
 
   const handleInputChange = (text: string) => {
-    // const urlRegex =
-    //   /(?:https?:\/\/)?([a-zA-Z0-9][-a-zA-Z0-9]*\.[a-zA-Z][-a-zA-Z0-9.]*[a-zA-Z]{2,}(?:\/[^\s]*)?)/g;
+    const urlRegex =
+      /(?:https?:\/\/)?([a-zA-Z0-9][-a-zA-Z0-9]*\.[a-zA-Z][-a-zA-Z0-9.]*[a-zA-Z]{2,}(?:\/[^\s]*)?)/g;
 
-    // const cleanedText = text.replace(urlRegex, (match) => {
-    //   if (match.length > 200 && match.includes("?")) {
-    //     return match.split("?")[0];
-    //   }
-    //   return match;
-    // });
+    const cleanedText = text.replace(urlRegex, (match) => {
+      if (match.length > 200 && match.includes("?")) {
+        return match.split("?")[0];
+      }
+      return match;
+    });
 
     setPrompt(text);
   };
