@@ -1,6 +1,6 @@
 "use node";
 
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { generateContentWithGemini } from "./openrouter";
 import { tavily } from "@tavily/core";
 import { v } from "convex/values";
 import { internalAction } from "./_generated/server";
@@ -23,16 +23,15 @@ export const search = internalAction({
   },
   handler: async (ctx, args) => {
     const tavilyKey = process.env.TAVILY_API_KEY;
-    const geminiKey = process.env.GOOGLE_GEMINI_API_KEY;
+    const openrouterKey = process.env.OPENROUTER_API_KEY;
 
     if (!tavilyKey) throw new Error("TAVILY_API_KEY is not set");
-    if (!geminiKey) throw new Error("GOOGLE_GEMINI_API_KEY is not set");
+    if (!openrouterKey) throw new Error("OPENROUTER_API_KEY is not set");
 
     let refinedQuery = args.query;
     let detectedTimeRange: "day" | "month" | "any_time" = "any_time";
 
     try {
-      const genAI = new GoogleGenerativeAI(geminiKey);
       let prunedForTavily: any[] = [];
       if (args.history && args.history.length > 0) {
         if (args.history.length <= 4) {
@@ -69,22 +68,7 @@ export const search = internalAction({
         New User Message: ${args.query}
         ${args.source ? `Target Source/URL: ${args.source}` : ""}`;
 
-      const model = genAI.getGenerativeModel({
-        model: "gemini-2.5-flash-lite",
-        systemInstruction,
-      });
-
-      const result = await model.generateContent(userPrompt);
-      const text = result.response.text().trim();
-
-      if (result.response.usageMetadata) {
-        console.log(
-          "Tavily Query Refinement - Input: ",
-          result.response.usageMetadata.promptTokenCount,
-          " Output: ",
-          result.response.usageMetadata.candidatesTokenCount,
-        );
-      }
+      const text = await generateContentWithGemini(userPrompt, systemInstruction, "google/gemini-2.5-flash-lite");
 
       if (text) {
         const lines = text.split("\n");

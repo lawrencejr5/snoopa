@@ -1,6 +1,6 @@
 "use node";
 
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { generateContentWithGemini } from "./openrouter";
 import OpenAI from "openai";
 import { internal } from "./_generated/api";
 import { internalAction } from "./_generated/server";
@@ -24,14 +24,14 @@ export const refresh_trending_topics = internalAction({
   handler: async (ctx) => {
     const firecrawl_key = process.env.FIRECRAWL_API_KEY;
     const deepseek_key = process.env.DEEPSEEK_API_KEY;
-    const gemini_key = process.env.GOOGLE_GEMINI_API_KEY;
+    const openrouter_key = process.env.OPENROUTER_API_KEY;
 
     if (!firecrawl_key) {
       console.error("[Trending] FIRECRAWL_API_KEY not set");
       return;
     }
-    if (!deepseek_key && !gemini_key) {
-      console.error("[Trending] Neither DEEPSEEK_API_KEY nor GOOGLE_GEMINI_API_KEY is set");
+    if (!deepseek_key && !openrouter_key) {
+      console.error("[Trending] Neither DEEPSEEK_API_KEY nor OPENROUTER_API_KEY is set");
       return;
     }
 
@@ -124,22 +124,17 @@ Extract exactly 10 trackable trending topics from this content.`;
     }
 
     // Gemini fallback
-    if (topics_json.length === 0 && gemini_key) {
+    if (topics_json.length === 0 && openrouter_key) {
       try {
-        const genAI = new GoogleGenerativeAI(gemini_key);
-        const model = genAI.getGenerativeModel({
-          model: "gemini-2.5-flash-lite",
-          systemInstruction: system_prompt,
-        });
-        const result = await model.generateContent(user_prompt);
-        let text = result.response.text().trim();
+        let text = await generateContentWithGemini(user_prompt, system_prompt, "google/gemini-2.5-flash-lite");
+        text = text.trim();
         // Strip markdown code fences if present
         text = text.replace(/^```[\w]*\n?/, "").replace(/\n?```$/, "").trim();
         const parsed = JSON.parse(text);
         topics_json = Array.isArray(parsed)
           ? parsed
           : parsed.topics ?? parsed.data ?? Object.values(parsed)[0] ?? [];
-        console.log(`[Trending] Gemini returned ${topics_json.length} topics`);
+        console.log(`[Trending] Gemini via OpenRouter returned ${topics_json.length} topics`);
       } catch (err) {
         console.error("[Trending] Gemini fallback also failed:", err);
         return;

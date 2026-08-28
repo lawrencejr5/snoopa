@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { generateContentWithGemini } from "./openrouter";
 import { v } from "convex/values";
 import OpenAI from "openai";
 import { internal } from "./_generated/api";
@@ -50,11 +50,7 @@ async function verifyHeadlineWithGemini(
   headline: string,
   snippet: string,
   condition: string,
-  geminiKey: string,
 ): Promise<boolean> {
-  const genAI = new GoogleGenerativeAI(geminiKey);
-  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
-
   const prompt = `You are a strict fact-checker. Given a news headline and snippet, determine whether it satisfies the following condition.
         Condition: "${condition}"
         Headline: "${headline}"
@@ -63,22 +59,17 @@ async function verifyHeadlineWithGemini(
         Reply with ONLY "true" if the condition is satisfied, or "false" if it is not. No explanation.`;
 
   try {
-    const result = await model.generateContent(prompt);
-    const text = result.response.text().trim().toLowerCase();
-    return text === "true";
+    const text = await generateContentWithGemini(prompt, undefined, "google/gemini-2.5-flash-lite");
+    return text.trim().toLowerCase() === "true";
   } catch (err) {
     console.warn(
       "Primary verification model failed, falling back to gemini-3.1-flash-lite",
     );
     try {
-      const fallbackModel = genAI.getGenerativeModel({
-        model: "gemini-3.1-flash-lite",
-      });
-      const result = await fallbackModel.generateContent(prompt);
-      const text = result.response.text().trim().toLowerCase();
-      return text === "true";
+      const text = await generateContentWithGemini(prompt, undefined, "google/gemini-3.1-flash-lite");
+      return text.trim().toLowerCase() === "true";
     } catch (fallbackErr) {
-      console.error("Gemini verification error:", fallbackErr);
+      console.error("OpenRouter Gemini verification error:", fallbackErr);
       return false;
     }
   }
@@ -87,11 +78,7 @@ async function verifyHeadlineWithGemini(
 async function verifySourceWithGemini(
   content: string,
   condition: string,
-  geminiKey: string,
 ): Promise<boolean> {
-  const genAI = new GoogleGenerativeAI(geminiKey);
-  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
-
   const prompt = `You are a strict fact-checker. Given the content of a web page, determine whether it satisfies the following condition.
         Condition: "${condition}"
         Content: "${content.substring(0, 15000)}"
@@ -99,22 +86,17 @@ async function verifySourceWithGemini(
         Reply with ONLY "true" if the condition is satisfied, or "false" if it is not. No explanation.`;
 
   try {
-    const result = await model.generateContent(prompt);
-    const text = result.response.text().trim().toLowerCase();
-    return text === "true";
+    const text = await generateContentWithGemini(prompt, undefined, "google/gemini-2.5-flash-lite");
+    return text.trim().toLowerCase() === "true";
   } catch (err) {
     console.warn(
       "Primary source verification model failed, falling back to gemini-3.1-flash-lite",
     );
     try {
-      const fallbackModel = genAI.getGenerativeModel({
-        model: "gemini-3.1-flash-lite",
-      });
-      const result = await fallbackModel.generateContent(prompt);
-      const text = result.response.text().trim().toLowerCase();
-      return text === "true";
+      const text = await generateContentWithGemini(prompt, undefined, "google/gemini-3.1-flash-lite");
+      return text.trim().toLowerCase() === "true";
     } catch (fallbackErr) {
-      console.error("Gemini source verification error:", fallbackErr);
+      console.error("OpenRouter Gemini source verification error:", fallbackErr);
       return false;
     }
   }
@@ -138,11 +120,9 @@ async function generateBrief(
   watchlistTitle: string,
   condition: string,
   headlines: VerifiedHeadline[],
-  geminiKey: string,
   deepseekKey: string,
   recentBriefs: string[] = [],
 ): Promise<string> {
-  const genAI = new GoogleGenerativeAI(geminiKey);
   const openai = new OpenAI({
     baseURL: "https://api.deepseek.com",
     apiKey: deepseekKey,
@@ -189,12 +169,8 @@ async function generateBrief(
       "DeepSeek primary model failed, falling back to gemini-2.5-flash-lite",
     );
     try {
-      const fallbackModel = genAI.getGenerativeModel({
-        model: "gemini-2.5-flash-lite",
-        systemInstruction: systemInstructions,
-      });
-      const result = await fallbackModel.generateContent(userPrompt);
-      return result.response.text().trim();
+      const text = await generateContentWithGemini(userPrompt, systemInstructions, "google/gemini-2.5-flash-lite");
+      return text.trim();
     } catch (fallbackErr) {
       console.error("Gemini brief generation error:", fallbackErr);
       // Fallback: use the first headline title
@@ -296,7 +272,6 @@ async function _processMonitoredSources(
   ctx: any,
   activeItems: any[],
   verifiedByItem: Map<string, { item: any; headlines: VerifiedHeadline[] }>,
-  geminiKey: string,
 ) {
   const watchlistIds = activeItems.map((i: any) => i._id);
   const allMonitoredSources = await ctx.runQuery(
@@ -350,7 +325,6 @@ async function _processMonitoredSources(
       const satisfied = await verifySourceWithGemini(
         snapshot,
         item.condition,
-        geminiKey,
       );
       sourceUpdates.push({ source, newHash, newSnapshot: snapshot, satisfied });
     }),
@@ -403,7 +377,6 @@ async function _runGeneralSearch(
   itemsForGeneralSearch: any[],
   processedSet: Set<string>,
   verifiedByItem: Map<string, { item: any; headlines: VerifiedHeadline[] }>,
-  geminiKey: string,
 ): Promise<Array<{ urlHash: string; watchlist_id: any }>> {
   // Build unique query configs (deduplicated by title+type+range)
   const queryMap = new Map<
@@ -497,7 +470,6 @@ async function _runGeneralSearch(
         headline.title,
         headline.content ?? "",
         item.condition,
-        geminiKey,
       );
 
       toMarkProcessed.push({ urlHash: headline.hash, watchlist_id: item._id });
@@ -534,7 +506,6 @@ async function _runGeneralSearch(
 async function _dispatchAlerts(
   ctx: any,
   verifiedByItem: Map<string, { item: any; headlines: VerifiedHeadline[] }>,
-  geminiKey: string,
   deepseekKey: string,
 ): Promise<number> {
   const PUSH_PREFIXES = [
@@ -560,7 +531,6 @@ async function _dispatchAlerts(
       item.title,
       item.condition,
       headlines,
-      geminiKey,
       deepseekKey,
       recent_briefs,
     );
@@ -631,10 +601,10 @@ async function _dispatchAlerts(
 export const run_firehose = internalAction({
   args: { tier: v.number() },
   handler: async (ctx, args) => {
-    const geminiKey = process.env.GOOGLE_GEMINI_API_KEY;
+    const openrouterKey = process.env.OPENROUTER_API_KEY;
     const deepseekKey = process.env.DEEPSEEK_API_KEY;
-    if (!geminiKey || !deepseekKey) {
-      console.error("Missing GOOGLE_GEMINI_API_KEY or DEEPSEEK_API_KEY");
+    if (!openrouterKey || !deepseekKey) {
+      console.error("Missing OPENROUTER_API_KEY or DEEPSEEK_API_KEY");
       return;
     }
 
@@ -716,7 +686,6 @@ export const run_firehose = internalAction({
         ctx,
         itemsToProcess,
         verifiedByItem,
-        geminiKey,
       );
 
     // 3B. Determine which items still need a general search
@@ -740,7 +709,6 @@ export const run_firehose = internalAction({
       itemsForGeneralSearch,
       processedSet,
       verifiedByItem,
-      geminiKey,
     );
 
     // 6. Flush processed headline entries
@@ -754,7 +722,6 @@ export const run_firehose = internalAction({
     const totalAlerts = await _dispatchAlerts(
       ctx,
       verifiedByItem,
-      geminiKey,
       deepseekKey,
     );
 

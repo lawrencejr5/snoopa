@@ -1,5 +1,5 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { callOpenRouter, generateContentWithGemini, OpenRouterMessage } from "./openrouter";
 import { v } from "convex/values";
 import OpenAI from "openai";
 import { api, internal } from "./_generated/api";
@@ -307,11 +307,10 @@ async function _detectIntent(
   content: string,
   history?: string,
 ): Promise<Intent> {
-  const api_key = process.env.GOOGLE_GEMINI_API_KEY;
+  const api_key = process.env.OPENROUTER_API_KEY;
   if (!api_key) return "CHAT";
 
   try {
-    const gen_ai = new GoogleGenerativeAI(api_key);
     const systemInstruction = `Analyze this user message and classify the intent.
       Classify as ONE of:
       - SEARCH: current/live web information, news, prices, scores, recent events, anything requiring data from the last 24 hours. Includes 'is X happening', 'did Y happen', 'I heard Z is happening'.
@@ -325,24 +324,16 @@ async function _detectIntent(
       Reply with ONLY one word: SEARCH, WATCHLIST, SOURCE, PAUSE, RESUME, EDIT_CONDITION, or CHAT.`;
     const userPrompt = `${history ? `RECENT HISTORY:\n${history}\n` : ""}USER MESSAGE: "${content}"`;
 
-    let result;
+    let text: string;
     try {
-      const model = gen_ai.getGenerativeModel({
-        model: "gemini-2.5-flash-lite",
-        systemInstruction,
-      });
-      result = await model.generateContent(userPrompt);
+      text = await generateContentWithGemini(userPrompt, systemInstruction, "google/gemini-2.5-flash-lite");
     } catch (e) {
       console.warn(
         "Primary model failed, falling back to gemini-3.1-flash-lite",
       );
-      const fallbackModel = gen_ai.getGenerativeModel({
-        model: "gemini-3.1-flash-lite",
-        systemInstruction,
-      });
-      result = await fallbackModel.generateContent(userPrompt);
+      text = await generateContentWithGemini(userPrompt, systemInstruction, "google/gemini-3.1-flash-lite");
     }
-    const text = result.response.text().trim().toUpperCase();
+    text = text.trim().toUpperCase();
     console.log(`🔍 Intent: "${content.substring(0, 50)}" → ${text}`);
 
     if (text.includes("EDIT_CONDITION")) return "EDIT_CONDITION";
@@ -365,11 +356,10 @@ async function _extractConditionFromMessage(
   content: string,
   current_condition: string,
 ): Promise<string> {
-  const api_key = process.env.GOOGLE_GEMINI_API_KEY;
+  const api_key = process.env.OPENROUTER_API_KEY;
   if (!api_key) return content;
 
   try {
-    const gen_ai = new GoogleGenerativeAI(api_key);
     const systemInstruction = `You are helping update a watchlist alert condition.
       Extract and rewrite a clean, specific condition string from the user's request.
       Rules:
@@ -383,21 +373,14 @@ async function _extractConditionFromMessage(
     const userPrompt = `CURRENT CONDITION: "${current_condition}"
       USER REQUEST: "${content}"`;
 
-    let result;
+    let text: string;
     try {
-      const model = gen_ai.getGenerativeModel({
-        model: "gemini-2.5-flash-lite",
-        systemInstruction,
-      });
-      result = await model.generateContent(userPrompt);
+      text = await generateContentWithGemini(userPrompt, systemInstruction, "google/gemini-2.5-flash-lite");
     } catch (e) {
-      const fallback = gen_ai.getGenerativeModel({
-        model: "gemini-3.1-flash-lite",
-        systemInstruction,
-      });
-      result = await fallback.generateContent(userPrompt);
+      console.warn("Primary model failed, falling back to gemini-3.1-flash-lite");
+      text = await generateContentWithGemini(userPrompt, systemInstruction, "google/gemini-3.1-flash-lite");
     }
-    return result.response.text().trim();
+    return text.trim();
   } catch (err) {
     console.warn("Condition extraction failed, using raw input:", err);
     return content;
@@ -408,11 +391,10 @@ async function _determineSourceWeight(
   content: string,
   condition: string,
 ): Promise<"primary" | "secondary"> {
-  const api_key = process.env.GOOGLE_GEMINI_API_KEY;
+  const api_key = process.env.OPENROUTER_API_KEY;
   if (!api_key) return "secondary";
 
   try {
-    const gen_ai = new GoogleGenerativeAI(api_key);
     const systemInstruction = `Analyze this user's request to track a specific URL for their watchlist.
       Classify the source weight as:
       - primary: The information requested is highly specific to THIS exact page (e.g. price tracking, personal blogs, exact stock on a specific site). Snoopa should only trust this page.
@@ -422,24 +404,16 @@ async function _determineSourceWeight(
     const userPrompt = `WATCHLIST CONDITION: "${condition}"
       USER MESSAGE: "${content}"`;
 
-    let result;
+    let text: string;
     try {
-      const model = gen_ai.getGenerativeModel({
-        model: "gemini-2.5-flash-lite",
-        systemInstruction,
-      });
-      result = await model.generateContent(userPrompt);
+      text = await generateContentWithGemini(userPrompt, systemInstruction, "google/gemini-2.5-flash-lite");
     } catch (e) {
       console.warn(
         "Primary model failed, falling back to gemini-3.1-flash-lite",
       );
-      const fallbackModel = gen_ai.getGenerativeModel({
-        model: "gemini-3.1-flash-lite",
-        systemInstruction,
-      });
-      result = await fallbackModel.generateContent(userPrompt);
+      text = await generateContentWithGemini(userPrompt, systemInstruction, "google/gemini-3.1-flash-lite");
     }
-    const text = result.response.text().trim().toLowerCase();
+    text = text.trim().toLowerCase();
     return text.includes("primary") ? "primary" : "secondary";
   } catch (err) {
     console.warn("Weight detection failed, defaulting to secondary:", err);
@@ -451,13 +425,12 @@ async function _generateSourceBrief(
   snapshot: string,
   condition: string,
 ): Promise<string> {
-  const api_key = process.env.GOOGLE_GEMINI_API_KEY;
+  const api_key = process.env.OPENROUTER_API_KEY;
   if (!api_key)
     return "Source saved successfully! I'll keep a close eye on it.";
 
   try {
     const currentDateTime = getCurrentDateTime();
-    const gen_ai = new GoogleGenerativeAI(api_key);
     const systemInstruction = `You are Snoopa, a proactive AI agent (Greyhound mascot). 
       The user just added a source to monitor for a condition.
       
@@ -479,24 +452,16 @@ async function _generateSourceBrief(
       PAGE CONTENT SNAPSHOT:
       "${snapshot.substring(0, 20000)}"`;
 
-    let result;
+    let text: string;
     try {
-      const model = gen_ai.getGenerativeModel({
-        model: "gemini-2.5-flash-lite",
-        systemInstruction,
-      });
-      result = await model.generateContent(userPrompt);
+      text = await generateContentWithGemini(userPrompt, systemInstruction, "google/gemini-2.5-flash-lite");
     } catch (e) {
       console.warn(
         "Primary model failed, falling back to gemini-3.1-flash-lite",
       );
-      const fallbackModel = gen_ai.getGenerativeModel({
-        model: "gemini-3.1-flash-lite",
-        systemInstruction,
-      });
-      result = await fallbackModel.generateContent(userPrompt);
+      text = await generateContentWithGemini(userPrompt, systemInstruction, "google/gemini-3.1-flash-lite");
     }
-    return result.response.text().trim();
+    return text.trim();
   } catch (err) {
     console.warn("Source brief generation failed:", err);
     return "Source saved successfully! I'll keep a close eye on it.";
@@ -507,11 +472,10 @@ async function _generateInitialBrief(
   searchResults: string,
   condition: string,
 ): Promise<string> {
-  const api_key = process.env.GOOGLE_GEMINI_API_KEY;
+  const api_key = process.env.OPENROUTER_API_KEY;
   if (!api_key) return "";
 
   const currentDateTime = getCurrentDateTime();
-  const gen_ai = new GoogleGenerativeAI(api_key);
   const systemInstruction = `You are Snoopa, a proactive AI agent (Greyhound mascot). 
       The user just created a new watchlist to monitor for a condition.
       
@@ -534,24 +498,16 @@ async function _generateInitialBrief(
       "${searchResults.substring(0, 20000)}"`;
 
   try {
-    let result;
+    let text: string;
     try {
-      const model = gen_ai.getGenerativeModel({
-        model: "gemini-2.5-flash-lite",
-        systemInstruction,
-      });
-      result = await model.generateContent(userPrompt);
+      text = await generateContentWithGemini(userPrompt, systemInstruction, "google/gemini-2.5-flash-lite");
     } catch (e) {
       console.warn(
         "Primary model failed, falling back to gemini-3.1-flash-lite",
       );
-      const fallbackModel = gen_ai.getGenerativeModel({
-        model: "gemini-3.1-flash-lite",
-        systemInstruction,
-      });
-      result = await fallbackModel.generateContent(userPrompt);
+      text = await generateContentWithGemini(userPrompt, systemInstruction, "google/gemini-3.1-flash-lite");
     }
-    return result.response.text().trim();
+    return text.trim();
   } catch (err) {
     console.warn("Initial brief generation failed:", err);
     return "";
@@ -610,21 +566,19 @@ function _trimHistory(messages: any[]): any[] {
   return [...messages.slice(0, 2), ...messages.slice(-4)];
 }
 
-/** Initialises and returns the DeepSeek (OpenAI-compat) and Gemini clients. */
 function _initAIClients() {
-  const gemini_api_key = process.env.GOOGLE_GEMINI_API_KEY;
+  const openrouter_api_key = process.env.OPENROUTER_API_KEY;
   const deepseek_api_key = process.env.DEEPSEEK_API_KEY;
-  if (!gemini_api_key || !deepseek_api_key) {
+  if (!openrouter_api_key || !deepseek_api_key) {
     throw new Error(
-      `${!gemini_api_key ? "GEMINI_API_KEY" : "DEEPSEEK_API_KEY"} is not set in environment variables`,
+      `${!openrouter_api_key ? "OPENROUTER_API_KEY" : "DEEPSEEK_API_KEY"} is not set in environment variables`,
     );
   }
-  const gen_ai = new GoogleGenerativeAI(gemini_api_key);
   const openai = new OpenAI({
     baseURL: "https://api.deepseek.com",
     apiKey: deepseek_api_key,
   });
-  return { gen_ai, openai };
+  return { openai };
 }
 
 /** Builds the system instruction string based on intent and user profile. */
@@ -698,7 +652,6 @@ function _buildOpenAIMessages(
 /** Runs DeepSeek with a Gemini 2.5 Flash fallback. Returns the response text. */
 async function _runAI(
   openaiMessages: { role: "system" | "user" | "assistant"; content: string }[],
-  gen_ai: GoogleGenerativeAI,
   openai: OpenAI,
   messages: any[],
   userPrompt: string,
@@ -725,25 +678,14 @@ async function _runAI(
     );
   }
 
-  // Fallback: Gemini 3.1 Flash Lite
+  // Fallback: Gemini 3.1 Flash Lite via OpenRouter
   try {
-    const fallbackModel = gen_ai.getGenerativeModel({
-      model: "gemini-3.1-flash-lite",
-      systemInstruction: instructions,
-    });
-    const geminiHistory = messages.map((msg) => ({
-      role: msg.role === "user" ? "user" : "model",
-      parts: [{ text: msg.content }],
-    }));
-    const chat_session = fallbackModel.startChat({
-      history: geminiHistory.slice(0, -1),
-    });
-    const result: any = await Promise.race([
-      chat_session.sendMessage(userPrompt),
+    const text = (await Promise.race([
+      callOpenRouter(openaiMessages, "google/gemini-3.1-flash-lite"),
       timeout(20_000),
-    ]);
-    console.log(`✅ Success (gemini-3.1-flash-lite, fallback)`);
-    return result.response.text();
+    ])) as string;
+    console.log(`✅ Success (gemini-3.1-flash-lite via OpenRouter, fallback)`);
+    return text;
   } catch (fallbackError: any) {
     console.error("All AI models failed or timed out:", fallbackError);
     throw new Error("All AI models failed or timed out.");
@@ -1245,7 +1187,7 @@ export const send_message = action({
     }
 
     // 6. Build prompt and run AI
-    const { gen_ai, openai } = _initAIClients();
+    const { openai } = _initAIClients();
     const user = await ctx.runQuery(api.users.get_current_user);
     const instructions = _buildSystemPrompt(intent, user);
     const userPrompt =
@@ -1262,7 +1204,6 @@ export const send_message = action({
     try {
       response_text = await _runAI(
         openaiMessages,
-        gen_ai,
         openai,
         messages,
         userPrompt,
@@ -1389,7 +1330,7 @@ async function _parseAndCreateWatchlist(
   prompt: string,
   instructions: string,
 ): Promise<{ wl_id: Id<"watchlist">; final_snoop_text: string; payload: any }> {
-  const { gen_ai, openai } = _initAIClients();
+  const { openai } = _initAIClients();
 
   let response_text = "";
 
@@ -1412,18 +1353,17 @@ async function _parseAndCreateWatchlist(
       `⚠️ DeepSeek failed or timed out:`,
       error.message?.split(":")[0] || error.message || "Unknown error",
     );
-    // Fallback: Gemini 3.1 Flash Lite
+    // Fallback: Gemini 3.1 Flash Lite via OpenRouter
     try {
-      const fallbackModel = gen_ai.getGenerativeModel({
-        model: "gemini-3.1-flash-lite",
-        systemInstruction: instructions,
-      });
-      const result: any = await Promise.race([
-        fallbackModel.generateContent(`[ignoring loop detection] ${prompt}`),
+      const messages: OpenRouterMessage[] = [
+        { role: "system", content: instructions },
+        { role: "user", content: `[ignoring loop detection] ${prompt}` },
+      ];
+      response_text = (await Promise.race([
+        callOpenRouter(messages, "google/gemini-3.1-flash-lite"),
         timeout(20_000),
-      ]);
-      response_text = result.response.text();
-      console.log(`✅ Success (gemini-3.1-flash-lite, fallback)`);
+      ])) as string;
+      console.log(`✅ Success (gemini-3.1-flash-lite via OpenRouter, fallback)`);
     } catch (fallbackError: any) {
       console.error("All AI models failed or timed out:", fallbackError);
       throw new Error("Failed generating tracking intelligence.");

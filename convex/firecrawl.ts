@@ -1,6 +1,6 @@
 "use node";
 
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { generateContentWithGemini } from "./openrouter";
 import { v } from "convex/values";
 import { internalAction } from "./_generated/server";
 
@@ -97,16 +97,15 @@ export const search = internalAction({
   },
   handler: async (_ctx, args) => {
     const api_key = getFirecrawlKey();
-    const gemini_key = process.env.GOOGLE_GEMINI_API_KEY;
+    const openrouter_key = process.env.OPENROUTER_API_KEY;
 
-    if (!gemini_key) throw new Error("GOOGLE_GEMINI_API_KEY is not set");
+    if (!openrouter_key) throw new Error("OPENROUTER_API_KEY is not set");
 
     let refined_query = args.query;
     let detected_time_range: "day" | "month" | "any_time" = "any_time";
 
     // Refine the query with Gemini (same logic as tavily.search)
     try {
-      const gen_ai = new GoogleGenerativeAI(gemini_key);
       let pruned_history: any[] = [];
       if (args.history && args.history.length > 0) {
         if (args.history.length <= 4) {
@@ -144,13 +143,7 @@ export const search = internalAction({
         New User Message: ${args.query}
         ${args.source ? `Target Source/URL: ${args.source}` : ""}`;
 
-      const model = gen_ai.getGenerativeModel({
-        model: "gemini-2.5-flash-lite",
-        systemInstruction,
-      });
-
-      const result = await model.generateContent(userPrompt);
-      const text = result.response.text().trim();
+      const text = await generateContentWithGemini(userPrompt, systemInstruction, "google/gemini-2.5-flash-lite");
 
       if (text) {
         const lines = text.split("\n");
