@@ -162,14 +162,17 @@ export const signOutAdmin = mutation({
 export const getAdminStats = query({
   args: {},
   handler: async (ctx) => {
-    const [users, watchlists, waitlist, feedbacks, snoops, adViews, authAccounts] = await Promise.all([
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+
+    const [users, watchlists, feedbacks, snoops, adViews, authAccounts, chats] = await Promise.all([
       ctx.db.query("users").collect(),
       ctx.db.query("watchlist").collect(),
-      ctx.db.query("waitlist").collect(),
       ctx.db.query("feedbacks").collect(),
       ctx.db.query("snoops").collect(),
       ctx.db.query("ad_views").collect(),
       ctx.db.query("authAccounts").collect(),
+      ctx.db.query("chats").collect(),
     ]);
 
     const tierCounts = {
@@ -180,15 +183,7 @@ export const getAdminStats = query({
     };
 
     let totalPremium = 0;
-    let iosCount = 0;
-    let androidCount = 0;
-    let webCount = 0;
     const countryCounts: Record<string, number> = {};
-
-    const appleUsers = new Set<string>();
-    authAccounts.forEach((acc) => {
-      if (acc.userId && acc.provider === "apple") appleUsers.add(acc.userId);
-    });
 
     users.forEach((u: any) => {
       const tier = u.sub_tier || u.plan || "free";
@@ -199,21 +194,31 @@ export const getAdminStats = query({
         totalPremium++;
       }
 
-      // Calculate OS from DB field or Apple Auth / Push tokens
-      const userOs = u.os || (appleUsers.has(u._id) ? "ios" : (u.pushTokens && u.pushTokens.length > 0 ? "ios" : "android"));
-      if (userOs === "ios") iosCount++;
-      else if (userOs === "android") androidCount++;
-      else webCount++;
-
-      // Country count
       const c = u.country || "US";
       countryCounts[c] = (countryCounts[c] || 0) + 1;
     });
 
+    // 1. Calculate OS Platform Source directly from authAccounts.provider field
+    let appleProviderCount = 0;
+    let googleProviderCount = 0;
+    let otherProviderCount = 0;
+
+    authAccounts.forEach((acc) => {
+      if (acc.provider === "apple") appleProviderCount++;
+      else if (acc.provider === "google") googleProviderCount++;
+      else otherProviderCount++;
+    });
+
+    // Fallback if authAccounts is empty in dev
+    if (authAccounts.length === 0) {
+      appleProviderCount = users.filter((u: any) => u.os === "ios").length || 1;
+      googleProviderCount = users.filter((u: any) => u.os === "android").length || 1;
+    }
+
     const storeSplit = [
-      { name: "iOS", value: iosCount || 1, color: "#6aaa66" },
-      { name: "Android", value: androidCount || 1, color: "#F4D03F" },
-      ...(webCount > 0 ? [{ name: "Web App", value: webCount, color: "#e2e2bb" }] : []),
+      { name: "Apple (iOS)", value: appleProviderCount, color: "#6aaa66" },
+      { name: "Google (Android)", value: googleProviderCount, color: "#F4D03F" },
+      ...(otherProviderCount > 0 ? [{ name: "Email / Other", value: otherProviderCount, color: "#e2e2bb" }] : []),
     ];
 
     const countryDistribution = Object.entries(countryCounts).map(([code, count]) => ({
@@ -222,6 +227,24 @@ export const getAdminStats = query({
       count,
     }));
 
+    // 2. Snoops Used (Month vs All Time) calculated from snoops table: (snoops - remaining)
+    let totalSnoopsUsedAllTime = 0;
+    let snoopsUsedThisMonth = 0;
+
+    snoops.forEach((s) => {
+      const used = Math.max(0, (s.snoops || 0) - (s.remaining || 0));
+      totalSnoopsUsedAllTime += used;
+
+      if (s._creationTime >= startOfMonth) {
+        snoopsUsedThisMonth += used;
+      }
+    });
+
+    // 3. Ad Views (Month vs All Time)
+    const totalAdViewsAllTime = adViews.length;
+    const adViewsThisMonth = adViews.filter((a) => (a.viewed_at || a._creationTime) >= startOfMonth).length;
+
+    // 4. Watchlist Status
     const watchlistStatus = {
       active: 0,
       completed: 0,
@@ -234,18 +257,17 @@ export const getAdminStats = query({
       }
     });
 
-    const totalSnoopsRemaining = snoops.reduce((acc, s) => acc + (s.remaining || 0), 0);
-
     return {
       totalUsers: users.length,
       totalPremiumUsers: totalPremium,
       tierCounts,
       totalWatchlists: watchlists.length,
       watchlistStatus,
-      totalWaitlist: waitlist.length,
       totalFeedbacks: feedbacks.length,
-      totalSnoopsRemaining,
-      totalAdViews: adViews.length,
+      snoopsUsedThisMonth,
+      totalSnoopsUsedAllTime,
+      adViewsThisMonth,
+      totalAdViewsAllTime,
       storeSplit,
       countryDistribution: countryDistribution.length > 0 ? countryDistribution : [{ country: "United States", code: "US", count: users.length }],
       recentUsers: users

@@ -39,8 +39,8 @@ export default function Header({
     <header className="top-header">
       <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
         <h2 className="header-title font-header">{title}</h2>
-        <span className="badge badge-green" style={{ fontSize: 11 }}>
-          <ShieldAlert style={{ width: 12, height: 12 }} /> Convex Dev
+        <span className="badge badge-muted" style={{ fontSize: 11 }}>
+          <ShieldAlert style={{ width: 12, height: 12 }} /> Production
         </span>
       </div>
 

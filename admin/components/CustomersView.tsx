@@ -52,7 +52,7 @@ export default function CustomersView() {
                 {users.length} {users.length === 1 ? "Customer" : "Customers"}
               </span>
             )}
-            <span className="badge badge-green" style={{ fontSize: 11 }}>
+            <span className="badge badge-muted" style={{ fontSize: 11 }}>
               <ShieldCheck style={{ width: 12, height: 12 }} /> Convex Real-time DB
             </span>
           </div>

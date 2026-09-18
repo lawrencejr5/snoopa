@@ -8,6 +8,8 @@ import {
   Smartphone,
   Globe,
   Eye,
+  MessageSquare,
+  CheckCircle2,
 } from "lucide-react";
 import {
   PieChart,
@@ -41,8 +43,8 @@ export default function AnalyticsView() {
   ];
 
   const storeData = stats.storeSplit || [
-    { name: "iOS", value: 50, color: "#6aaa66" },
-    { name: "Android", value: 50, color: "#F4D03F" },
+    { name: "Apple (iOS)", value: 1, color: "#6aaa66" },
+    { name: "Google (Android)", value: 1, color: "#F4D03F" },
   ];
 
   const countries = stats.countryDistribution || [
@@ -53,6 +55,7 @@ export default function AnalyticsView() {
     <div>
       {/* KPI Cards Row */}
       <div className="metrics-grid">
+        {/* Card 1: Total Customers */}
         <div className="card">
           <div className="metric-header">
             <span className="metric-title">Total Customers</span>
@@ -70,6 +73,7 @@ export default function AnalyticsView() {
           </div>
         </div>
 
+        {/* Card 2: Active Subscriptions */}
         <div className="card">
           <div className="metric-header">
             <span className="metric-title">Active Subscriptions</span>
@@ -83,31 +87,31 @@ export default function AnalyticsView() {
           </div>
         </div>
 
+        {/* Card 3: Snoops Used (This Month vs All Time) */}
         <div className="card">
           <div className="metric-header">
-            <span className="metric-title">OS Platform Split</span>
+            <span className="metric-title">Snoops Used (This Month)</span>
             <div className="metric-icon-wrap">
-              <Smartphone style={{ width: 18, height: 18, color: "var(--accent-warning)" }} />
+              <MessageSquare style={{ width: 18, height: 18, color: "var(--accent-warning)" }} />
             </div>
           </div>
-          <div className="metric-value" style={{ fontSize: 20 }}>
-            iOS vs Android
-          </div>
-          <div className="metric-sub">
-            <span className="badge badge-green" style={{ fontSize: 10 }}>Convex Native Database</span>
+          <div className="metric-value">{stats.snoopsUsedThisMonth}</div>
+          <div className="metric-sub" style={{ fontSize: 11, color: "var(--text-secondary)" }}>
+            Total Snoops Used: <strong style={{ color: "var(--text-primary)" }}>{stats.totalSnoopsUsedAllTime}</strong> All-Time
           </div>
         </div>
 
+        {/* Card 4: Ad Views (This Month vs All Time) */}
         <div className="card">
           <div className="metric-header">
-            <span className="metric-title">Snoops & Ad Views</span>
+            <span className="metric-title">Ad Views (This Month)</span>
             <div className="metric-icon-wrap">
               <Eye style={{ width: 18, height: 18, color: "var(--accent-milk)" }} />
             </div>
           </div>
-          <div className="metric-value">{stats.totalAdViews}</div>
-          <div className="metric-sub">
-            {stats.totalSnoopsRemaining} Snoops in circulation
+          <div className="metric-value">{stats.adViewsThisMonth}</div>
+          <div className="metric-sub" style={{ fontSize: 11, color: "var(--text-secondary)" }}>
+            Total Ad Views: <strong style={{ color: "var(--text-primary)" }}>{stats.totalAdViewsAllTime}</strong> All-Time
           </div>
         </div>
       </div>
@@ -148,7 +152,7 @@ export default function AnalyticsView() {
         <div className="card chart-card-sm">
           <div className="card-title-row">
             <h3 className="card-title font-header">OS Platform Source</h3>
-            <span className="badge badge-green">Convex DB</span>
+            <span className="badge badge-muted">authAccounts</span>
           </div>
           <div style={{ width: "100%", height: 200, display: "flex", alignItems: "center", justifyContent: "center" }}>
             <ResponsiveContainer width="100%" height="100%">
@@ -226,7 +230,7 @@ export default function AnalyticsView() {
         <div className="card chart-card-lg">
           <div className="card-title-row">
             <h3 className="card-title font-header">Watchlists & Snoopa Activity</h3>
-            <span className="badge badge-gold">Fact Hunting</span>
+            <span className="badge badge-muted">Fact Hunting</span>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, marginBottom: 20 }}>
             <div style={{ padding: 16, backgroundColor: "var(--bg-input)", borderRadius: 10, border: "1px solid var(--border-color)" }}>
@@ -240,9 +244,9 @@ export default function AnalyticsView() {
               </div>
             </div>
             <div style={{ padding: 16, backgroundColor: "var(--bg-input)", borderRadius: 10, border: "1px solid var(--border-color)" }}>
-              <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>Waitlist Signups</div>
-              <div style={{ fontSize: 24, fontWeight: 700, color: "var(--accent-warning)", fontFamily: "var(--font-header)" }}>
-                {stats.totalWaitlist}
+              <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>Completed Tracking</div>
+              <div style={{ fontSize: 24, fontWeight: 700, color: "var(--accent-milk)", fontFamily: "var(--font-header)" }}>
+                {stats.watchlistStatus.completed}
               </div>
             </div>
           </div>

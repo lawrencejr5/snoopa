@@ -69,7 +69,7 @@ export default function WaitlistFeedbackView() {
             <h3 className="card-title font-header" style={{ fontSize: 18 }}>
               Early Access Waitlist
             </h3>
-            <span className="badge badge-gold">{waitlists.length} Waitlist Registrations</span>
+            <span className="badge badge-muted">{waitlists.length} Registrations</span>
           </div>
 
           {waitlists.length === 0 ? (
@@ -136,7 +136,7 @@ export default function WaitlistFeedbackView() {
             <h3 className="card-title font-header" style={{ fontSize: 18 }}>
               User Feedback Submissions
             </h3>
-            <span className="badge badge-green">{feedbacks.length} Submissions</span>
+            <span className="badge badge-muted">{feedbacks.length} Submissions</span>
           </div>
 
           {feedbacks.length === 0 ? (
