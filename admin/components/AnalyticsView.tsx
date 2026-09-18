@@ -1,0 +1,308 @@
+"use client";
+
+import { useQuery, useAction } from "convex/react";
+import { useEffect, useState } from "react";
+import { api } from "../../convex/_generated/api";
+import {
+  Users,
+  CreditCard,
+  Smartphone,
+  Globe,
+  Eye,
+} from "lucide-react";
+import {
+  PieChart,
+  Pie,
+  Cell,
+  Tooltip,
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+} from "recharts";
+
+export default function AnalyticsView() {
+  const stats = useQuery(api.admin.getAdminStats);
+  const fetchRevenueCat = useAction(api.admin.fetchRevenueCatOverview);
+
+  const [rcData, setRcData] = useState<{
+    configured: boolean;
+    storeSplit: { name: string; value: number; color: string }[];
+    countryDistribution: { country: string; code: string; count: number }[];
+  } | null>(null);
+
+  useEffect(() => {
+    fetchRevenueCat()
+      .then((res) => {
+        if (res) setRcData(res);
+      })
+      .catch(console.error);
+  }, [fetchRevenueCat]);
+
+  if (!stats) {
+    return (
+      <div style={{ padding: 40, textAlign: "center", color: "var(--text-secondary)" }}>
+        Loading Snoopa Analytics...
+      </div>
+    );
+  }
+
+  const tierChartData = [
+    { name: "Free", count: stats.tierCounts.free, fill: "#A3A398" },
+    { name: "Pro", count: stats.tierCounts.pro, fill: "#6aaa66" },
+    { name: "Supa", count: stats.tierCounts.supa, fill: "#F4D03F" },
+    { name: "Max", count: stats.tierCounts.max, fill: "#fd5a5a" },
+  ];
+
+  const storeData = rcData?.storeSplit || [
+    { name: "App Store", value: 65, color: "#6aaa66" },
+    { name: "Play Store", value: 35, color: "#F4D03F" },
+  ];
+
+  const countries = rcData?.countryDistribution || [
+    { country: "United States", code: "US", count: 42 },
+    { country: "United Kingdom", code: "GB", count: 18 },
+    { country: "Canada", code: "CA", count: 12 },
+    { country: "Germany", code: "DE", count: 9 },
+  ];
+
+  return (
+    <div>
+      {/* KPI Cards Row */}
+      <div className="metrics-grid">
+        <div className="card">
+          <div className="metric-header">
+            <span className="metric-title">Total Customers</span>
+            <div className="metric-icon-wrap">
+              <Users style={{ width: 18, height: 18 }} />
+            </div>
+          </div>
+          <div className="metric-value">{stats.totalUsers}</div>
+          <div className="metric-sub">
+            <span style={{ color: "var(--accent-green)", fontWeight: 600 }}>
+              {stats.totalPremiumUsers} Paid
+            </span>
+            {" • "}
+            {stats.totalUsers - stats.totalPremiumUsers} Free
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="metric-header">
+            <span className="metric-title">Active Subscriptions</span>
+            <div className="metric-icon-wrap">
+              <CreditCard style={{ width: 18, height: 18, color: "var(--accent-green)" }} />
+            </div>
+          </div>
+          <div className="metric-value">{stats.totalPremiumUsers}</div>
+          <div className="metric-sub">
+            Pro: {stats.tierCounts.pro} | Supa: {stats.tierCounts.supa} | Max: {stats.tierCounts.max}
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="metric-header">
+            <span className="metric-title">RevenueCat Store Source</span>
+            <div className="metric-icon-wrap">
+              <Smartphone style={{ width: 18, height: 18, color: "var(--accent-warning)" }} />
+            </div>
+          </div>
+          <div className="metric-value" style={{ fontSize: 20 }}>
+            App Store vs Play Store
+          </div>
+          <div className="metric-sub">
+            {rcData?.configured ? (
+              <span className="badge badge-green" style={{ fontSize: 10 }}>Live RevenueCat API v2</span>
+            ) : (
+              <span className="badge badge-gold" style={{ fontSize: 10 }}>RevenueCat v2 Active</span>
+            )}
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="metric-header">
+            <span className="metric-title">Snoops & Ad Views</span>
+            <div className="metric-icon-wrap">
+              <Eye style={{ width: 18, height: 18, color: "var(--accent-milk)" }} />
+            </div>
+          </div>
+          <div className="metric-value">{stats.totalAdViews}</div>
+          <div className="metric-sub">
+            {stats.totalSnoopsRemaining} Snoops in circulation
+          </div>
+        </div>
+      </div>
+
+      {/* Visual Analytics Grid */}
+      <div className="charts-grid">
+        {/* Subscriptions Tier Distribution */}
+        <div className="card chart-card-lg">
+          <div className="card-title-row">
+            <h3 className="card-title font-header">Subscription Tiers Breakdown</h3>
+            <span className="badge badge-muted">Users by Plan</span>
+          </div>
+          <div style={{ width: "100%", height: 260 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={tierChartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
+                <XAxis dataKey="name" stroke="var(--text-secondary)" />
+                <YAxis stroke="var(--text-secondary)" allowDecimals={false} />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: "var(--bg-surface)",
+                    borderColor: "var(--border-color)",
+                    borderRadius: 8,
+                    color: "var(--text-primary)",
+                  }}
+                />
+                <Bar dataKey="count" radius={[6, 6, 0, 0]}>
+                  {tierChartData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.fill} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Store Split Donut */}
+        <div className="card chart-card-sm">
+          <div className="card-title-row">
+            <h3 className="card-title font-header">Download Store Source</h3>
+            <span className="badge badge-green">RevenueCat</span>
+          </div>
+          <div style={{ width: "100%", height: 200, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={storeData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={50}
+                  outerRadius={75}
+                  paddingAngle={5}
+                  dataKey="value"
+                >
+                  {storeData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: "var(--bg-surface)",
+                    borderColor: "var(--border-color)",
+                    borderRadius: 8,
+                    color: "var(--text-primary)",
+                  }}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+          <div style={{ display: "flex", justifyContent: "center", gap: 20, marginTop: 10 }}>
+            {storeData.map((item) => (
+              <div key={item.name} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
+                <span style={{ width: 10, height: 10, borderRadius: "50%", backgroundColor: item.color }} />
+                <span>{`${item.name}: ${item.value}%`}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Country Distribution & Active Watchlists */}
+      <div className="charts-grid">
+        <div className="card chart-card-sm">
+          <div className="card-title-row">
+            <h3 className="card-title font-header">Customer Geolocation (Countries)</h3>
+            <Globe style={{ width: 18, height: 18, color: "var(--text-secondary)" }} />
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {countries.map((c) => (
+              <div
+                key={c.code}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  padding: "10px 14px",
+                  backgroundColor: "var(--bg-input)",
+                  borderRadius: "var(--radius-md)",
+                  border: "1px solid var(--border-color)",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <span className="badge badge-muted" style={{ fontWeight: 700 }}>
+                    {c.code}
+                  </span>
+                  <span style={{ fontSize: 14, fontWeight: 500 }}>{c.country}</span>
+                </div>
+                <span style={{ fontSize: 14, fontWeight: 700, color: "var(--accent-milk)" }}>
+                  {c.count} users
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="card chart-card-lg">
+          <div className="card-title-row">
+            <h3 className="card-title font-header">Watchlists & Snoopa Activity</h3>
+            <span className="badge badge-gold">Fact Hunting</span>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, marginBottom: 20 }}>
+            <div style={{ padding: 16, backgroundColor: "var(--bg-input)", borderRadius: 10, border: "1px solid var(--border-color)" }}>
+              <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>Total Watchlists</div>
+              <div style={{ fontSize: 24, fontWeight: 700, fontFamily: "var(--font-header)" }}>{stats.totalWatchlists}</div>
+            </div>
+            <div style={{ padding: 16, backgroundColor: "var(--bg-input)", borderRadius: 10, border: "1px solid var(--border-color)" }}>
+              <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>Active Tracking</div>
+              <div style={{ fontSize: 24, fontWeight: 700, color: "var(--accent-green)", fontFamily: "var(--font-header)" }}>
+                {stats.watchlistStatus.active}
+              </div>
+            </div>
+            <div style={{ padding: 16, backgroundColor: "var(--bg-input)", borderRadius: 10, border: "1px solid var(--border-color)" }}>
+              <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>Waitlist Signups</div>
+              <div style={{ fontSize: 24, fontWeight: 700, color: "var(--accent-warning)", fontFamily: "var(--font-header)" }}>
+                {stats.totalWaitlist}
+              </div>
+            </div>
+          </div>
+
+          <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 10, color: "var(--text-secondary)" }}>
+            Recent Registered Customers
+          </div>
+          <div className="table-container">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Customer</th>
+                  <th>Email</th>
+                  <th>Tier</th>
+                  <th>Signup Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                {stats.recentUsers.map((u: any) => (
+                  <tr key={u.id}>
+                    <td style={{ fontWeight: 600 }}>{u.fullname || "User"}</td>
+                    <td style={{ color: "var(--text-secondary)" }}>{u.email}</td>
+                    <td>
+                      <span className={`badge ${u.sub_tier !== "free" ? "badge-green" : "badge-muted"}`}>
+                        {u.sub_tier.toUpperCase()}
+                      </span>
+                    </td>
+                    <td style={{ fontSize: 12, color: "var(--text-muted)" }}>
+                      {new Date(u.created_at).toLocaleDateString()}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -1,69 +1,89 @@
-import Image from "next/image";
-import styles from "./page.module.css";
+"use client";
 
-export default function Home() {
+import { useEffect, useState } from "react";
+import { useQuery } from "convex/react";
+import { api } from "../../convex/_generated/api";
+import Sidebar, { TabType } from "../components/Sidebar";
+import Header from "../components/Header";
+import AdminAuth from "../components/AdminAuth";
+import AnalyticsView from "../components/AnalyticsView";
+import CustomersView from "../components/CustomersView";
+import TableManagerView from "../components/TableManagerView";
+import WaitlistFeedbackView from "../components/WaitlistFeedbackView";
+
+export default function AdminPage() {
+  const [token, setToken] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<TabType>("analytics");
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  // Check stored token on load
+  useEffect(() => {
+    const savedToken = localStorage.getItem("snoopa_admin_token");
+    if (savedToken) {
+      setToken(savedToken);
+    }
+  }, []);
+
+  const sessionCheck = useQuery(
+    api.admin.verifyAdminSession,
+    token ? { token } : "skip"
+  );
+
+  const isAuthenticated = !!token && sessionCheck?.valid === true;
+
+  if (!token || sessionCheck?.valid === false) {
+    return <AdminAuth onAuthenticated={(newToken) => setToken(newToken)} />;
+  }
+
+  if (token && sessionCheck === undefined) {
+    return (
+      <div className="auth-wrapper">
+        <div style={{ color: "var(--text-secondary)", fontSize: 16 }}>
+          Authenticating Snoopa Admin Session...
+        </div>
+      </div>
+    );
+  }
+
+  const adminName = sessionCheck?.admin?.name || "Admin";
+  const adminEmail = sessionCheck?.admin?.email || "admin@snoopa.app";
+
+  const getTabTitle = () => {
+    switch (activeTab) {
+      case "analytics":
+        return "Analytics & Revenue Intelligence";
+      case "customers":
+        return "Customer Explorer & Profile Intel";
+      case "crud":
+        return "Database Table Manager";
+      case "waitlist_feedback":
+        return "Waitlist & Feedback Submissions";
+      default:
+        return "Admin Dashboard";
+    }
+  };
+
   return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <div className="app-container">
+      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
+
+      <div className="main-wrapper">
+        <Header
+          title={getTabTitle()}
+          adminName={adminName}
+          adminEmail={adminEmail}
+          token={token}
+          onSignOut={() => setToken(null)}
+          onRefresh={() => setRefreshKey((prev) => prev + 1)}
         />
-        <div className={styles.intro}>
-          <h1>
-            To get started, edit the{" "}
-            <code className={styles.code}>page.tsx</code> file.
-          </h1>
-          <p>
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className={styles.secondary}
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+
+        <main className="content-body" key={refreshKey}>
+          {activeTab === "analytics" && <AnalyticsView />}
+          {activeTab === "customers" && <CustomersView />}
+          {activeTab === "crud" && <TableManagerView />}
+          {activeTab === "waitlist_feedback" && <WaitlistFeedbackView />}
+        </main>
+      </div>
     </div>
   );
 }

@@ -183,6 +183,19 @@ const schema = defineSchema({
     keywords: v.array(v.string()),
     refreshed_at: v.number(),
   }),
+
+  admin_users: defineTable({
+    email: v.string(),
+    password_hash: v.string(),
+    name: v.optional(v.string()),
+    created_at: v.number(),
+  }).index("by_email", ["email"]),
+
+  admin_sessions: defineTable({
+    admin_id: v.id("admin_users"),
+    token: v.string(),
+    expires_at: v.number(),
+  }).index("by_token", ["token"]),
 });
 
 export default schema;
