@@ -24,7 +24,7 @@
   --accent-lightgreen: #bfd5be;
   
   --font-header: 'Space Grotesk', system-ui, -apple-system, sans-serif;
-  --font-body: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-body: 'Space Grotesk', system-ui, -apple-system, sans-serif;
   
   --radius-sm: 6px;
   --radius-md: 10px;
@@ -47,9 +47,13 @@ html, body {
   height: 100%;
   background-color: var(--bg-dark);
   color: var(--text-primary);
-  font-family: var(--font-body);
+  font-family: var(--font-header);
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
+}
+
+button, input, select, textarea, table, th, td {
+  font-family: var(--font-header);
 }
 
 h1, h2, h3, h4, h5, h6, .font-header {

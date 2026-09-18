@@ -257,6 +257,24 @@ export const getAdminStats = query({
       }
     });
 
+    const usersMap = new Map(users.map((u: any) => [u._id.toString(), u]));
+
+    const recentWatchlists = watchlists
+      .sort((a: any, b: any) => b._creationTime - a._creationTime)
+      .slice(0, 5)
+      .map((w: any) => {
+        const u: any = usersMap.get(w.user_id?.toString());
+        return {
+          id: w._id,
+          title: w.title,
+          condition: w.condition,
+          status: w.status,
+          user_email: u ? u.email : "Unknown",
+          user_name: u ? u.fullname || u.email : "User",
+          created_at: w._creationTime,
+        };
+      });
+
     return {
       totalUsers: users.length,
       totalPremiumUsers: totalPremium,
@@ -280,6 +298,7 @@ export const getAdminStats = query({
           sub_tier: u.sub_tier || u.plan || "free",
           created_at: u._creationTime,
         })),
+      recentWatchlists,
     };
   },
 });

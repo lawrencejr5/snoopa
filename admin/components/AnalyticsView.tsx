@@ -29,7 +29,13 @@ export default function AnalyticsView() {
 
   if (!stats) {
     return (
-      <div style={{ padding: 40, textAlign: "center", color: "var(--text-secondary)" }}>
+      <div
+        style={{
+          padding: 40,
+          textAlign: "center",
+          color: "var(--text-secondary)",
+        }}
+      >
         Loading Snoopa Analytics...
       </div>
     );
@@ -78,12 +84,15 @@ export default function AnalyticsView() {
           <div className="metric-header">
             <span className="metric-title">Active Subscriptions</span>
             <div className="metric-icon-wrap">
-              <CreditCard style={{ width: 18, height: 18, color: "var(--accent-green)" }} />
+              <CreditCard
+                style={{ width: 18, height: 18, color: "var(--accent-green)" }}
+              />
             </div>
           </div>
           <div className="metric-value">{stats.totalPremiumUsers}</div>
           <div className="metric-sub">
-            Pro: {stats.tierCounts.pro} | Supa: {stats.tierCounts.supa} | Max: {stats.tierCounts.max}
+            Pro: {stats.tierCounts.pro} | Supa: {stats.tierCounts.supa} | Max:{" "}
+            {stats.tierCounts.max}
           </div>
         </div>
 
@@ -92,12 +101,25 @@ export default function AnalyticsView() {
           <div className="metric-header">
             <span className="metric-title">Snoops Used (This Month)</span>
             <div className="metric-icon-wrap">
-              <MessageSquare style={{ width: 18, height: 18, color: "var(--accent-warning)" }} />
+              <MessageSquare
+                style={{
+                  width: 18,
+                  height: 18,
+                  color: "var(--accent-warning)",
+                }}
+              />
             </div>
           </div>
           <div className="metric-value">{stats.snoopsUsedThisMonth}</div>
-          <div className="metric-sub" style={{ fontSize: 11, color: "var(--text-secondary)" }}>
-            Total Snoops Used: <strong style={{ color: "var(--text-primary)" }}>{stats.totalSnoopsUsedAllTime}</strong> All-Time
+          <div
+            className="metric-sub"
+            style={{ fontSize: 11, color: "var(--text-secondary)" }}
+          >
+            Total Snoops Used:{" "}
+            <strong style={{ color: "var(--text-primary)" }}>
+              {stats.totalSnoopsUsedAllTime}
+            </strong>{" "}
+            All-Time
           </div>
         </div>
 
@@ -106,12 +128,21 @@ export default function AnalyticsView() {
           <div className="metric-header">
             <span className="metric-title">Ad Views (This Month)</span>
             <div className="metric-icon-wrap">
-              <Eye style={{ width: 18, height: 18, color: "var(--accent-milk)" }} />
+              <Eye
+                style={{ width: 18, height: 18, color: "var(--accent-milk)" }}
+              />
             </div>
           </div>
           <div className="metric-value">{stats.adViewsThisMonth}</div>
-          <div className="metric-sub" style={{ fontSize: 11, color: "var(--text-secondary)" }}>
-            Total Ad Views: <strong style={{ color: "var(--text-primary)" }}>{stats.totalAdViewsAllTime}</strong> All-Time
+          <div
+            className="metric-sub"
+            style={{ fontSize: 11, color: "var(--text-secondary)" }}
+          >
+            Total Ad Views:{" "}
+            <strong style={{ color: "var(--text-primary)" }}>
+              {stats.totalAdViewsAllTime}
+            </strong>{" "}
+            All-Time
           </div>
         </div>
       </div>
@@ -121,13 +152,18 @@ export default function AnalyticsView() {
         {/* Subscriptions Tier Distribution */}
         <div className="card chart-card-lg">
           <div className="card-title-row">
-            <h3 className="card-title font-header">Subscription Tiers Breakdown</h3>
+            <h3 className="card-title font-header">
+              Subscription Tiers Breakdown
+            </h3>
             <span className="badge badge-muted">Users by Plan</span>
           </div>
           <div style={{ width: "100%", height: 260 }}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={tierChartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  stroke="var(--border-color)"
+                />
                 <XAxis dataKey="name" stroke="var(--text-secondary)" />
                 <YAxis stroke="var(--text-secondary)" allowDecimals={false} />
                 <Tooltip
@@ -154,7 +190,15 @@ export default function AnalyticsView() {
             <h3 className="card-title font-header">OS Platform Source</h3>
             <span className="badge badge-muted">authAccounts</span>
           </div>
-          <div style={{ width: "100%", height: 200, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div
+            style={{
+              width: "100%",
+              height: 200,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
@@ -181,10 +225,32 @@ export default function AnalyticsView() {
               </PieChart>
             </ResponsiveContainer>
           </div>
-          <div style={{ display: "flex", justifyContent: "center", gap: 20, marginTop: 10 }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "center",
+              gap: 20,
+              marginTop: 10,
+            }}
+          >
             {storeData.map((item) => (
-              <div key={item.name} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
-                <span style={{ width: 10, height: 10, borderRadius: "50%", backgroundColor: item.color }} />
+              <div
+                key={item.name}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  fontSize: 13,
+                }}
+              >
+                <span
+                  style={{
+                    width: 10,
+                    height: 10,
+                    borderRadius: "50%",
+                    backgroundColor: item.color,
+                  }}
+                />
                 <span>{`${item.name}: ${item.value}`}</span>
               </div>
             ))}
@@ -196,8 +262,12 @@ export default function AnalyticsView() {
       <div className="charts-grid">
         <div className="card chart-card-sm">
           <div className="card-title-row">
-            <h3 className="card-title font-header">Customer Geolocation (Countries)</h3>
-            <Globe style={{ width: 18, height: 18, color: "var(--text-secondary)" }} />
+            <h3 className="card-title font-header">
+              Customer Geolocation (Countries)
+            </h3>
+            <Globe
+              style={{ width: 18, height: 18, color: "var(--text-secondary)" }}
+            />
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             {countries.map((c) => (
@@ -214,12 +284,23 @@ export default function AnalyticsView() {
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <span className="badge badge-muted" style={{ fontWeight: 700 }}>
+                  <span
+                    className="badge badge-muted"
+                    style={{ fontWeight: 700 }}
+                  >
                     {c.code}
                   </span>
-                  <span style={{ fontSize: 14, fontWeight: 500 }}>{c.country}</span>
+                  <span style={{ fontSize: 14, fontWeight: 500 }}>
+                    {c.country}
+                  </span>
                 </div>
-                <span style={{ fontSize: 14, fontWeight: 700, color: "var(--accent-milk)" }}>
+                <span
+                  style={{
+                    fontSize: 14,
+                    fontWeight: 700,
+                    color: "var(--accent-milk)",
+                  }}
+                >
                   {c.count} users
                 </span>
               </div>
@@ -229,56 +310,145 @@ export default function AnalyticsView() {
 
         <div className="card chart-card-lg">
           <div className="card-title-row">
-            <h3 className="card-title font-header">Watchlists & Snoopa Activity</h3>
+            <h3 className="card-title font-header">
+              Watchlists & Snoopa Activity
+            </h3>
             <span className="badge badge-muted">Fact Hunting</span>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, marginBottom: 20 }}>
-            <div style={{ padding: 16, backgroundColor: "var(--bg-input)", borderRadius: 10, border: "1px solid var(--border-color)" }}>
-              <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>Total Watchlists</div>
-              <div style={{ fontSize: 24, fontWeight: 700, fontFamily: "var(--font-header)" }}>{stats.totalWatchlists}</div>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(3, 1fr)",
+              gap: 16,
+              marginBottom: 20,
+            }}
+          >
+            <div
+              style={{
+                padding: 16,
+                backgroundColor: "var(--bg-input)",
+                borderRadius: 10,
+                border: "1px solid var(--border-color)",
+              }}
+            >
+              <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+                Total Watchlists
+              </div>
+              <div
+                style={{
+                  fontSize: 24,
+                  fontWeight: 700,
+                  fontFamily: "var(--font-header)",
+                }}
+              >
+                {stats.totalWatchlists}
+              </div>
             </div>
-            <div style={{ padding: 16, backgroundColor: "var(--bg-input)", borderRadius: 10, border: "1px solid var(--border-color)" }}>
-              <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>Active Tracking</div>
-              <div style={{ fontSize: 24, fontWeight: 700, color: "var(--accent-green)", fontFamily: "var(--font-header)" }}>
+            <div
+              style={{
+                padding: 16,
+                backgroundColor: "var(--bg-input)",
+                borderRadius: 10,
+                border: "1px solid var(--border-color)",
+              }}
+            >
+              <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+                Active Tracking
+              </div>
+              <div
+                style={{
+                  fontSize: 24,
+                  fontWeight: 700,
+                  color: "var(--accent-green)",
+                  fontFamily: "var(--font-header)",
+                }}
+              >
                 {stats.watchlistStatus.active}
               </div>
             </div>
-            <div style={{ padding: 16, backgroundColor: "var(--bg-input)", borderRadius: 10, border: "1px solid var(--border-color)" }}>
-              <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>Completed Tracking</div>
-              <div style={{ fontSize: 24, fontWeight: 700, color: "var(--accent-milk)", fontFamily: "var(--font-header)" }}>
+            <div
+              style={{
+                padding: 16,
+                backgroundColor: "var(--bg-input)",
+                borderRadius: 10,
+                border: "1px solid var(--border-color)",
+              }}
+            >
+              <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+                Completed Tracking
+              </div>
+              <div
+                style={{
+                  fontSize: 24,
+                  fontWeight: 700,
+                  color: "var(--accent-milk)",
+                  fontFamily: "var(--font-header)",
+                }}
+              >
                 {stats.watchlistStatus.completed}
               </div>
             </div>
           </div>
 
-          <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 10, color: "var(--text-secondary)" }}>
-            Recent Registered Customers
+          <div
+            style={{
+              fontSize: 14,
+              fontWeight: 600,
+              marginBottom: 10,
+              color: "var(--text-secondary)",
+            }}
+          >
+            Recent Watchlists
           </div>
           <div className="table-container">
             <table className="data-table">
               <thead>
                 <tr>
+                  <th>Topic / Watchlist</th>
                   <th>Customer</th>
-                  <th>Email</th>
-                  <th>Tier</th>
-                  <th>Signup Date</th>
+                  <th>Status</th>
+                  <th>Date</th>
                 </tr>
               </thead>
               <tbody>
-                {stats.recentUsers.map((u: any) => (
-                  <tr key={u.id}>
-                    <td style={{ fontWeight: 600 }}>{u.fullname || "User"}</td>
-                    <td style={{ color: "var(--text-secondary)" }}>{u.email}</td>
-                    <td>
-                      <span className={`badge ${u.sub_tier !== "free" ? "badge-green" : "badge-muted"}`}>
-                        {u.sub_tier.toUpperCase()}
-                      </span>
-                    </td>
-                    <td style={{ fontSize: 12, color: "var(--text-muted)" }}>
-                      {new Date(u.created_at).toLocaleDateString()}
+                {(stats.recentWatchlists || []).length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={5}
+                      style={{
+                        textAlign: "center",
+                        color: "var(--text-secondary)",
+                        padding: 20,
+                      }}
+                    >
+                      No watchlists created yet.
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  (stats.recentWatchlists || []).map((w: any) => (
+                    <tr key={w.id}>
+                      <td style={{ fontWeight: 600 }}>{w.title}</td>
+                      <td style={{ fontSize: 13 }}>
+                        <div style={{ fontWeight: 500 }}>{w.user_name}</div>
+                        <div
+                          style={{ fontSize: 11, color: "var(--text-muted)" }}
+                        >
+                          {w.user_email}
+                        </div>
+                      </td>
+                      <td>
+                        <span
+                          className={`badge ${w.status === "active" ? "badge-green" : "badge-muted"}`}
+                        >
+                          {w.status.toUpperCase()}
+                        </span>
+                      </td>
+                      <td style={{ fontSize: 12, color: "var(--text-muted)" }}>
+                        {new Date(w.created_at).toLocaleDateString()}
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
