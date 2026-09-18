@@ -1,7 +1,6 @@
 "use client";
 
-import { useQuery, useAction } from "convex/react";
-import { useEffect, useState } from "react";
+import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import {
   Users,
@@ -25,21 +24,6 @@ import {
 
 export default function AnalyticsView() {
   const stats = useQuery(api.admin.getAdminStats);
-  const fetchRevenueCat = useAction(api.admin.fetchRevenueCatOverview);
-
-  const [rcData, setRcData] = useState<{
-    configured: boolean;
-    storeSplit: { name: string; value: number; color: string }[];
-    countryDistribution: { country: string; code: string; count: number }[];
-  } | null>(null);
-
-  useEffect(() => {
-    fetchRevenueCat()
-      .then((res) => {
-        if (res) setRcData(res);
-      })
-      .catch(console.error);
-  }, [fetchRevenueCat]);
 
   if (!stats) {
     return (
@@ -56,16 +40,13 @@ export default function AnalyticsView() {
     { name: "Max", count: stats.tierCounts.max, fill: "#fd5a5a" },
   ];
 
-  const storeData = rcData?.storeSplit || [
-    { name: "App Store", value: 65, color: "#6aaa66" },
-    { name: "Play Store", value: 35, color: "#F4D03F" },
+  const storeData = stats.storeSplit || [
+    { name: "iOS", value: 50, color: "#6aaa66" },
+    { name: "Android", value: 50, color: "#F4D03F" },
   ];
 
-  const countries = rcData?.countryDistribution || [
-    { country: "United States", code: "US", count: 42 },
-    { country: "United Kingdom", code: "GB", count: 18 },
-    { country: "Canada", code: "CA", count: 12 },
-    { country: "Germany", code: "DE", count: 9 },
+  const countries = stats.countryDistribution || [
+    { country: "United States", code: "US", count: stats.totalUsers },
   ];
 
   return (
@@ -104,20 +85,16 @@ export default function AnalyticsView() {
 
         <div className="card">
           <div className="metric-header">
-            <span className="metric-title">RevenueCat Store Source</span>
+            <span className="metric-title">OS Platform Split</span>
             <div className="metric-icon-wrap">
               <Smartphone style={{ width: 18, height: 18, color: "var(--accent-warning)" }} />
             </div>
           </div>
           <div className="metric-value" style={{ fontSize: 20 }}>
-            App Store vs Play Store
+            iOS vs Android
           </div>
           <div className="metric-sub">
-            {rcData?.configured ? (
-              <span className="badge badge-green" style={{ fontSize: 10 }}>Live RevenueCat API v2</span>
-            ) : (
-              <span className="badge badge-gold" style={{ fontSize: 10 }}>RevenueCat v2 Active</span>
-            )}
+            <span className="badge badge-green" style={{ fontSize: 10 }}>Convex Native Database</span>
           </div>
         </div>
 
@@ -170,8 +147,8 @@ export default function AnalyticsView() {
         {/* Store Split Donut */}
         <div className="card chart-card-sm">
           <div className="card-title-row">
-            <h3 className="card-title font-header">Download Store Source</h3>
-            <span className="badge badge-green">RevenueCat</span>
+            <h3 className="card-title font-header">OS Platform Source</h3>
+            <span className="badge badge-green">Convex DB</span>
           </div>
           <div style={{ width: "100%", height: 200, display: "flex", alignItems: "center", justifyContent: "center" }}>
             <ResponsiveContainer width="100%" height="100%">
@@ -204,7 +181,7 @@ export default function AnalyticsView() {
             {storeData.map((item) => (
               <div key={item.name} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
                 <span style={{ width: 10, height: 10, borderRadius: "50%", backgroundColor: item.color }} />
-                <span>{`${item.name}: ${item.value}%`}</span>
+                <span>{`${item.name}: ${item.value}`}</span>
               </div>
             ))}
           </div>

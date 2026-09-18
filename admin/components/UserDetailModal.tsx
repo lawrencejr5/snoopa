@@ -1,22 +1,18 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useQuery, useMutation, useAction } from "convex/react";
+import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
 import {
   X,
   Smartphone,
   Globe,
-  CheckCircle2,
-  List,
-  MessageSquare,
-  Eye,
   Trash2,
   ShieldAlert,
   Save,
   CreditCard,
-  Bell,
+  Apple,
 } from "lucide-react";
 
 interface UserDetailModalProps {
@@ -28,11 +24,8 @@ export default function UserDetailModal({ userId, onClose }: UserDetailModalProp
   const data = useQuery(api.admin.getUserDetails, { user_id: userId });
   const updateUserPlan = useMutation(api.admin.updateUserPlan);
   const deleteUserAdmin = useMutation(api.admin.deleteUserAdmin);
-  const fetchRevenueCat = useAction(api.admin.fetchRevenueCatCustomerData);
 
   const [activeTab, setActiveTab] = useState<"overview" | "watchlists" | "chats" | "activity">("overview");
-  const [rcInfo, setRcInfo] = useState<any>(null);
-  const [rcLoading, setRcLoading] = useState(true);
 
   // Edit sub tier state
   const [selectedTier, setSelectedTier] = useState<"free" | "pro" | "supa" | "max">("free");
@@ -44,17 +37,8 @@ export default function UserDetailModal({ userId, onClose }: UserDetailModalProp
     if (data?.user) {
       setSelectedTier((data.user.sub_tier as any) || data.user.plan || "free");
       setIsPremium(!!data.user.is_premium || data.user.sub_tier !== "free");
-
-      // Fetch RevenueCat customer intel
-      setRcLoading(true);
-      fetchRevenueCat({ app_user_id: data.user._id })
-        .then((res) => {
-          setRcInfo(res);
-        })
-        .catch(console.error)
-        .finally(() => setRcLoading(false));
     }
-  }, [data, fetchRevenueCat]);
+  }, [data]);
 
   if (!data || !data.user) {
     return (
@@ -102,6 +86,9 @@ export default function UserDetailModal({ userId, onClose }: UserDetailModalProp
     }
   };
 
+  const userOs = user.os === "ios" ? "iOS" : user.os === "android" ? "Android" : "iOS";
+  const userCountry = user.country || "US";
+
   return (
     <div className="drawer-overlay" onClick={onClose}>
       <div className="drawer-content" onClick={(e) => e.stopPropagation()}>
@@ -123,25 +110,25 @@ export default function UserDetailModal({ userId, onClose }: UserDetailModalProp
           </button>
         </div>
 
-        {/* RevenueCat & Country Badge Banner */}
+        {/* Convex User Attributes Banner */}
         <div style={{ padding: "16px 24px", backgroundColor: "var(--bg-input)", borderBottom: "1px solid var(--border-color)" }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", marginBottom: 8 }}>
-            REVENUECAT SUBSCRIBER INTEL
+            CONVEX DATABASE USER INTEL
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
             <div className="badge badge-green">
-              <Smartphone style={{ width: 12, height: 12 }} />
-              <span>Store: {rcLoading ? "Querying RevenueCat..." : rcInfo?.store || "App Store"}</span>
+              {userOs === "iOS" ? <Apple style={{ width: 12, height: 12 }} /> : <Smartphone style={{ width: 12, height: 12 }} />}
+              <span>OS: {userOs}</span>
             </div>
 
             <div className="badge badge-gold">
               <Globe style={{ width: 12, height: 12 }} />
-              <span>Country: {rcLoading ? "..." : rcInfo?.country || "US"}</span>
+              <span>Country: {userCountry}</span>
             </div>
 
             <div className="badge badge-muted">
               <CreditCard style={{ width: 12, height: 12 }} />
-              <span>Entitlement: {user.sub_tier ? user.sub_tier.toUpperCase() : "FREE"}</span>
+              <span>Tier: {user.sub_tier ? user.sub_tier.toUpperCase() : "FREE"}</span>
             </div>
           </div>
         </div>
@@ -232,6 +219,20 @@ export default function UserDetailModal({ userId, onClose }: UserDetailModalProp
                   <div style={{ display: "flex", justifyContent: "space-between" }}>
                     <span style={{ color: "var(--text-secondary)" }}>Username:</span>
                     <span style={{ fontWeight: 600 }}>{user.username ? `@${user.username}` : "Not Set"}</span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span style={{ color: "var(--text-secondary)" }}>OS Platform:</span>
+                    <span style={{ fontWeight: 600 }}>{userOs}</span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span style={{ color: "var(--text-secondary)" }}>Country:</span>
+                    <span style={{ fontWeight: 600 }}>{userCountry}</span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span style={{ color: "var(--text-secondary)" }}>Last Seen:</span>
+                    <span style={{ fontWeight: 600 }}>
+                      {user.last_seen ? new Date(user.last_seen).toLocaleString() : new Date(user._creationTime).toLocaleString()}
+                    </span>
                   </div>
                   <div style={{ display: "flex", justifyContent: "space-between" }}>
                     <span style={{ color: "var(--text-secondary)" }}>Avatar Preset:</span>

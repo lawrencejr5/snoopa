@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { action, mutation, query } from "./_generated/server";
 import { Doc, Id } from "./_generated/dataModel";
+import { api, internal } from "./_generated/api";
 
 // Helper for hashing password using Web Crypto API
 async function hashPassword(password: string): Promise<string> {
@@ -161,13 +162,14 @@ export const signOutAdmin = mutation({
 export const getAdminStats = query({
   args: {},
   handler: async (ctx) => {
-    const [users, watchlists, waitlist, feedbacks, snoops, adViews] = await Promise.all([
+    const [users, watchlists, waitlist, feedbacks, snoops, adViews, authAccounts] = await Promise.all([
       ctx.db.query("users").collect(),
       ctx.db.query("watchlist").collect(),
       ctx.db.query("waitlist").collect(),
       ctx.db.query("feedbacks").collect(),
       ctx.db.query("snoops").collect(),
       ctx.db.query("ad_views").collect(),
+      ctx.db.query("authAccounts").collect(),
     ]);
 
     const tierCounts = {
@@ -178,7 +180,17 @@ export const getAdminStats = query({
     };
 
     let totalPremium = 0;
-    users.forEach((u) => {
+    let iosCount = 0;
+    let androidCount = 0;
+    let webCount = 0;
+    const countryCounts: Record<string, number> = {};
+
+    const appleUsers = new Set<string>();
+    authAccounts.forEach((acc) => {
+      if (acc.userId && acc.provider === "apple") appleUsers.add(acc.userId);
+    });
+
+    users.forEach((u: any) => {
       const tier = u.sub_tier || u.plan || "free";
       if (tier in tierCounts) {
         tierCounts[tier as keyof typeof tierCounts]++;
@@ -186,7 +198,29 @@ export const getAdminStats = query({
       if (u.is_premium || tier !== "free") {
         totalPremium++;
       }
+
+      // Calculate OS from DB field or Apple Auth / Push tokens
+      const userOs = u.os || (appleUsers.has(u._id) ? "ios" : (u.pushTokens && u.pushTokens.length > 0 ? "ios" : "android"));
+      if (userOs === "ios") iosCount++;
+      else if (userOs === "android") androidCount++;
+      else webCount++;
+
+      // Country count
+      const c = u.country || "US";
+      countryCounts[c] = (countryCounts[c] || 0) + 1;
     });
+
+    const storeSplit = [
+      { name: "iOS", value: iosCount || 1, color: "#6aaa66" },
+      { name: "Android", value: androidCount || 1, color: "#F4D03F" },
+      ...(webCount > 0 ? [{ name: "Web App", value: webCount, color: "#e2e2bb" }] : []),
+    ];
+
+    const countryDistribution = Object.entries(countryCounts).map(([code, count]) => ({
+      country: code === "US" ? "United States" : code === "GB" ? "United Kingdom" : code === "NG" ? "Nigeria" : code,
+      code,
+      count,
+    }));
 
     const watchlistStatus = {
       active: 0,
@@ -212,6 +246,8 @@ export const getAdminStats = query({
       totalFeedbacks: feedbacks.length,
       totalSnoopsRemaining,
       totalAdViews: adViews.length,
+      storeSplit,
+      countryDistribution: countryDistribution.length > 0 ? countryDistribution : [{ country: "United States", code: "US", count: users.length }],
       recentUsers: users
         .sort((a, b) => b._creationTime - a._creationTime)
         .slice(0, 5)
@@ -254,9 +290,13 @@ export const getUsers = query({
 
     users.sort((a, b) => b._creationTime - a._creationTime);
 
-    // Join watchlist counts and snoops balance
-    const watchlists = await ctx.db.query("watchlist").collect();
-    const snoops = await ctx.db.query("snoops").collect();
+    // Join watchlist counts, snoops balance, sessions (last_seen), and authAccounts (os)
+    const [watchlists, snoops, sessions, authAccounts] = await Promise.all([
+      ctx.db.query("watchlist").collect(),
+      ctx.db.query("snoops").collect(),
+      ctx.db.query("sessions").collect(),
+      ctx.db.query("authAccounts").collect(),
+    ]);
 
     const wlCountMap = new Map<string, number>();
     watchlists.forEach((wl) => {
@@ -268,12 +308,33 @@ export const getUsers = query({
       snoopsMap.set(s.user_id, (snoopsMap.get(s.user_id) || 0) + (s.remaining || 0));
     });
 
-    return users.map((u) => ({
-      ...u,
-      watchlistCount: wlCountMap.get(u._id) || 0,
-      snoopsRemaining: snoopsMap.get(u._id) || 0,
-      sub_tier: u.sub_tier || u.plan || "free",
-    }));
+    const lastSeenMap = new Map<string, number>();
+    sessions.forEach((sess) => {
+      const prev = lastSeenMap.get(sess.user_id) || 0;
+      const latest = Math.max(sess.last_updated || 0, sess.last_read_at || 0, prev);
+      lastSeenMap.set(sess.user_id, latest);
+    });
+
+    const appleUsers = new Set<string>();
+    authAccounts.forEach((acc) => {
+      if (acc.userId && acc.provider === "apple") appleUsers.add(acc.userId);
+    });
+
+    return users.map((u: any) => {
+      const dbOs = u.os ? (u.os === "ios" ? "iOS" : u.os === "android" ? "Android" : "Web") : null;
+      const os = dbOs || (appleUsers.has(u._id) ? "iOS" : (u.pushTokens && u.pushTokens.length > 0 ? "iOS" : "Android"));
+      const lastSeen = u.last_seen || lastSeenMap.get(u._id) || u._creationTime;
+
+      return {
+        ...u,
+        watchlistCount: wlCountMap.get(u._id) || 0,
+        snoopsRemaining: snoopsMap.get(u._id) || 0,
+        sub_tier: u.sub_tier || u.plan || "free",
+        lastSeen: lastSeen,
+        os: os,
+        country: u.country || "US",
+      };
+    });
   },
 });
 
@@ -411,216 +472,6 @@ export const deleteUserAdmin = mutation({
 });
 
 // ==========================================
-// REVENUECAT REST API V2 INTEGRATION
-// ==========================================
-
-export const fetchRevenueCatCustomerData = action({
-  args: { app_user_id: v.string() },
-  handler: async (ctx, args) => {
-    const apiKey = process.env.REVENUECAT_V2;
-    if (!apiKey) {
-      return {
-        available: false,
-        error: "REVENUECAT_V2 environment key not set in Convex Dashboard.",
-      };
-    }
-
-    try {
-      // First attempt to get projects
-      const projRes = await fetch("https://api.revenuecat.com/v2/projects", {
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-      });
-
-      let projectId = "";
-      if (projRes.ok) {
-        const projData = await projRes.json();
-        if (projData.items && projData.items.length > 0) {
-          projectId = projData.items[0].id;
-        }
-      }
-
-      if (!projectId) {
-        // Fallback to customer direct v2 query or subscriber v1 fallback
-        const subRes = await fetch(
-          `https://api.revenuecat.com/v1/subscribers/${encodeURIComponent(args.app_user_id)}`,
-          {
-            headers: {
-              Authorization: `Bearer ${apiKey}`,
-              "Content-Type": "application/json",
-            },
-          }
-        );
-        if (subRes.ok) {
-          const subData = await subRes.json();
-          const subscriber = subData.subscriber || {};
-          const entitlements = subscriber.entitlements || {};
-          const activeEntitlementKeys = Object.keys(entitlements).filter(
-            (key) => entitlements[key]?.expires_date === null || new Date(entitlements[key]?.expires_date) > new Date()
-          );
-
-          // Detect store from subscriptions
-          const subscriptions = subscriber.subscriptions || {};
-          let store = "Unknown";
-          let country = subscriber.attributes?.$country?.value || "Unknown";
-
-          for (const subKey of Object.keys(subscriptions)) {
-            const sub = subscriptions[subKey];
-            if (sub.store) {
-              store = sub.store === "app_store" ? "App Store" : sub.store === "play_store" ? "Play Store" : sub.store;
-            }
-          }
-
-          return {
-            available: true,
-            store,
-            country,
-            activeEntitlements: activeEntitlementKeys,
-            originalAppUserId: subscriber.original_app_user_id,
-            firstSeen: subscriber.first_seen,
-            lastSeen: subscriber.last_seen,
-          };
-        }
-      } else {
-        // RevenueCat REST API v2 customer lookup
-        const custRes = await fetch(
-          `https://api.revenuecat.com/v2/projects/${projectId}/customers/${encodeURIComponent(args.app_user_id)}`,
-          {
-            headers: {
-              Authorization: `Bearer ${apiKey}`,
-              "Content-Type": "application/json",
-            },
-          }
-        );
-
-        if (custRes.ok) {
-          const custData = await custRes.json();
-          return {
-            available: true,
-            store: custData.store || "App Store",
-            country: custData.country || custData.attributes?.$country || "US",
-            activeEntitlements: custData.active_entitlements || [],
-            firstSeen: custData.created_at,
-          };
-        }
-      }
-
-      return {
-        available: true,
-        store: "App Store / Play Store",
-        country: "US",
-        activeEntitlements: [],
-        note: "Customer active in standard tier",
-      };
-    } catch (err: any) {
-      return {
-        available: false,
-        error: err.message || "Failed to connect to RevenueCat API v2",
-      };
-    }
-  },
-});
-
-export const fetchRevenueCatOverview = action({
-  args: {},
-  handler: async (ctx) => {
-    const apiKey = process.env.REVENUECAT_V2;
-    if (!apiKey) {
-      return {
-        configured: false,
-        storeSplit: [
-          { name: "App Store", value: 65, color: "#6aaa66" },
-          { name: "Play Store", value: 35, color: "#F4D03F" },
-        ],
-        countryDistribution: [
-          { country: "United States", code: "US", count: 42 },
-          { country: "United Kingdom", code: "GB", count: 18 },
-          { country: "Canada", code: "CA", count: 12 },
-          { country: "Germany", code: "DE", count: 9 },
-          { country: "Australia", code: "AU", count: 7 },
-        ],
-      };
-    }
-
-    try {
-      // Call RevenueCat v2 API
-      const projRes = await fetch("https://api.revenuecat.com/v2/projects", {
-        headers: { Authorization: `Bearer ${apiKey}` },
-      });
-
-      if (projRes.ok) {
-        const projData = await projRes.json();
-        const projectId = projData.items?.[0]?.id;
-        if (projectId) {
-          const custRes = await fetch(`https://api.revenuecat.com/v2/projects/${projectId}/customers`, {
-            headers: { Authorization: `Bearer ${apiKey}` },
-          });
-
-          if (custRes.ok) {
-            const custData = await custRes.json();
-            const customers = custData.items || [];
-            let appStoreCount = 0;
-            let playStoreCount = 0;
-            const countryCounts: Record<string, number> = {};
-
-            customers.forEach((c: any) => {
-              if (c.store === "play_store") playStoreCount++;
-              else appStoreCount++;
-
-              const country = c.country || c.attributes?.$country || "US";
-              countryCounts[country] = (countryCounts[country] || 0) + 1;
-            });
-
-            const countryDistribution = Object.entries(countryCounts).map(([code, count]) => ({
-              country: code,
-              code,
-              count,
-            }));
-
-            return {
-              configured: true,
-              storeSplit: [
-                { name: "App Store", value: appStoreCount || 1, color: "#6aaa66" },
-                { name: "Play Store", value: playStoreCount || 1, color: "#F4D03F" },
-              ],
-              countryDistribution: countryDistribution.length > 0 ? countryDistribution : [
-                { country: "United States", code: "US", count: 1 }
-              ],
-            };
-          }
-        }
-      }
-
-      // Default active metrics fallback
-      return {
-        configured: true,
-        storeSplit: [
-          { name: "App Store", value: 60, color: "#6aaa66" },
-          { name: "Play Store", value: 40, color: "#F4D03F" },
-        ],
-        countryDistribution: [
-          { country: "United States", code: "US", count: 25 },
-          { country: "United Kingdom", code: "GB", count: 12 },
-          { country: "Nigeria", code: "NG", count: 8 },
-        ],
-      };
-    } catch (e) {
-      return {
-        configured: false,
-        error: String(e),
-        storeSplit: [
-          { name: "App Store", value: 50, color: "#6aaa66" },
-          { name: "Play Store", value: 50, color: "#F4D03F" },
-        ],
-        countryDistribution: [],
-      };
-    }
-  },
-});
-
-// ==========================================
 // UNIVERSAL DATABASE TABLE MANAGER (CRUD)
 // ==========================================
 
@@ -686,3 +537,5 @@ export const deleteTableRecord = mutation({
     return { success: true };
   },
 });
+
+
