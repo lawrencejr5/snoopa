@@ -340,36 +340,58 @@ export const getUsers = query({
     ]);
 
     const wlCountMap = new Map<string, number>();
-    watchlists.forEach((wl) => {
-      wlCountMap.set(wl.user_id, (wlCountMap.get(wl.user_id) || 0) + 1);
+    watchlists.forEach((wl: any) => {
+      const uId = wl.user_id?.toString();
+      if (uId) wlCountMap.set(uId, (wlCountMap.get(uId) || 0) + 1);
     });
 
     const snoopsMap = new Map<string, number>();
-    snoops.forEach((s) => {
-      snoopsMap.set(s.user_id, (snoopsMap.get(s.user_id) || 0) + (s.remaining || 0));
+    snoops.forEach((s: any) => {
+      const uId = s.user_id?.toString();
+      if (uId) snoopsMap.set(uId, (snoopsMap.get(uId) || 0) + (s.remaining || 0));
     });
 
     const lastSeenMap = new Map<string, number>();
-    sessions.forEach((sess) => {
-      const prev = lastSeenMap.get(sess.user_id) || 0;
-      const latest = Math.max(sess.last_updated || 0, sess.last_read_at || 0, prev);
-      lastSeenMap.set(sess.user_id, latest);
+    sessions.forEach((sess: any) => {
+      const uId = sess.user_id?.toString();
+      if (uId) {
+        const prev = lastSeenMap.get(uId) || 0;
+        const latest = Math.max(sess.last_updated || 0, sess.last_read_at || 0, prev);
+        lastSeenMap.set(uId, latest);
+      }
     });
 
-    const appleUsers = new Set<string>();
-    authAccounts.forEach((acc) => {
-      if (acc.userId && acc.provider === "apple") appleUsers.add(acc.userId);
+    const userProviderMap = new Map<string, string>();
+    authAccounts.forEach((acc: any) => {
+      if (acc.userId && acc.provider) {
+        userProviderMap.set(acc.userId.toString(), acc.provider);
+      }
     });
 
     return users.map((u: any) => {
-      const dbOs = u.os ? (u.os === "ios" ? "iOS" : u.os === "android" ? "Android" : "Web") : null;
-      const os = dbOs || (appleUsers.has(u._id) ? "iOS" : (u.pushTokens && u.pushTokens.length > 0 ? "iOS" : "Android"));
-      const lastSeen = u.last_seen || lastSeenMap.get(u._id) || u._creationTime;
+      const uIdStr = u._id.toString();
+      const provider = userProviderMap.get(uIdStr);
+
+      let os = "Android";
+      if (provider === "apple") {
+        os = "iOS";
+      } else if (provider === "google") {
+        os = "Android";
+      } else if (u.os) {
+        os = u.os === "ios" ? "iOS" : u.os === "android" ? "Android" : "Web";
+      } else if (provider === "password") {
+        os = "Email / Web";
+      } else if (provider) {
+        os = provider;
+      }
+
+      const lastSeen = u.last_seen || lastSeenMap.get(uIdStr) || u._creationTime;
 
       return {
         ...u,
-        watchlistCount: wlCountMap.get(u._id) || 0,
-        snoopsRemaining: snoopsMap.get(u._id) || 0,
+        provider: provider || (u.os === "ios" ? "apple" : u.os === "android" ? "google" : "email"),
+        watchlistCount: wlCountMap.get(uIdStr) || 0,
+        snoopsRemaining: snoopsMap.get(uIdStr) || 0,
         sub_tier: u.sub_tier || u.plan || "free",
         lastSeen: lastSeen,
         os: os,

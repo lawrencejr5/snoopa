@@ -465,11 +465,25 @@ h1, h2, h3, h4, h5, h6, .font-header {
   background-color: var(--bg-input);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
-  padding: 9px 14px;
+  padding: 9px 38px 9px 14px;
+  min-width: 180px;
   color: var(--text-primary);
   font-size: 14px;
+  font-family: var(--font-header);
   outline: none;
   cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23A3A398' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  background-size: 16px;
+  transition: border-color 0.15s ease;
+}
+
+.select-field:focus, .select-field:hover {
+  border-color: var(--border-hover);
 }
 
 .data-table {
