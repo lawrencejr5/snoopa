@@ -157,7 +157,12 @@ const schema = defineSchema({
     content: v.string(),
     images: v.optional(v.array(v.id("_storage"))),
     timestamp: v.number(),
-  }).index("by_user", ["user_id"]),
+    status: v.optional(
+      v.union(v.literal("unread"), v.literal("read"), v.literal("fulfilled"))
+    ),
+  })
+    .index("by_user", ["user_id"])
+    .index("by_status", ["status"]),
 
   snoops: defineTable({
     user_id: v.id("users"),

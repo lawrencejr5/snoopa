@@ -10,7 +10,7 @@ import AnalyticsView from "../components/AnalyticsView";
 import CustomersView from "../components/CustomersView";
 import WatchlistsView from "../components/WatchlistsView";
 import TableManagerView from "../components/TableManagerView";
-import WaitlistFeedbackView from "../components/WaitlistFeedbackView";
+import ReportsFeedbackView from "../components/ReportsFeedbackView";
 
 export default function AdminPage() {
   const [token, setToken] = useState<string | null>(null);
@@ -59,8 +59,8 @@ export default function AdminPage() {
         return "Watchlist Intelligence & Proactive Snoopers";
       case "crud":
         return "Database Table Manager";
-      case "waitlist_feedback":
-        return "Waitlist & Feedback Submissions";
+      case "reports_feedback":
+        return "Customer Reports & Feedback Submissions";
       default:
         return "Admin Dashboard";
     }
@@ -85,7 +85,7 @@ export default function AdminPage() {
           {activeTab === "customers" && <CustomersView />}
           {activeTab === "watchlists" && <WatchlistsView />}
           {activeTab === "crud" && <TableManagerView />}
-          {activeTab === "waitlist_feedback" && <WaitlistFeedbackView />}
+          {activeTab === "reports_feedback" && <ReportsFeedbackView />}
         </main>
       </div>
     </div>

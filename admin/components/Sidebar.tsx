@@ -1,13 +1,11 @@
 "use client";
 
-import { BarChart3, Users, Radio, Database, MessageSquare } from "lucide-react";
+import { useQuery } from "convex/react";
+import { BarChart3, Database, MessageSquare, Radio, Users } from "lucide-react";
+import { api } from "../../convex/_generated/api";
 
 export type TabType =
-  | "analytics"
-  | "customers"
-  | "watchlists"
-  | "crud"
-  | "waitlist_feedback";
+  "analytics" | "customers" | "watchlists" | "crud" | "reports_feedback";
 
 interface SidebarProps {
   activeTab: TabType;
@@ -15,6 +13,8 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
+  const unreadFeedbackCount = useQuery(api.feedback.getUnreadFeedbackCount);
+
   const navItems = [
     {
       id: "analytics" as TabType,
@@ -32,14 +32,15 @@ export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
       icon: Radio,
     },
     {
+      id: "reports_feedback" as TabType,
+      label: "Reports & Feedback",
+      icon: MessageSquare,
+      badge: unreadFeedbackCount || 0,
+    },
+    {
       id: "crud" as TabType,
       label: "Table Manager (CRUD)",
       icon: Database,
-    },
-    {
-      id: "waitlist_feedback" as TabType,
-      label: "Waitlist & Feedback",
-      icon: MessageSquare,
     },
   ];
 
@@ -63,8 +64,31 @@ export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
               className={`nav-item ${isActive ? "active" : ""}`}
               onClick={() => setActiveTab(item.id)}
             >
-              <Icon className="icon" style={{ color: isActive ? "var(--text-primary)" : "var(--text-secondary)" }} />
-              <span>{item.label}</span>
+              <Icon
+                className="icon"
+                style={{
+                  color: isActive
+                    ? "var(--text-primary)"
+                    : "var(--text-secondary)",
+                }}
+              />
+              <span style={{ flex: 1, textAlign: "left" }}>
+                {item.label}
+                {item.badge !== undefined && item.badge > 0 && (
+                  <span
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 600,
+                      marginLeft: 4,
+                      color: isActive
+                        ? "var(--text-primary)"
+                        : "var(--text-secondary)",
+                    }}
+                  >
+                    ({item.badge})
+                  </span>
+                )}
+              </span>
             </button>
           );
         })}
@@ -72,10 +96,19 @@ export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
 
       <div className="sidebar-footer">
         <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-          <span style={{ fontSize: 11, fontWeight: 700, color: "var(--accent-milk)", letterSpacing: "0.05em" }}>
+          <span
+            style={{
+              fontSize: 11,
+              fontWeight: 700,
+              color: "var(--accent-milk)",
+              letterSpacing: "0.05em",
+            }}
+          >
             GREYHOUND SPIRIT
           </span>
-          <span style={{ fontSize: 10, color: "var(--text-muted)" }}>Proactive Fact Investigator</span>
+          <span style={{ fontSize: 10, color: "var(--text-muted)" }}>
+            Proactive Fact Investigator
+          </span>
         </div>
       </div>
     </aside>
