@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
@@ -26,10 +27,11 @@ import {
 
 interface CustomerDetailPageProps {
   userId: Id<"users">;
-  onBack: () => void;
+  onBack?: () => void;
 }
 
 export default function CustomerDetailPage({ userId, onBack }: CustomerDetailPageProps) {
+  const router = useRouter();
   const data = useQuery(api.admin.getUserDetails, { user_id: userId });
   const updateUserPlan = useMutation(api.admin.updateUserPlan);
   const deleteUserAdmin = useMutation(api.admin.deleteUserAdmin);
@@ -52,10 +54,18 @@ export default function CustomerDetailPage({ userId, onBack }: CustomerDetailPag
     }
   }, [data]);
 
+  const handleBack = () => {
+    if (onBack) {
+      onBack();
+    } else {
+      router.back();
+    }
+  };
+
   if (!data || !data.user) {
     return (
       <div style={{ padding: 40, textAlign: "center", color: "var(--text-secondary)" }}>
-        <button className="btn-secondary" onClick={onBack} style={{ marginBottom: 20 }}>
+        <button className="btn-secondary" onClick={handleBack} style={{ marginBottom: 20 }}>
           <ArrowLeft style={{ width: 16, height: 16 }} /> Back to Customers Directory
         </button>
         <div>Loading customer profile intelligence...</div>
@@ -91,7 +101,7 @@ export default function CustomerDetailPage({ userId, onBack }: CustomerDetailPag
     try {
       await deleteUserAdmin({ user_id: user._id });
       alert("User account and all associated watchlists deleted.");
-      onBack();
+      router.push("/customers");
     } catch (e: any) {
       alert("Failed to delete user: " + e.message);
     }
@@ -127,7 +137,7 @@ export default function CustomerDetailPage({ userId, onBack }: CustomerDetailPag
       <div>
         <button
           className="btn-secondary"
-          onClick={onBack}
+          onClick={handleBack}
           style={{ marginBottom: 16, padding: "8px 14px", fontSize: 13 }}
         >
           <ArrowLeft style={{ width: 15, height: 15 }} /> Back to Customers Directory

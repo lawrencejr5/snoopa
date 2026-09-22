@@ -1,46 +1,51 @@
 "use client";
 
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useQuery } from "convex/react";
 import { BarChart3, Database, MessageSquare, Radio, Users } from "lucide-react";
 import { api } from "../../convex/_generated/api";
 
-export type TabType =
-  "analytics" | "customers" | "watchlists" | "crud" | "reports_feedback";
-
-interface SidebarProps {
-  activeTab: TabType;
-  setActiveTab: (tab: TabType) => void;
-}
-
-export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
+export default function Sidebar() {
+  const pathname = usePathname();
   const unreadFeedbackCount = useQuery(api.feedback.getUnreadFeedbackCount);
 
   const navItems = [
     {
-      id: "analytics" as TabType,
+      id: "analytics",
+      href: "/",
       label: "Analytics & Revenue",
       icon: BarChart3,
+      isActive: pathname === "/" || pathname === "/analytics",
     },
     {
-      id: "customers" as TabType,
+      id: "customers",
+      href: "/customers",
       label: "Customer Explorer",
       icon: Users,
+      isActive: pathname.startsWith("/customers"),
     },
     {
-      id: "watchlists" as TabType,
+      id: "watchlists",
+      href: "/watchlists",
       label: "Watchlists & Intel",
       icon: Radio,
+      isActive: pathname.startsWith("/watchlists"),
     },
     {
-      id: "reports_feedback" as TabType,
+      id: "reports_feedback",
+      href: "/reports-feedback",
       label: "Reports & Feedback",
       icon: MessageSquare,
       badge: unreadFeedbackCount || 0,
+      isActive: pathname.startsWith("/reports-feedback"),
     },
     {
-      id: "crud" as TabType,
+      id: "crud",
+      href: "/crud",
       label: "Table Manager (CRUD)",
       icon: Database,
+      isActive: pathname.startsWith("/crud"),
     },
   ];
 
@@ -57,12 +62,12 @@ export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
       <nav className="sidebar-nav">
         {navItems.map((item) => {
           const Icon = item.icon;
-          const isActive = activeTab === item.id;
+          const isActive = item.isActive;
           return (
-            <button
+            <Link
               key={item.id}
+              href={item.href}
               className={`nav-item ${isActive ? "active" : ""}`}
-              onClick={() => setActiveTab(item.id)}
             >
               <Icon
                 className="icon"
@@ -89,7 +94,7 @@ export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
                   </span>
                 )}
               </span>
-            </button>
+            </Link>
           );
         })}
       </nav>

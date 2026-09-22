@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
@@ -16,7 +17,6 @@ import {
   ArrowUp,
   ArrowDown,
 } from "lucide-react";
-import CustomerDetailPage from "./CustomerDetailPage";
 
 function formatTimeAgo(timestamp: number) {
   if (!timestamp) return "Never";
@@ -34,11 +34,11 @@ function formatTimeAgo(timestamp: number) {
 type SortField = "created" | "country" | "snoops" | "watchlists" | "lastSeen";
 
 export default function CustomersView() {
+  const router = useRouter();
   const [search, setSearch] = useState("");
   const [tierFilter, setTierFilter] = useState("all");
   const [sortBy, setSortBy] = useState<SortField>("created");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
-  const [selectedUserId, setSelectedUserId] = useState<Id<"users"> | null>(null);
 
   // Direct Convex query
   const users = useQuery(api.admin.getUsers, {
@@ -91,15 +91,6 @@ export default function CustomersView() {
       <ArrowDown style={{ width: 12, height: 12, marginLeft: 4, display: "inline" }} />
     );
   };
-
-  if (selectedUserId) {
-    return (
-      <CustomerDetailPage
-        userId={selectedUserId}
-        onBack={() => setSelectedUserId(null)}
-      />
-    );
-  }
 
   return (
     <div>
@@ -207,7 +198,7 @@ export default function CustomersView() {
                 const isGoogle = u.provider === "google" || u.os === "Android";
 
                 return (
-                  <tr key={u._id} onClick={() => setSelectedUserId(u._id)}>
+                  <tr key={u._id} onClick={() => router.push(`/customers/${u._id}`)}>
                     <td>
                       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                         <div className="avatar-circle">
@@ -279,7 +270,7 @@ export default function CustomersView() {
                         className="btn-secondary"
                         onClick={(e) => {
                           e.stopPropagation();
-                          setSelectedUserId(u._id);
+                          router.push(`/customers/${u._id}`);
                         }}
                         style={{ padding: "6px 12px", fontSize: 12 }}
                       >

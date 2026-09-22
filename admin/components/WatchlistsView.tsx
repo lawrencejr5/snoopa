@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
@@ -18,7 +19,6 @@ import {
   Bell,
   Tag,
 } from "lucide-react";
-import WatchlistDetailPage from "./WatchlistDetailPage";
 
 function formatTimeAgo(timestamp: number) {
   if (!timestamp) return "Never";
@@ -43,12 +43,11 @@ type SortField =
   | "notifications";
 
 export default function WatchlistsView() {
+  const router = useRouter();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [sortBy, setSortBy] = useState<SortField>("created");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
-  const [selectedWatchlistId, setSelectedWatchlistId] =
-    useState<Id<"watchlist"> | null>(null);
 
   // Convex query
   const watchlists = useQuery(api.admin.getWatchlists, {
@@ -107,15 +106,6 @@ export default function WatchlistsView() {
       <ArrowDown style={{ width: 12, height: 12, marginLeft: 4, display: "inline" }} />
     );
   };
-
-  if (selectedWatchlistId) {
-    return (
-      <WatchlistDetailPage
-        watchlistId={selectedWatchlistId}
-        onBack={() => setSelectedWatchlistId(null)}
-      />
-    );
-  }
 
   return (
     <div>
@@ -266,7 +256,7 @@ export default function WatchlistsView() {
                 return (
                   <tr
                     key={w._id}
-                    onClick={() => setSelectedWatchlistId(w._id)}
+                    onClick={() => router.push(`/watchlists/${w._id}`)}
                   >
                     <td>
                       <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
@@ -388,7 +378,7 @@ export default function WatchlistsView() {
                         className="btn-secondary"
                         onClick={(e) => {
                           e.stopPropagation();
-                          setSelectedWatchlistId(w._id);
+                          router.push(`/watchlists/${w._id}`);
                         }}
                         style={{ padding: "6px 12px", fontSize: 12 }}
                       >

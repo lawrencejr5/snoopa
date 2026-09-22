@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
@@ -25,7 +26,7 @@ import {
 
 interface WatchlistDetailPageProps {
   watchlistId: Id<"watchlist">;
-  onBack: () => void;
+  onBack?: () => void;
 }
 
 function formatTimeAgo(timestamp: number) {
@@ -45,6 +46,7 @@ export default function WatchlistDetailPage({
   watchlistId,
   onBack,
 }: WatchlistDetailPageProps) {
+  const router = useRouter();
   const data = useQuery(api.admin.getWatchlistDetails, {
     watchlist_id: watchlistId,
   });
@@ -57,12 +59,20 @@ export default function WatchlistDetailPage({
   const [updating, setUpdating] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
 
+  const handleBack = () => {
+    if (onBack) {
+      onBack();
+    } else {
+      router.back();
+    }
+  };
+
   if (!data || !data.watchlist) {
     return (
       <div style={{ padding: 40, textAlign: "center", color: "var(--text-secondary)" }}>
         <button
           className="btn-secondary"
-          onClick={onBack}
+          onClick={handleBack}
           style={{ marginBottom: 20 }}
         >
           <ArrowLeft style={{ width: 16, height: 16 }} /> Back to Watchlists Directory
@@ -102,7 +112,7 @@ export default function WatchlistDetailPage({
     try {
       await deleteWatchlist({ watchlist_id: watchlist._id });
       alert("Watchlist and associated chats & notifications deleted successfully.");
-      onBack();
+      router.push("/watchlists");
     } catch (e: any) {
       alert("Failed to delete watchlist: " + e.message);
     }
@@ -114,7 +124,7 @@ export default function WatchlistDetailPage({
       <div>
         <button
           className="btn-secondary"
-          onClick={onBack}
+          onClick={handleBack}
           style={{ marginBottom: 16, padding: "8px 14px", fontSize: 13 }}
         >
           <ArrowLeft style={{ width: 15, height: 15 }} /> Back to Watchlists Directory
