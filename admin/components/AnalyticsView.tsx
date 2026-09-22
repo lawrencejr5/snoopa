@@ -210,7 +210,7 @@ export default function AnalyticsView() {
                   paddingAngle={5}
                   dataKey="value"
                 >
-                  {storeData.map((entry, index) => (
+                  {storeData.map((entry: { name: string; value: number; color: string }, index: number) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
@@ -233,7 +233,7 @@ export default function AnalyticsView() {
               marginTop: 10,
             }}
           >
-            {storeData.map((item) => (
+            {storeData.map((item: { name: string; value: number; color: string }) => (
               <div
                 key={item.name}
                 style={{
@@ -270,7 +270,7 @@ export default function AnalyticsView() {
             />
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {countries.map((c) => (
+            {countries.map((c: { code: string; count: number }) => (
               <div
                 key={c.code}
                 style={{
