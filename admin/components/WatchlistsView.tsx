@@ -309,8 +309,15 @@ export default function WatchlistsView() {
                       </div>
                     </td>
                     <td>
-                      <div>
-                        <div style={{ fontWeight: 600, fontSize: 13 }}>
+                      <div
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          router.push(`/customers/${w.user_id}`);
+                        }}
+                        style={{ cursor: "pointer" }}
+                        title={`View customer profile for ${w.owner_name}`}
+                      >
+                        <div style={{ fontWeight: 600, fontSize: 13, color: "var(--accent-milk)", textDecoration: "underline" }}>
                           {w.owner_name}
                         </div>
                         <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>

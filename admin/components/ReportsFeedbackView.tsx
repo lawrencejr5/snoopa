@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
@@ -34,6 +35,7 @@ function formatTimeAgo(timestamp: number) {
 }
 
 export default function ReportsFeedbackView() {
+  const router = useRouter();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [selectedFeedback, setSelectedFeedback] = useState<any | null>(null);
@@ -209,13 +211,27 @@ export default function ReportsFeedbackView() {
                         display: "flex",
                         alignItems: "center",
                         gap: 10,
+                        cursor: f.user_id ? "pointer" : "default",
+                      }}
+                      onClick={(e) => {
+                        if (f.user_id) {
+                          e.stopPropagation();
+                          router.push(`/customers/${f.user_id}`);
+                        }
                       }}
                     >
                       <div className="avatar-circle" style={{ width: 32, height: 32, fontSize: 14 }}>
-                        {f.user_fullname.charAt(0).toUpperCase()}
+                        {f.user_fullname ? f.user_fullname.charAt(0).toUpperCase() : "U"}
                       </div>
                       <div>
-                        <div style={{ fontWeight: 600, fontSize: 14 }}>
+                        <div
+                          style={{
+                            fontWeight: 600,
+                            fontSize: 14,
+                            color: f.user_id ? "var(--accent-milk)" : "inherit",
+                            textDecoration: f.user_id ? "underline" : "none",
+                          }}
+                        >
                           {f.user_fullname}
                         </div>
                         <div
@@ -435,14 +451,35 @@ export default function ReportsFeedbackView() {
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "space-between",
+                flexWrap: "wrap",
+                gap: 12,
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 12,
+                  cursor: selectedFeedback.user_id ? "pointer" : "default",
+                }}
+                onClick={() => {
+                  if (selectedFeedback.user_id) {
+                    router.push(`/customers/${selectedFeedback.user_id}`);
+                  }
+                }}
+              >
                 <div className="avatar-circle">
-                  {selectedFeedback.user_fullname.charAt(0).toUpperCase()}
+                  {selectedFeedback.user_fullname ? selectedFeedback.user_fullname.charAt(0).toUpperCase() : "U"}
                 </div>
                 <div>
-                  <div style={{ fontWeight: 600, fontSize: 14 }}>
+                  <div
+                    style={{
+                      fontWeight: 600,
+                      fontSize: 14,
+                      color: selectedFeedback.user_id ? "var(--accent-milk)" : "inherit",
+                      textDecoration: selectedFeedback.user_id ? "underline" : "none",
+                    }}
+                  >
                     {selectedFeedback.user_fullname}
                   </div>
                   <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>
@@ -451,9 +488,15 @@ export default function ReportsFeedbackView() {
                 </div>
               </div>
 
-              <div style={{ fontSize: 11, fontFamily: "monospace", color: "var(--text-muted)" }}>
-                ID: {selectedFeedback.user_id}
-              </div>
+              {selectedFeedback.user_id && (
+                <button
+                  className="btn-secondary"
+                  style={{ padding: "6px 12px", fontSize: 12 }}
+                  onClick={() => router.push(`/customers/${selectedFeedback.user_id}`)}
+                >
+                  <User style={{ width: 13, height: 13 }} /> View Customer Profile
+                </button>
+              )}
             </div>
 
             {/* Feedback Full Content */}
