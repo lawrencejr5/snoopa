@@ -545,7 +545,11 @@ export default function CustomerDetailPage({
       {/* Account & Subscription Settings Tab */}
       {activeTab === "overview" && (
         <div
-          style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+            gap: 20,
+          }}
         >
           {/* Admin Subscription Manager Card */}
           <div className="card" style={{ padding: 24 }}>

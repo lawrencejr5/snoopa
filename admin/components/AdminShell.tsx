@@ -16,6 +16,7 @@ interface AdminShellProps {
 export default function AdminShell({ children }: AdminShellProps) {
   const [token, setToken] = useState<string | null>(null);
   const [isInitializing, setIsInitializing] = useState(true);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
 
@@ -97,7 +98,18 @@ export default function AdminShell({ children }: AdminShellProps) {
 
   return (
     <div className="app-container">
-      <Sidebar />
+      {/* Mobile Drawer Backdrop Overlay */}
+      {mobileMenuOpen && (
+        <div
+          className="sidebar-backdrop"
+          onClick={() => setMobileMenuOpen(false)}
+        />
+      )}
+
+      <Sidebar
+        mobileOpen={mobileMenuOpen}
+        onClose={() => setMobileMenuOpen(false)}
+      />
 
       <div className="main-wrapper">
         <Header
@@ -112,6 +124,7 @@ export default function AdminShell({ children }: AdminShellProps) {
           onRefresh={() => {
             router.refresh();
           }}
+          onToggleMobileMenu={() => setMobileMenuOpen((prev) => !prev)}
         />
 
         <main className="content-body">{children}</main>

@@ -1,6 +1,6 @@
 "use client";
 
-import { LogOut, RefreshCw, ShieldAlert } from "lucide-react";
+import { LogOut, Menu, RefreshCw, ShieldAlert } from "lucide-react";
 import { useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 
@@ -11,6 +11,7 @@ interface HeaderProps {
   token: string;
   onSignOut: () => void;
   onRefresh?: () => void;
+  onToggleMobileMenu?: () => void;
 }
 
 export default function Header({
@@ -20,6 +21,7 @@ export default function Header({
   token,
   onSignOut,
   onRefresh,
+  onToggleMobileMenu,
 }: HeaderProps) {
   const signOut = useMutation(api.admin.signOutAdmin);
 
@@ -37,9 +39,19 @@ export default function Header({
 
   return (
     <header className="top-header">
-      <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+        {onToggleMobileMenu && (
+          <button
+            className="btn-icon mobile-menu-btn"
+            onClick={onToggleMobileMenu}
+            title="Toggle Menu"
+          >
+            <Menu style={{ width: 18, height: 18 }} />
+          </button>
+        )}
+
         <h2 className="header-title font-header">{title}</h2>
-        <span className="badge badge-muted" style={{ fontSize: 11 }}>
+        <span className="badge badge-muted header-prod-badge" style={{ fontSize: 11 }}>
           <ShieldAlert style={{ width: 12, height: 12 }} /> Production
         </span>
       </div>
@@ -52,6 +64,7 @@ export default function Header({
         )}
 
         <div
+          className="admin-user-chip"
           style={{
             display: "flex",
             alignItems: "center",
@@ -63,7 +76,7 @@ export default function Header({
           }}
         >
           <div className="avatar-circle">{adminName.charAt(0).toUpperCase()}</div>
-          <div style={{ display: "flex", flexDirection: "column" }}>
+          <div className="admin-email-text" style={{ display: "flex", flexDirection: "column" }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>
               {adminName}
             </span>
@@ -73,7 +86,7 @@ export default function Header({
 
         <button className="btn-secondary" onClick={handleLogout} title="Sign Out">
           <LogOut style={{ width: 16, height: 16, color: "var(--accent-danger)" }} />
-          <span style={{ fontSize: 13 }}>Sign Out</span>
+          <span className="btn-text" style={{ fontSize: 13 }}>Sign Out</span>
         </button>
       </div>
     </header>

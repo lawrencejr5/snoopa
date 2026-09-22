@@ -4,10 +4,15 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useQuery } from "convex/react";
-import { BarChart3, Database, MessageSquare, Radio, Users } from "lucide-react";
+import { BarChart3, Database, MessageSquare, Radio, Users, X } from "lucide-react";
 import { api } from "../../convex/_generated/api";
 
-export default function Sidebar() {
+interface SidebarProps {
+  mobileOpen?: boolean;
+  onClose?: () => void;
+}
+
+export default function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
   const pathname = usePathname();
   const unreadFeedbackCount = useQuery(api.feedback.getUnreadFeedbackCount);
 
@@ -51,31 +56,49 @@ export default function Sidebar() {
   ];
 
   return (
-    <aside className="sidebar">
-      <div className="sidebar-header">
-        <div
-          className="logo-badge"
-          style={{
-            background: "transparent",
-            padding: 0,
-            overflow: "hidden",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <Image
-            src="/images/icon-nobg.png"
-            alt="Snoopa Logo"
-            width={36}
-            height={36}
-            style={{ objectFit: "contain" }}
-          />
+    <aside className={`sidebar ${mobileOpen ? "mobile-open" : ""}`}>
+      <div className="sidebar-header" style={{ justifyContent: "space-between" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div
+            className="logo-badge"
+            style={{
+              background: "transparent",
+              padding: 0,
+              overflow: "hidden",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Image
+              src="/images/icon-nobg.png"
+              alt="Snoopa Logo"
+              width={36}
+              height={36}
+              style={{ objectFit: "contain" }}
+            />
+          </div>
+          <div>
+            <h1 className="brand-title">Snoopa</h1>
+            <p className="brand-subtitle">Admin Intelligence</p>
+          </div>
         </div>
-        <div>
-          <h1 className="brand-title">Snoopa</h1>
-          <p className="brand-subtitle">Admin Intelligence</p>
-        </div>
+
+        {onClose && (
+          <button
+            className="mobile-close-btn"
+            onClick={onClose}
+            title="Close Menu"
+            style={{
+              background: "none",
+              border: "none",
+              color: "var(--text-secondary)",
+              cursor: "pointer",
+            }}
+          >
+            <X style={{ width: 20, height: 20 }} />
+          </button>
+        )}
       </div>
 
       <nav className="sidebar-nav">
@@ -87,6 +110,7 @@ export default function Sidebar() {
               key={item.id}
               href={item.href}
               className={`nav-item ${isActive ? "active" : ""}`}
+              onClick={() => onClose?.()}
             >
               <Icon
                 className="icon"
