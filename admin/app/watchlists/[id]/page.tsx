@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { Id } from "../../../../convex/_generated/dataModel";
+import { Id } from "@convex/_generated/dataModel";
 import WatchlistDetailPage from "../../../components/WatchlistDetailPage";
 
 export default function WatchlistDetailRoutePage() {

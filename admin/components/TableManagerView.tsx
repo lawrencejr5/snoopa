@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
-import { api } from "../../convex/_generated/api";
+import { api } from "@convex/_generated/api";
 import { Database, Plus, Trash2, Edit3, Eye, Search, X, Check } from "lucide-react";
 
 const TABLES = [

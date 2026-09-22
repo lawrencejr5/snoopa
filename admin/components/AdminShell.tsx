@@ -4,7 +4,7 @@ import { useEffect, useState, ReactNode } from "react";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useQuery } from "convex/react";
-import { api } from "../../convex/_generated/api";
+import { api } from "@convex/_generated/api";
 import Sidebar from "./Sidebar";
 import Header from "./Header";
 import AdminAuth from "./AdminAuth";

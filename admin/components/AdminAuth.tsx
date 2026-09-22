@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import { useMutation } from "convex/react";
-import { api } from "../../convex/_generated/api";
+import { api } from "@convex/_generated/api";
 import { Lock, Mail, User, ArrowRight, ShieldCheck } from "lucide-react";
 
 interface AdminAuthProps {

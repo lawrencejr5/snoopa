@@ -5,7 +5,7 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useQuery, useMutation } from "convex/react";
 import { BarChart3, Database, MessageSquare, Radio, Users, X, LogOut } from "lucide-react";
-import { api } from "../../convex/_generated/api";
+import { api } from "@convex/_generated/api";
 
 interface SidebarProps {
   mobileOpen?: boolean;
