@@ -1,8 +1,13 @@
 "use client";
 
-import { BarChart3, Users, Database, MessageSquare } from "lucide-react";
+import { BarChart3, Users, Radio, Database, MessageSquare } from "lucide-react";
 
-export type TabType = "analytics" | "customers" | "crud" | "waitlist_feedback";
+export type TabType =
+  | "analytics"
+  | "customers"
+  | "watchlists"
+  | "crud"
+  | "waitlist_feedback";
 
 interface SidebarProps {
   activeTab: TabType;
@@ -20,6 +25,11 @@ export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
       id: "customers" as TabType,
       label: "Customer Explorer",
       icon: Users,
+    },
+    {
+      id: "watchlists" as TabType,
+      label: "Watchlists & Intel",
+      icon: Radio,
     },
     {
       id: "crud" as TabType,

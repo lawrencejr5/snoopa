@@ -343,7 +343,18 @@ export default function CustomerDetailPage({ userId, onBack }: CustomerDetailPag
                             </span>
                           )}
                         </div>
-                        <div style={{ fontSize: 14, color: "var(--text-primary)" }}>
+                        <div
+                          style={{
+                            fontSize: 14,
+                            color: "var(--text-primary)",
+                            display: "-webkit-box",
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: "vertical",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            lineHeight: "1.4",
+                          }}
+                        >
                           <strong style={{ color: "var(--text-secondary)" }}>Condition to Snoop: </strong>
                           <span>"{wl.condition}"</span>
                         </div>

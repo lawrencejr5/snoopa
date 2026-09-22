@@ -8,6 +8,7 @@ import Header from "../components/Header";
 import AdminAuth from "../components/AdminAuth";
 import AnalyticsView from "../components/AnalyticsView";
 import CustomersView from "../components/CustomersView";
+import WatchlistsView from "../components/WatchlistsView";
 import TableManagerView from "../components/TableManagerView";
 import WaitlistFeedbackView from "../components/WaitlistFeedbackView";
 
@@ -54,6 +55,8 @@ export default function AdminPage() {
         return "Analytics & Revenue Intelligence";
       case "customers":
         return "Customer Explorer & Profile Intel";
+      case "watchlists":
+        return "Watchlist Intelligence & Proactive Snoopers";
       case "crud":
         return "Database Table Manager";
       case "waitlist_feedback":
@@ -80,6 +83,7 @@ export default function AdminPage() {
         <main className="content-body" key={refreshKey}>
           {activeTab === "analytics" && <AnalyticsView />}
           {activeTab === "customers" && <CustomersView />}
+          {activeTab === "watchlists" && <WatchlistsView />}
           {activeTab === "crud" && <TableManagerView />}
           {activeTab === "waitlist_feedback" && <WaitlistFeedbackView />}
         </main>

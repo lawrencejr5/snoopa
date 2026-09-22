@@ -535,6 +535,173 @@ export const deleteUserAdmin = mutation({
 });
 
 // ==========================================
+// WATCHLIST INTELLIGENCE & EXPLORER
+// ==========================================
+
+export const getWatchlists = query({
+  args: {
+    search: v.optional(v.string()),
+    status_filter: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    let watchlists = await ctx.db.query("watchlist").collect();
+
+    // Join user data, chat count, and notification count
+    const [users, chats, notifications] = await Promise.all([
+      ctx.db.query("users").collect(),
+      ctx.db.query("chats").collect(),
+      ctx.db.query("notifications").collect(),
+    ]);
+
+    const users_map = new Map(users.map((u) => [u._id.toString(), u]));
+
+    const chat_count_map = new Map<string, number>();
+    chats.forEach((c) => {
+      if (c.watchlist_id) {
+        const w_id = c.watchlist_id.toString();
+        chat_count_map.set(w_id, (chat_count_map.get(w_id) || 0) + 1);
+      }
+    });
+
+    const notif_count_map = new Map<string, number>();
+    notifications.forEach((n) => {
+      if (n.watchlist_id) {
+        const w_id = n.watchlist_id.toString();
+        notif_count_map.set(w_id, (notif_count_map.get(w_id) || 0) + 1);
+      }
+    });
+
+    let results = watchlists.map((w) => {
+      const owner = users_map.get(w.user_id.toString());
+      const w_id_str = w._id.toString();
+      return {
+        ...w,
+        owner_name: owner ? owner.fullname || owner.email : "Unknown User",
+        owner_email: owner ? owner.email : "Unknown",
+        chat_count: chat_count_map.get(w_id_str) || 0,
+        notification_count: notif_count_map.get(w_id_str) || 0,
+      };
+    });
+
+    if (args.search) {
+      const term = args.search.toLowerCase();
+      results = results.filter(
+        (w) =>
+          w.title.toLowerCase().includes(term) ||
+          w.condition.toLowerCase().includes(term) ||
+          w.owner_name.toLowerCase().includes(term) ||
+          w.owner_email.toLowerCase().includes(term) ||
+          w.keywords.some((k) => k.toLowerCase().includes(term))
+      );
+    }
+
+    if (args.status_filter && args.status_filter !== "all") {
+      results = results.filter((w) => w.status === args.status_filter);
+    }
+
+    results.sort((a, b) => b._creationTime - a._creationTime);
+
+    return results;
+  },
+});
+
+export const getWatchlistDetails = query({
+  args: { watchlist_id: v.id("watchlist") },
+  handler: async (ctx, args) => {
+    const watchlist = await ctx.db.get(args.watchlist_id);
+    if (!watchlist) return null;
+
+    const owner = await ctx.db.get(watchlist.user_id);
+
+    const [chats, notifications, logs, monitored_sources, processed_headlines] =
+      await Promise.all([
+        ctx.db
+          .query("chats")
+          .withIndex("by_watchlist", (q) => q.eq("watchlist_id", args.watchlist_id))
+          .collect(),
+        ctx.db
+          .query("notifications")
+          .withIndex("by_watchlist", (q) => q.eq("watchlist_id", args.watchlist_id))
+          .collect(),
+        ctx.db
+          .query("logs")
+          .withIndex("by_watchlist", (q) => q.eq("watchlist_id", args.watchlist_id))
+          .collect(),
+        ctx.db
+          .query("monitored_sources")
+          .withIndex("by_watchlist", (q) => q.eq("watchlist_id", args.watchlist_id))
+          .collect(),
+        ctx.db
+          .query("processed_headlines")
+          .withIndex("by_watchlist", (q) => q.eq("watchlist_id", args.watchlist_id))
+          .collect(),
+      ]);
+
+    chats.sort((a, b) => a._creationTime - b._creationTime);
+    notifications.sort((a, b) => b._creationTime - a._creationTime);
+    logs.sort((a, b) => b.timestamp - a.timestamp);
+
+    return {
+      watchlist,
+      owner,
+      chats,
+      notifications,
+      logs,
+      monitored_sources,
+      processed_headlines,
+    };
+  },
+});
+
+export const updateWatchlistStatusAdmin = mutation({
+  args: {
+    watchlist_id: v.id("watchlist"),
+    status: v.union(v.literal("active"), v.literal("completed"), v.literal("inactive")),
+  },
+  handler: async (ctx, args) => {
+    const watchlist = await ctx.db.get(args.watchlist_id);
+    if (!watchlist) throw new Error("Watchlist not found");
+
+    await ctx.db.patch(args.watchlist_id, {
+      status: args.status,
+    });
+
+    return { success: true };
+  },
+});
+
+export const deleteWatchlistAdmin = mutation({
+  args: { watchlist_id: v.id("watchlist") },
+  handler: async (ctx, args) => {
+    const watchlist = await ctx.db.get(args.watchlist_id);
+    if (!watchlist) throw new Error("Watchlist not found");
+
+    const [logs, chats, sources, monitoredSources, notifications, processedHeadlines] =
+      await Promise.all([
+        ctx.db.query("logs").withIndex("by_watchlist", (q) => q.eq("watchlist_id", args.watchlist_id)).collect(),
+        ctx.db.query("chats").withIndex("by_watchlist", (q) => q.eq("watchlist_id", args.watchlist_id)).collect(),
+        ctx.db.query("sources").withIndex("by_watchlist", (q) => q.eq("watchlist_id", args.watchlist_id)).collect(),
+        ctx.db.query("monitored_sources").withIndex("by_watchlist", (q) => q.eq("watchlist_id", args.watchlist_id)).collect(),
+        ctx.db.query("notifications").withIndex("by_watchlist", (q) => q.eq("watchlist_id", args.watchlist_id)).collect(),
+        ctx.db.query("processed_headlines").withIndex("by_watchlist", (q) => q.eq("watchlist_id", args.watchlist_id)).collect(),
+      ]);
+
+    await Promise.all([
+      ...logs.map((item) => ctx.db.delete(item._id)),
+      ...chats.map((item) => ctx.db.delete(item._id)),
+      ...sources.map((item) => ctx.db.delete(item._id)),
+      ...monitoredSources.map((item) => ctx.db.delete(item._id)),
+      ...notifications.map((item) => ctx.db.delete(item._id)),
+      ...processedHeadlines.map((item) => ctx.db.delete(item._id)),
+      ctx.db.delete(args.watchlist_id),
+    ]);
+
+    return { success: true };
+  },
+});
+
+
+// ==========================================
 // UNIVERSAL DATABASE TABLE MANAGER (CRUD)
 // ==========================================
 
