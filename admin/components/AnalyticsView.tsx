@@ -291,7 +291,7 @@ export default function AnalyticsView() {
                     {c.code}
                   </span>
                   <span style={{ fontSize: 14, fontWeight: 500 }}>
-                    {c.country}
+                    {c.code}
                   </span>
                 </div>
                 <span
