@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useQuery } from "convex/react";
 import { BarChart3, Database, MessageSquare, Radio, Users } from "lucide-react";
@@ -52,7 +53,25 @@ export default function Sidebar() {
   return (
     <aside className="sidebar">
       <div className="sidebar-header">
-        <div className="logo-badge">S</div>
+        <div
+          className="logo-badge"
+          style={{
+            background: "transparent",
+            padding: 0,
+            overflow: "hidden",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Image
+            src="/images/icon-nobg.png"
+            alt="Snoopa Logo"
+            width={36}
+            height={36}
+            style={{ objectFit: "contain" }}
+          />
+        </div>
         <div>
           <h1 className="brand-title">Snoopa</h1>
           <p className="brand-subtitle">Admin Intelligence</p>

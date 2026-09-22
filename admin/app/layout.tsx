@@ -6,6 +6,9 @@ import AdminShell from "../components/AdminShell";
 export const metadata: Metadata = {
   title: "Snoopa | Admin & Analytics",
   description: "Tactical Luxury Admin Intelligence for Snoopa",
+  icons: {
+    icon: "/images/icon-nobg.png",
+  },
 };
 
 export default function RootLayout({

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, ReactNode } from "react";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
@@ -14,6 +15,7 @@ interface AdminShellProps {
 
 export default function AdminShell({ children }: AdminShellProps) {
   const [token, setToken] = useState<string | null>(null);
+  const [isInitializing, setIsInitializing] = useState(true);
   const pathname = usePathname();
   const router = useRouter();
 
@@ -23,6 +25,7 @@ export default function AdminShell({ children }: AdminShellProps) {
     if (savedToken) {
       setToken(savedToken);
     }
+    setIsInitializing(false);
   }, []);
 
   const sessionCheck = useQuery(
@@ -30,18 +33,38 @@ export default function AdminShell({ children }: AdminShellProps) {
     token ? { token } : "skip"
   );
 
-  if (!token || sessionCheck?.valid === false) {
-    return <AdminAuth onAuthenticated={(newToken) => setToken(newToken)} />;
-  }
-
-  if (token && sessionCheck === undefined) {
+  // Show loading screen while reading stored token or validating session with Convex
+  if (isInitializing || (token && sessionCheck === undefined)) {
     return (
       <div className="auth-wrapper">
-        <div style={{ color: "var(--text-secondary)", fontSize: 16 }}>
-          Authenticating Snoopa Admin Session...
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
+          <div
+            style={{
+              width: 48,
+              height: 48,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Image
+              src="/images/icon-nobg.png"
+              alt="Snoopa Logo"
+              width={48}
+              height={48}
+              style={{ objectFit: "contain" }}
+            />
+          </div>
+          <div style={{ color: "var(--text-secondary)", fontSize: 14, fontWeight: 500 }}>
+            Authenticating Snoopa Admin Session...
+          </div>
         </div>
       </div>
     );
+  }
+
+  if (!token || sessionCheck?.valid === false) {
+    return <AdminAuth onAuthenticated={(newToken) => setToken(newToken)} />;
   }
 
   const adminName = sessionCheck?.admin?.name || "Admin";

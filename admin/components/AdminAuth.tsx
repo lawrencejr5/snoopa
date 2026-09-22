@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Lock, Mail, User, ArrowRight, ShieldCheck } from "lucide-react";
@@ -54,7 +55,25 @@ export default function AdminAuth({ onAuthenticated }: AdminAuthProps) {
     <div className="auth-wrapper">
       <div className="auth-card">
         <div className="auth-header">
-          <div className="auth-logo">S</div>
+          <div
+            className="auth-logo"
+            style={{
+              background: "transparent",
+              padding: 0,
+              overflow: "hidden",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Image
+              src="/images/icon-nobg.png"
+              alt="Snoopa Logo"
+              width={54}
+              height={54}
+              style={{ objectFit: "contain" }}
+            />
+          </div>
           <h1 className="auth-title font-header">Snoopa Admin</h1>
           <p className="auth-subtitle">
             {isSignUp ? "Create a new admin investigator account" : "Enter your credentials to access intel"}
