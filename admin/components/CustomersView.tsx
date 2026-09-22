@@ -16,7 +16,7 @@ import {
   ArrowUp,
   ArrowDown,
 } from "lucide-react";
-import UserDetailModal from "./UserDetailModal";
+import CustomerDetailPage from "./CustomerDetailPage";
 
 function formatTimeAgo(timestamp: number) {
   if (!timestamp) return "Never";
@@ -91,6 +91,15 @@ export default function CustomersView() {
       <ArrowDown style={{ width: 12, height: 12, marginLeft: 4, display: "inline" }} />
     );
   };
+
+  if (selectedUserId) {
+    return (
+      <CustomerDetailPage
+        userId={selectedUserId}
+        onBack={() => setSelectedUserId(null)}
+      />
+    );
+  }
 
   return (
     <div>
@@ -284,13 +293,6 @@ export default function CustomersView() {
           </table>
         )}
       </div>
-
-      {selectedUserId && (
-        <UserDetailModal
-          userId={selectedUserId}
-          onClose={() => setSelectedUserId(null)}
-        />
-      )}
     </div>
   );
 }
