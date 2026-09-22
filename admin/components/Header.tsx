@@ -1,16 +1,11 @@
 "use client";
 
-import { LogOut, Menu, RefreshCw, ShieldAlert } from "lucide-react";
-import { useMutation } from "convex/react";
-import { api } from "../../convex/_generated/api";
+import { Menu, ShieldAlert } from "lucide-react";
 
 interface HeaderProps {
   title: string;
   adminName: string;
   adminEmail: string;
-  token: string;
-  onSignOut: () => void;
-  onRefresh?: () => void;
   onToggleMobileMenu?: () => void;
 }
 
@@ -18,25 +13,8 @@ export default function Header({
   title,
   adminName,
   adminEmail,
-  token,
-  onSignOut,
-  onRefresh,
   onToggleMobileMenu,
 }: HeaderProps) {
-  const signOut = useMutation(api.admin.signOutAdmin);
-
-  const handleLogout = async () => {
-    try {
-      if (token) {
-        await signOut({ token });
-      }
-    } catch (e) {
-      console.error(e);
-    }
-    localStorage.removeItem("snoopa_admin_token");
-    onSignOut();
-  };
-
   return (
     <header className="top-header">
       <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
@@ -57,12 +35,6 @@ export default function Header({
       </div>
 
       <div className="header-actions">
-        {onRefresh && (
-          <button className="btn-icon" onClick={onRefresh} title="Refresh Data">
-            <RefreshCw style={{ width: 16, height: 16 }} />
-          </button>
-        )}
-
         <div
           className="admin-user-chip"
           style={{
@@ -83,11 +55,6 @@ export default function Header({
             <span style={{ fontSize: 11, color: "var(--text-secondary)" }}>{adminEmail}</span>
           </div>
         </div>
-
-        <button className="btn-secondary" onClick={handleLogout} title="Sign Out">
-          <LogOut style={{ width: 16, height: 16, color: "var(--accent-danger)" }} />
-          <span className="btn-text" style={{ fontSize: 13 }}>Sign Out</span>
-        </button>
       </div>
     </header>
   );

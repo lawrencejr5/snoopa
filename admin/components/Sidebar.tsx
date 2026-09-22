@@ -3,18 +3,34 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { useQuery } from "convex/react";
-import { BarChart3, Database, MessageSquare, Radio, Users, X } from "lucide-react";
+import { useQuery, useMutation } from "convex/react";
+import { BarChart3, Database, MessageSquare, Radio, Users, X, LogOut } from "lucide-react";
 import { api } from "../../convex/_generated/api";
 
 interface SidebarProps {
   mobileOpen?: boolean;
   onClose?: () => void;
+  token?: string | null;
+  onSignOut?: () => void;
 }
 
-export default function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
+export default function Sidebar({ mobileOpen = false, onClose, token, onSignOut }: SidebarProps) {
   const pathname = usePathname();
   const unreadFeedbackCount = useQuery(api.feedback.getUnreadFeedbackCount);
+  const signOut = useMutation(api.admin.signOutAdmin);
+
+  const handleLogout = async () => {
+    try {
+      if (token) {
+        await signOut({ token });
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    localStorage.removeItem("snoopa_admin_token");
+    if (onSignOut) onSignOut();
+    if (onClose) onClose();
+  };
 
   const navItems = [
     {
@@ -143,21 +159,21 @@ export default function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
       </nav>
 
       <div className="sidebar-footer">
-        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-          <span
-            style={{
-              fontSize: 11,
-              fontWeight: 700,
-              color: "var(--accent-milk)",
-              letterSpacing: "0.05em",
-            }}
-          >
-            GREYHOUND SPIRIT
-          </span>
-          <span style={{ fontSize: 10, color: "var(--text-muted)" }}>
-            Proactive Fact Investigator
-          </span>
-        </div>
+        <button
+          className="btn-secondary"
+          onClick={handleLogout}
+          title="Sign Out"
+          style={{
+            width: "100%",
+            justifyContent: "center",
+            padding: "10px 14px",
+            borderColor: "var(--accent-danger-glow)",
+            color: "var(--accent-danger)",
+          }}
+        >
+          <LogOut style={{ width: 16, height: 16, color: "var(--accent-danger)" }} />
+          <span style={{ fontSize: 13, fontWeight: 600 }}>Sign Out</span>
+        </button>
       </div>
     </aside>
   );

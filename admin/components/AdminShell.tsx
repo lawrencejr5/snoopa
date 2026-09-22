@@ -96,6 +96,12 @@ export default function AdminShell({ children }: AdminShellProps) {
     return "Admin Dashboard";
   };
 
+  const handleSignOut = () => {
+    setToken(null);
+    setMobileMenuOpen(false);
+    router.push("/");
+  };
+
   return (
     <div className="app-container">
       {/* Mobile Drawer Backdrop Overlay */}
@@ -109,6 +115,8 @@ export default function AdminShell({ children }: AdminShellProps) {
       <Sidebar
         mobileOpen={mobileMenuOpen}
         onClose={() => setMobileMenuOpen(false)}
+        token={token}
+        onSignOut={handleSignOut}
       />
 
       <div className="main-wrapper">
@@ -116,14 +124,6 @@ export default function AdminShell({ children }: AdminShellProps) {
           title={getTabTitle()}
           adminName={adminName}
           adminEmail={adminEmail}
-          token={token}
-          onSignOut={() => {
-            setToken(null);
-            router.push("/");
-          }}
-          onRefresh={() => {
-            router.refresh();
-          }}
           onToggleMobileMenu={() => setMobileMenuOpen((prev) => !prev)}
         />
 
