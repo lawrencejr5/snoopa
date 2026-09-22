@@ -141,6 +141,7 @@ h1, h2, h3, h4, h5, h6, .font-header {
   background: transparent;
   width: 100%;
   text-align: left;
+  text-decoration: none;
 }
 
 .nav-item:hover {
