@@ -45,4 +45,4 @@ google-services.json
 firebase-private-key.json
 
 #convex
-convex/_generated
+# convex/_generated
