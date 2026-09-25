@@ -479,18 +479,7 @@ export const getUsers = query({
       const uIdStr = u._id.toString();
       const provider = userProviderMap.get(uIdStr);
 
-      let os = "Android";
-      if (provider === "apple") {
-        os = "iOS";
-      } else if (provider === "google") {
-        os = "Android";
-      } else if (u.os) {
-        os = u.os === "ios" ? "iOS" : u.os === "android" ? "Android" : "Web";
-      } else if (provider === "password") {
-        os = "Email / Web";
-      } else if (provider) {
-        os = provider;
-      }
+      const os = provider === "google" ? "Android" : "iOS";
 
       const lastSeen = u.last_seen || lastSeenMap.get(uIdStr) || u._creationTime;
       const userSnoops = userSnoopsMap.get(uIdStr) || [];
@@ -518,7 +507,7 @@ export const getUserDetails = query({
     const user = await ctx.db.get(args.user_id);
     if (!user) return null;
 
-    const [watchlists, snoopsList, adViews, feedbacks, notifications] = await Promise.all([
+    const [watchlists, snoopsList, adViews, feedbacks, notifications, authAccounts] = await Promise.all([
       ctx.db
         .query("watchlist")
         .withIndex("by_user", (q) => q.eq("user_id", args.user_id))
@@ -539,6 +528,7 @@ export const getUserDetails = query({
         .query("notifications")
         .withIndex("by_user", (q) => q.eq("user_id", args.user_id))
         .collect(),
+      ctx.db.query("authAccounts").collect(),
     ]);
 
     // Gather chats for user's watchlists
@@ -554,11 +544,18 @@ export const getUserDetails = query({
       chats = chatArrays.flat();
     }
 
+    const authAcc = authAccounts.find((acc: any) => acc.userId?.toString() === args.user_id.toString());
+    const provider = authAcc?.provider;
+    const os = provider === "google" ? "Android" : "iOS";
+
     const snoopStats = computeUserSnoopStats(user, snoopsList || []);
 
     return {
       user: {
         ...user,
+        provider: provider || (user.os === "ios" ? "apple" : user.os === "android" ? "google" : "email"),
+        os: os,
+        sub_tier: user.sub_tier || user.plan || "free",
         snoopsRemaining: snoopStats.remaining,
         snoopsTotal: snoopStats.total,
         snoopsFormatted: snoopStats.snoopsFormatted,

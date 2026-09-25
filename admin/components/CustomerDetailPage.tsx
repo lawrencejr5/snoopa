@@ -24,6 +24,19 @@ interface CustomerDetailPageProps {
   onBack?: () => void;
 }
 
+function formatTimeAgo(timestamp: number) {
+  if (!timestamp) return "Never";
+  const diffMs = Date.now() - timestamp;
+  const diffMins = Math.floor(diffMs / (1000 * 60));
+  if (diffMins < 1) return "Just now";
+  if (diffMins < 60) return `${diffMins}m ago`;
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours < 24) return `${diffHours}h ago`;
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays < 7) return `${diffDays}d ago`;
+  return new Date(timestamp).toLocaleDateString();
+}
+
 export default function CustomerDetailPage({
   userId,
   onBack,
@@ -45,8 +58,9 @@ export default function CustomerDetailPage({
 
   useEffect(() => {
     if (data?.user) {
-      setSelectedTier((data.user.sub_tier as any) || data.user.plan || "free");
-      setIsPremium(!!data.user.is_premium || data.user.sub_tier !== "free");
+      const tier = data.user.sub_tier || data.user.plan || "free";
+      setSelectedTier(tier as any);
+      setIsPremium(!!data.user.is_premium || tier !== "free");
     }
   }, [data]);
 
@@ -107,8 +121,7 @@ export default function CustomerDetailPage({
     }
   };
 
-  const userOs =
-    user.os === "ios" ? "iOS" : user.os === "android" ? "Android" : "iOS";
+  const userOs = user.os || "iOS";
   const userCountry = user.country || "US";
   const totalSnoopsRemaining = snoopsList.reduce(
     (acc: number, s: any) => acc + (s.remaining || 0),
@@ -229,10 +242,10 @@ export default function CustomerDetailPage({
             }}
           >
             <div className="badge badge-muted" style={{ padding: "6px 12px" }}>
-              {userOs === "iOS" ? (
-                <Apple style={{ width: 13, height: 13 }} />
-              ) : (
+              {userOs === "Android" ? (
                 <Smartphone style={{ width: 13, height: 13 }} />
+              ) : (
+                <Apple style={{ width: 13, height: 13 }} />
               )}
               <span>{userOs}</span>
             </div>
@@ -418,12 +431,12 @@ export default function CustomerDetailPage({
                         display: "flex",
                         justifyContent: "space-between",
                         alignItems: "flex-start",
-                        gap: 16,
+                        gap: 12,
                         marginBottom: 12,
                         flexWrap: "wrap",
                       }}
                     >
-                      <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ minWidth: 0, flex: "1 1 220px" }}>
                         <div
                           style={{
                             display: "flex",
@@ -435,7 +448,11 @@ export default function CustomerDetailPage({
                         >
                           <h4
                             className="font-header"
-                            style={{ fontSize: 18, fontWeight: 700 }}
+                            style={{
+                              fontSize: 18,
+                              fontWeight: 700,
+                              wordBreak: "break-word",
+                            }}
                           >
                             {wl.title}
                           </h4>
@@ -457,11 +474,7 @@ export default function CustomerDetailPage({
                           style={{
                             fontSize: 14,
                             color: "var(--text-primary)",
-                            display: "-webkit-box",
-                            WebkitLineClamp: 2,
-                            WebkitBoxOrient: "vertical",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
+                            wordBreak: "break-word",
                             lineHeight: "1.4",
                           }}
                         >
@@ -476,7 +489,8 @@ export default function CustomerDetailPage({
                         style={{
                           fontSize: 12,
                           color: "var(--text-muted)",
-                          textAlign: "right",
+                          flexShrink: 0,
+                          wordBreak: "break-all",
                         }}
                       >
                         <div>
@@ -486,7 +500,7 @@ export default function CustomerDetailPage({
                         <div>
                           Last Checked:{" "}
                           {wl.last_checked
-                            ? new Date(wl.last_checked).toLocaleString()
+                            ? formatTimeAgo(wl.last_checked)
                             : "Never"}
                         </div>
                       </div>
@@ -534,6 +548,8 @@ export default function CustomerDetailPage({
                         marginTop: 16,
                         paddingTop: 14,
                         borderTop: "1px solid var(--border-color)",
+                        flexWrap: "wrap",
+                        gap: 10,
                       }}
                     >
                       <div
