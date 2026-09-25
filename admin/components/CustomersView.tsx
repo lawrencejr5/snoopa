@@ -11,7 +11,6 @@ import {
   Eye,
   Globe,
   Search,
-  ShieldCheck,
   Smartphone,
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -236,14 +235,21 @@ export default function CustomersView() {
               Customers Directory
             </h3>
             {users && (
-              <span className="badge badge-muted">
-                {users.length} {users.length === 1 ? "Customer" : "Customers"}
-              </span>
+              <>
+                <span className="badge badge-muted">
+                  {users.length} {users.length === 1 ? "User" : "Users"}
+                </span>
+                <span className="badge badge-green" style={{ fontSize: 11 }}>
+                  {
+                    users.filter(
+                      (u: any) =>
+                        u.is_premium || (u.sub_tier && u.sub_tier !== "free"),
+                    ).length
+                  }{" "}
+                  paid
+                </span>
+              </>
             )}
-            <span className="badge badge-muted" style={{ fontSize: 11 }}>
-              <ShieldCheck style={{ width: 12, height: 12 }} /> Convex Real-time
-              DB
-            </span>
           </div>
 
           <div

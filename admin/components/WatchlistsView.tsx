@@ -267,7 +267,7 @@ export default function WatchlistsView() {
               <>
                 <span className="badge badge-muted">
                   {watchlists.length}{" "}
-                  {watchlists.length === 1 ? "Watchlist" : "Watchlists"}
+                  {watchlists.length === 1 ? "Tracked" : "Watchlists"}
                 </span>
                 <span className="badge badge-green" style={{ fontSize: 11 }}>
                   {watchlists.filter((w: any) => w.status === "active").length}{" "}
