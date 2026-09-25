@@ -132,7 +132,7 @@ export default function WatchlistDetailPage({
         </button>
 
         <div
-          className="card"
+          className="card detail-header-card"
           style={{
             padding: 24,
             display: "flex",
@@ -142,53 +142,61 @@ export default function WatchlistDetailPage({
             gap: 20,
           }}
         >
-          <div style={{ display: "flex", alignItems: "flex-start", gap: 16 }}>
+          <div
+            className="detail-header-main"
+            style={{
+              minWidth: 0,
+              flex: "1 1 300px",
+            }}
+          >
             <div
-              className="avatar-circle"
               style={{
-                width: 52,
-                height: 52,
-                borderRadius: "var(--radius-md)",
-                backgroundColor: "var(--bg-input)",
-                border: "1px solid var(--border-color)",
                 display: "flex",
                 alignItems: "center",
-                justifyContent: "center",
+                gap: 10,
+                marginBottom: 6,
+                flexWrap: "wrap",
               }}
             >
-              <Radio
-                style={{ width: 24, height: 24, color: "var(--accent-milk)" }}
-              />
-            </div>
-
-            <div>
               <div
                 style={{
-                  display: "flex",
+                  width: 36,
+                  height: 36,
+                  borderRadius: "var(--radius-md)",
+                  backgroundColor: "var(--bg-input)",
+                  border: "1px solid var(--border-color)",
+                  display: "inline-flex",
                   alignItems: "center",
-                  gap: 10,
-                  marginBottom: 6,
-                  flexWrap: "wrap",
+                  justifyContent: "center",
+                  flexShrink: 0,
                 }}
               >
-                <h2
-                  className="font-header"
-                  style={{ fontSize: 24, fontWeight: 700 }}
-                >
-                  {watchlist.title}
-                </h2>
-                <span
-                  className={`badge ${
-                    watchlist.status === "active"
-                      ? "badge-green"
-                      : watchlist.status === "completed"
-                        ? "badge-gold"
-                        : "badge-muted"
-                  }`}
-                  style={{ fontSize: 12 }}
-                >
-                  {watchlist.status.toUpperCase()}
-                </span>
+                <Radio
+                  style={{ width: 18, height: 18, color: "var(--accent-milk)" }}
+                />
+              </div>
+              <h2
+                className="font-header"
+                style={{
+                  fontSize: 24,
+                  fontWeight: 700,
+                  wordBreak: "break-word",
+                }}
+              >
+                {watchlist.title}
+              </h2>
+              <span
+                className={`badge ${
+                  watchlist.status === "active"
+                    ? "badge-green"
+                    : watchlist.status === "completed"
+                      ? "badge-gold"
+                      : "badge-muted"
+                }`}
+                style={{ fontSize: 12 }}
+              >
+                {watchlist.status.toUpperCase()}
+              </span>
                 {watchlist.search_type && (
                   <span className="badge badge-muted" style={{ fontSize: 11 }}>
                     <Globe style={{ width: 11, height: 11, marginRight: 4 }} />
@@ -207,6 +215,7 @@ export default function WatchlistDetailPage({
                   fontSize: 14,
                   color: "var(--text-primary)",
                   marginBottom: 8,
+                  wordBreak: "break-word",
                 }}
               >
                 <strong style={{ color: "var(--text-secondary)" }}>
@@ -223,10 +232,11 @@ export default function WatchlistDetailPage({
                 style={{
                   display: "flex",
                   alignItems: "center",
-                  gap: 14,
+                  gap: 10,
                   fontSize: 12,
                   color: "var(--text-muted)",
                   flexWrap: "wrap",
+                  wordBreak: "break-all",
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -263,19 +273,38 @@ export default function WatchlistDetailPage({
                 </span>
               </div>
             </div>
-          </div>
 
           {/* Action Controls */}
           <div
+            className="detail-header-actions"
             style={{
               display: "flex",
               alignItems: "center",
               gap: 12,
               flexWrap: "wrap",
+              width: "100%",
+              maxWidth: "100%",
+              boxSizing: "border-box",
             }}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                flex: 1,
+                minWidth: 0,
+                maxWidth: "100%",
+                boxSizing: "border-box",
+              }}
+            >
+              <span
+                style={{
+                  fontSize: 12,
+                  color: "var(--text-secondary)",
+                  flexShrink: 0,
+                }}
+              >
                 Status:
               </span>
               <select
@@ -283,7 +312,14 @@ export default function WatchlistDetailPage({
                 value={watchlist.status}
                 disabled={updating}
                 onChange={(e) => handleStatusChange(e.target.value as any)}
-                style={{ padding: "6px 12px", fontSize: 13 }}
+                style={{
+                  padding: "6px 12px",
+                  fontSize: 13,
+                  flex: 1,
+                  minWidth: 0,
+                  maxWidth: "100%",
+                  boxSizing: "border-box",
+                }}
               >
                 <option value="active">Active</option>
                 <option value="completed">Completed</option>

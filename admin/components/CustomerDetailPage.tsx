@@ -141,7 +141,16 @@ export default function CustomerDetailPage({
             gap: 20,
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 16,
+              flexWrap: "wrap",
+              minWidth: 0,
+              flex: "1 1 300px",
+            }}
+          >
             <div
               className="avatar-circle"
               style={{
@@ -151,22 +160,28 @@ export default function CustomerDetailPage({
                 borderRadius: "var(--radius-md)",
                 backgroundColor: "var(--bg-input)",
                 border: "1px solid var(--border-color)",
+                flexShrink: 0,
               }}
             >
               {(user.fullname || user.email).charAt(0).toUpperCase()}
             </div>
-            <div>
+            <div style={{ minWidth: 0, flex: 1 }}>
               <div
                 style={{
                   display: "flex",
                   alignItems: "center",
                   gap: 10,
                   marginBottom: 4,
+                  flexWrap: "wrap",
                 }}
               >
                 <h2
                   className="font-header"
-                  style={{ fontSize: 24, fontWeight: 700 }}
+                  style={{
+                    fontSize: 24,
+                    fontWeight: 700,
+                    wordBreak: "break-word",
+                  }}
                 >
                   {user.fullname || "Anonymous Customer"}
                 </h2>
@@ -189,9 +204,11 @@ export default function CustomerDetailPage({
                 style={{
                   display: "flex",
                   alignItems: "center",
-                  gap: 12,
+                  gap: 8,
                   fontSize: 13,
                   color: "var(--text-secondary)",
+                  flexWrap: "wrap",
+                  wordBreak: "break-all",
                 }}
               >
                 <span>{user.email}</span>
@@ -203,7 +220,14 @@ export default function CustomerDetailPage({
             </div>
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              flexWrap: "wrap",
+            }}
+          >
             <div className="badge badge-muted" style={{ padding: "6px 12px" }}>
               {userOs === "iOS" ? (
                 <Apple style={{ width: 13, height: 13 }} />
@@ -396,15 +420,17 @@ export default function CustomerDetailPage({
                         alignItems: "flex-start",
                         gap: 16,
                         marginBottom: 12,
+                        flexWrap: "wrap",
                       }}
                     >
-                      <div>
+                      <div style={{ minWidth: 0, flex: 1 }}>
                         <div
                           style={{
                             display: "flex",
                             alignItems: "center",
                             gap: 10,
                             marginBottom: 4,
+                            flexWrap: "wrap",
                           }}
                         >
                           <h4

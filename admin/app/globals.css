@@ -869,7 +869,8 @@ h1, h2, h3, h4, h5, h6, .font-header {
 
   .select-field {
     width: 100%;
-    min-width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
   }
 
   .metrics-grid {
@@ -908,6 +909,34 @@ h1, h2, h3, h4, h5, h6, .font-header {
     min-width: 650px;
   }
 
+  .detail-header-card {
+    flex-direction: column;
+    align-items: stretch !important;
+  }
+
+  .detail-header-actions {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    flex-direction: column;
+    align-items: stretch !important;
+    gap: 10px !important;
+  }
+
+  .detail-header-actions > div {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  .detail-header-actions select,
+  .detail-header-actions button {
+    flex: 1;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
   .modal-center-box {
     padding: 18px;
     max-width: 95vw;
@@ -920,6 +949,7 @@ h1, h2, h3, h4, h5, h6, .font-header {
 
 @media (max-width: 480px) {
   .metrics-grid {
-    grid-template-columns: 1fr !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
   }
 }
