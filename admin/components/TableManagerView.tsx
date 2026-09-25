@@ -105,8 +105,8 @@ export default function TableManagerView() {
       {/* Table Toolbar & Selector */}
       <div className="table-container">
         <div className="table-toolbar">
-          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-            <Database style={{ width: 20, height: 20, color: "var(--accent-green)" }} />
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <Database style={{ width: 20, height: 20, color: "var(--accent-green)", flexShrink: 0 }} />
             <div>
               <h3 className="card-title font-header" style={{ fontSize: 18 }}>
                 Universal Database CRUD Inspector
@@ -117,7 +117,7 @@ export default function TableManagerView() {
             </div>
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", width: "100%" }}>
             <select
               className="select-field"
               value={selectedTable}
@@ -142,7 +142,7 @@ export default function TableManagerView() {
               />
             </div>
 
-            <button className="btn-primary" onClick={() => setShowAddModal(true)}>
+            <button className="btn-primary" onClick={() => setShowAddModal(true)} style={{ whiteSpace: "nowrap" }}>
               <Plus style={{ width: 16, height: 16 }} /> Add Record
             </button>
           </div>
@@ -255,7 +255,7 @@ export default function TableManagerView() {
                 <X style={{ width: 14, height: 14 }} />
               </button>
             </div>
-            <div className="json-code" style={{ maxHeight: 380 }}>
+            <div className="json-code" style={{ maxHeight: 380, overflowX: "auto", wordBreak: "break-word", maxWidth: "100%", boxSizing: "border-box" }}>
               {JSON.stringify(viewJsonRecord, null, 2)}
             </div>
           </div>
@@ -266,9 +266,9 @@ export default function TableManagerView() {
       {editRecord && (
         <div className="modal-center-overlay" onClick={() => setEditRecord(null)}>
           <div className="modal-center-box" onClick={(e) => e.stopPropagation()}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 14 }}>
-              <h3 className="font-header" style={{ fontSize: 16 }}>Edit Record ID: {editRecord._id}</h3>
-              <button className="btn-icon" onClick={() => setEditRecord(null)}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 14, gap: 10, alignItems: "flex-start" }}>
+              <h3 className="font-header" style={{ fontSize: 16, wordBreak: "break-all" }}>Edit Record ID: {editRecord._id}</h3>
+              <button className="btn-icon" onClick={() => setEditRecord(null)} style={{ flexShrink: 0 }}>
                 <X style={{ width: 14, height: 14 }} />
               </button>
             </div>
@@ -278,11 +278,11 @@ export default function TableManagerView() {
             <textarea
               className="input-field-normal"
               rows={12}
-              style={{ fontFamily: "monospace", fontSize: 12, marginBottom: 16 }}
+              style={{ fontFamily: "monospace", fontSize: 12, marginBottom: 16, width: "100%", maxWidth: "100%", boxSizing: "border-box" }}
               value={editJsonStr}
               onChange={(e) => setEditJsonStr(e.target.value)}
             />
-            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", flexWrap: "wrap" }}>
               <button className="btn-secondary" onClick={() => setEditRecord(null)}>
                 Cancel
               </button>
@@ -298,9 +298,9 @@ export default function TableManagerView() {
       {showAddModal && (
         <div className="modal-center-overlay" onClick={() => setShowAddModal(false)}>
           <div className="modal-center-box" onClick={(e) => e.stopPropagation()}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 14 }}>
-              <h3 className="font-header" style={{ fontSize: 16 }}>Add Record to Table: {selectedTable}</h3>
-              <button className="btn-icon" onClick={() => setShowAddModal(false)}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 14, gap: 10, alignItems: "flex-start" }}>
+              <h3 className="font-header" style={{ fontSize: 16, wordBreak: "break-all" }}>Add Record to Table: {selectedTable}</h3>
+              <button className="btn-icon" onClick={() => setShowAddModal(false)} style={{ flexShrink: 0 }}>
                 <X style={{ width: 14, height: 14 }} />
               </button>
             </div>
@@ -310,11 +310,11 @@ export default function TableManagerView() {
             <textarea
               className="input-field-normal"
               rows={12}
-              style={{ fontFamily: "monospace", fontSize: 12, marginBottom: 16 }}
+              style={{ fontFamily: "monospace", fontSize: 12, marginBottom: 16, width: "100%", maxWidth: "100%", boxSizing: "border-box" }}
               value={newJsonStr}
               onChange={(e) => setNewJsonStr(e.target.value)}
             />
-            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", flexWrap: "wrap" }}>
               <button className="btn-secondary" onClick={() => setShowAddModal(false)}>
                 Cancel
               </button>

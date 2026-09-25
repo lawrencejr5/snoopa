@@ -100,7 +100,7 @@ export default function ReportsFeedbackView() {
       {/* Top Bar & Filters */}
       <div className="table-container">
         <div className="table-toolbar">
-          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
             <h3 className="card-title font-header" style={{ fontSize: 18 }}>
               Reports & Feedback Submissions
             </h3>
@@ -122,6 +122,7 @@ export default function ReportsFeedbackView() {
               alignItems: "center",
               gap: 12,
               flexWrap: "wrap",
+              width: "100%",
             }}
           >
             <div className="search-input-wrap">
@@ -312,14 +313,28 @@ export default function ReportsFeedbackView() {
                       justifyContent: "space-between",
                       paddingTop: 12,
                       borderTop: "1px solid var(--border-color)",
+                      flexWrap: "wrap",
+                      gap: 10,
+                      width: "100%",
+                      boxSizing: "border-box",
                     }}
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        flex: "1 1 200px",
+                        minWidth: 0,
+                        maxWidth: "100%",
+                      }}
+                    >
                       <span
                         style={{
                           fontSize: 12,
                           color: "var(--text-secondary)",
+                          flexShrink: 0,
                         }}
                       >
                         Set Status:
@@ -333,7 +348,14 @@ export default function ReportsFeedbackView() {
                             e.target.value as "unread" | "read" | "fulfilled"
                           )
                         }
-                        style={{ padding: "4px 10px", fontSize: 12 }}
+                        style={{
+                          padding: "4px 10px",
+                          fontSize: 12,
+                          flex: 1,
+                          minWidth: 0,
+                          maxWidth: "100%",
+                          boxSizing: "border-box",
+                        }}
                       >
                         <option value="unread">Unread</option>
                         <option value="read">Read</option>
@@ -341,7 +363,14 @@ export default function ReportsFeedbackView() {
                       </select>
                     </div>
 
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        flexWrap: "wrap",
+                      }}
+                    >
                       <button
                         className="btn-secondary"
                         style={{ padding: "6px 12px", fontSize: 12 }}
@@ -408,11 +437,12 @@ export default function ReportsFeedbackView() {
                 marginBottom: 18,
                 paddingBottom: 14,
                 borderBottom: "1px solid var(--border-color)",
+                gap: 12,
               }}
             >
               <div>
-                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
-                  <h3 className="font-header" style={{ fontSize: 18, fontWeight: 700 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4, flexWrap: "wrap" }}>
+                  <h3 className="font-header" style={{ fontSize: 18, fontWeight: 700, wordBreak: "break-word" }}>
                     Feedback Report Details
                   </h3>
                   <span
@@ -435,7 +465,7 @@ export default function ReportsFeedbackView() {
               <button
                 className="btn-secondary"
                 onClick={() => setSelectedFeedback(null)}
-                style={{ padding: 6, borderRadius: "50%" }}
+                style={{ padding: 6, borderRadius: "50%", flexShrink: 0 }}
               >
                 <X style={{ width: 18, height: 18 }} />
               </button>
@@ -461,6 +491,8 @@ export default function ReportsFeedbackView() {
                   alignItems: "center",
                   gap: 12,
                   cursor: selectedFeedback.user_id ? "pointer" : "default",
+                  minWidth: 0,
+                  flex: "1 1 200px",
                 }}
                 onClick={() => {
                   if (selectedFeedback.user_id) {
@@ -468,21 +500,22 @@ export default function ReportsFeedbackView() {
                   }
                 }}
               >
-                <div className="avatar-circle">
+                <div className="avatar-circle" style={{ flexShrink: 0 }}>
                   {selectedFeedback.user_fullname ? selectedFeedback.user_fullname.charAt(0).toUpperCase() : "U"}
                 </div>
-                <div>
+                <div style={{ minWidth: 0, flex: 1 }}>
                   <div
                     style={{
                       fontWeight: 600,
                       fontSize: 14,
                       color: selectedFeedback.user_id ? "var(--accent-milk)" : "inherit",
                       textDecoration: selectedFeedback.user_id ? "underline" : "none",
+                      wordBreak: "break-word",
                     }}
                   >
                     {selectedFeedback.user_fullname}
                   </div>
-                  <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+                  <div style={{ fontSize: 12, color: "var(--text-secondary)", wordBreak: "break-all" }}>
                     {selectedFeedback.user_email}
                   </div>
                 </div>
@@ -521,6 +554,7 @@ export default function ReportsFeedbackView() {
                   fontSize: 14,
                   lineHeight: 1.6,
                   whiteSpace: "pre-wrap",
+                  wordBreak: "break-word",
                   color: "var(--text-primary)",
                 }}
               >
@@ -564,8 +598,8 @@ export default function ReportsFeedbackView() {
                 <div
                   style={{
                     display: "grid",
-                    gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
-                    gap: 12,
+                    gridTemplateColumns: "repeat(auto-fill, minmax(110px, 1fr))",
+                    gap: 10,
                   }}
                 >
                   {selectedFeedback.image_urls.map((url: string, index: number) => (
