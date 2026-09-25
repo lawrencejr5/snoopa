@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useRef } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { Id } from "@convex/_generated/dataModel";
@@ -44,16 +44,143 @@ type SortField =
 
 export default function WatchlistsView() {
   const router = useRouter();
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [sortBy, setSortBy] = useState<SortField>("created");
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const searchParams = useSearchParams();
+
+  // Load initial search, filter, and sort state from URL search params or sessionStorage
+  const [search, setSearch] = useState(() => {
+    if (typeof window === "undefined") return "";
+    const param = searchParams.get("search");
+    if (param !== null) return param;
+    try {
+      const saved = JSON.parse(sessionStorage.getItem("watchlists_state") || "{}");
+      return saved.search || "";
+    } catch {
+      return "";
+    }
+  });
+
+  const [statusFilter, setStatusFilter] = useState(() => {
+    if (typeof window === "undefined") return "all";
+    const param = searchParams.get("status");
+    if (param !== null) return param;
+    try {
+      const saved = JSON.parse(sessionStorage.getItem("watchlists_state") || "{}");
+      return saved.statusFilter || "all";
+    } catch {
+      return "all";
+    }
+  });
+
+  const [sortBy, setSortBy] = useState<SortField>(() => {
+    if (typeof window === "undefined") return "created";
+    const param = searchParams.get("sortBy");
+    if (param !== null) return param as SortField;
+    try {
+      const saved = JSON.parse(sessionStorage.getItem("watchlists_state") || "{}");
+      return saved.sortBy || "created";
+    } catch {
+      return "created";
+    }
+  });
+
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">(() => {
+    if (typeof window === "undefined") return "desc";
+    const param = searchParams.get("sortOrder");
+    if (param !== null) return param as "asc" | "desc";
+    try {
+      const saved = JSON.parse(sessionStorage.getItem("watchlists_state") || "{}");
+      return saved.sortOrder || "desc";
+    } catch {
+      return "desc";
+    }
+  });
+
+  // Keep URL and sessionStorage in sync when state changes
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    sessionStorage.setItem(
+      "watchlists_state",
+      JSON.stringify({ search, statusFilter, sortBy, sortOrder })
+    );
+
+    const params = new URLSearchParams();
+    if (search) params.set("search", search);
+    if (statusFilter !== "all") params.set("status", statusFilter);
+    if (sortBy !== "created") params.set("sortBy", sortBy);
+    if (sortOrder !== "desc") params.set("sortOrder", sortOrder);
+
+    const qs = params.toString();
+    const newUrl = `${window.location.pathname}${qs ? `?${qs}` : ""}`;
+    window.history.replaceState(null, "", newUrl);
+  }, [search, statusFilter, sortBy, sortOrder]);
+
+  // Track scroll position of the scrollable container (.content-body)
+  const isNavigatingRef = useRef(false);
+  useEffect(() => {
+    const contentBody = document.querySelector(".content-body");
+    if (!contentBody) return;
+
+    const handleScroll = () => {
+      if (isNavigatingRef.current) return;
+      sessionStorage.setItem("watchlists_scroll_top", contentBody.scrollTop.toString());
+    };
+
+    contentBody.addEventListener("scroll", handleScroll, { passive: true });
+    return () => {
+      isNavigatingRef.current = true;
+      contentBody.removeEventListener("scroll", handleScroll);
+    };
+  }, []);
 
   // Convex query
   const watchlists = useQuery(api.admin.getWatchlists, {
     search: search || undefined,
     status_filter: statusFilter || undefined,
   });
+
+  // Restore scroll height when data finishes loading
+  const hasRestoredScroll = useRef(false);
+  useEffect(() => {
+    if (watchlists !== undefined && watchlists.length > 0 && !hasRestoredScroll.current) {
+      hasRestoredScroll.current = true;
+      const savedScroll = sessionStorage.getItem("watchlists_scroll_top");
+      if (savedScroll) {
+        const scrollTop = parseInt(savedScroll, 10);
+        if (!isNaN(scrollTop) && scrollTop > 0) {
+          const attemptRestore = () => {
+            const contentBody = document.querySelector(".content-body");
+            if (contentBody) {
+              contentBody.scrollTop = scrollTop;
+            }
+          };
+
+          attemptRestore();
+          requestAnimationFrame(attemptRestore);
+          setTimeout(attemptRestore, 50);
+          setTimeout(attemptRestore, 150);
+        }
+      }
+    }
+  }, [watchlists]);
+
+  const handleWatchlistClick = (watchlistId: string) => {
+    isNavigatingRef.current = true;
+    const contentBody = document.querySelector(".content-body");
+    if (contentBody) {
+      sessionStorage.setItem("watchlists_scroll_top", contentBody.scrollTop.toString());
+    }
+    router.push(`/watchlists/${watchlistId}`);
+  };
+
+  const handleCustomerClick = (userId: string) => {
+    isNavigatingRef.current = true;
+    const contentBody = document.querySelector(".content-body");
+    if (contentBody) {
+      sessionStorage.setItem("watchlists_scroll_top", contentBody.scrollTop.toString());
+    }
+    router.push(`/customers/${userId}`);
+  };
 
   const sortedWatchlists = watchlists
     ? [...watchlists].sort((a: any, b: any) => {
@@ -256,7 +383,7 @@ export default function WatchlistsView() {
                 return (
                   <tr
                     key={w._id}
-                    onClick={() => router.push(`/watchlists/${w._id}`)}
+                    onClick={() => handleWatchlistClick(w._id)}
                   >
                     <td>
                       <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
@@ -312,7 +439,7 @@ export default function WatchlistsView() {
                       <div
                         onClick={(e) => {
                           e.stopPropagation();
-                          router.push(`/customers/${w.user_id}`);
+                          handleCustomerClick(w.user_id);
                         }}
                         style={{ cursor: "pointer" }}
                         title={`View customer profile for ${w.owner_name}`}
@@ -385,7 +512,7 @@ export default function WatchlistsView() {
                         className="btn-secondary"
                         onClick={(e) => {
                           e.stopPropagation();
-                          router.push(`/watchlists/${w._id}`);
+                          handleWatchlistClick(w._id);
                         }}
                         style={{ padding: "6px 12px", fontSize: 12 }}
                       >
@@ -402,3 +529,4 @@ export default function WatchlistsView() {
     </div>
   );
 }
+

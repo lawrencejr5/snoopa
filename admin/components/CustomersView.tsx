@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useRef } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { Id } from "@convex/_generated/dataModel";
@@ -35,16 +35,134 @@ type SortField = "created" | "country" | "snoops" | "watchlists" | "lastSeen";
 
 export default function CustomersView() {
   const router = useRouter();
-  const [search, setSearch] = useState("");
-  const [tierFilter, setTierFilter] = useState("all");
-  const [sortBy, setSortBy] = useState<SortField>("created");
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const searchParams = useSearchParams();
+
+  // Load initial search, filter, and sort state from URL search params or sessionStorage
+  const [search, setSearch] = useState(() => {
+    if (typeof window === "undefined") return "";
+    const param = searchParams.get("search");
+    if (param !== null) return param;
+    try {
+      const saved = JSON.parse(sessionStorage.getItem("customers_state") || "{}");
+      return saved.search || "";
+    } catch {
+      return "";
+    }
+  });
+
+  const [tierFilter, setTierFilter] = useState(() => {
+    if (typeof window === "undefined") return "all";
+    const param = searchParams.get("tier");
+    if (param !== null) return param;
+    try {
+      const saved = JSON.parse(sessionStorage.getItem("customers_state") || "{}");
+      return saved.tierFilter || "all";
+    } catch {
+      return "all";
+    }
+  });
+
+  const [sortBy, setSortBy] = useState<SortField>(() => {
+    if (typeof window === "undefined") return "created";
+    const param = searchParams.get("sortBy");
+    if (param !== null) return param as SortField;
+    try {
+      const saved = JSON.parse(sessionStorage.getItem("customers_state") || "{}");
+      return saved.sortBy || "created";
+    } catch {
+      return "created";
+    }
+  });
+
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">(() => {
+    if (typeof window === "undefined") return "desc";
+    const param = searchParams.get("sortOrder");
+    if (param !== null) return param as "asc" | "desc";
+    try {
+      const saved = JSON.parse(sessionStorage.getItem("customers_state") || "{}");
+      return saved.sortOrder || "desc";
+    } catch {
+      return "desc";
+    }
+  });
+
+  // Keep URL and sessionStorage in sync when filter/search/sort state changes
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    sessionStorage.setItem(
+      "customers_state",
+      JSON.stringify({ search, tierFilter, sortBy, sortOrder })
+    );
+
+    const params = new URLSearchParams();
+    if (search) params.set("search", search);
+    if (tierFilter !== "all") params.set("tier", tierFilter);
+    if (sortBy !== "created") params.set("sortBy", sortBy);
+    if (sortOrder !== "desc") params.set("sortOrder", sortOrder);
+
+    const qs = params.toString();
+    const newUrl = `${window.location.pathname}${qs ? `?${qs}` : ""}`;
+    window.history.replaceState(null, "", newUrl);
+  }, [search, tierFilter, sortBy, sortOrder]);
+
+  // Track scroll position of the scrollable container (.content-body)
+  const isNavigatingRef = useRef(false);
+  useEffect(() => {
+    const contentBody = document.querySelector(".content-body");
+    if (!contentBody) return;
+
+    const handleScroll = () => {
+      if (isNavigatingRef.current) return;
+      sessionStorage.setItem("customers_scroll_top", contentBody.scrollTop.toString());
+    };
+
+    contentBody.addEventListener("scroll", handleScroll, { passive: true });
+    return () => {
+      isNavigatingRef.current = true;
+      contentBody.removeEventListener("scroll", handleScroll);
+    };
+  }, []);
 
   // Direct Convex query
   const users = useQuery(api.admin.getUsers, {
     search: search || undefined,
     tierFilter: tierFilter || undefined,
   });
+
+  // Restore scroll height when data finishes loading
+  const hasRestoredScroll = useRef(false);
+  useEffect(() => {
+    if (users !== undefined && users.length > 0 && !hasRestoredScroll.current) {
+      hasRestoredScroll.current = true;
+      const savedScroll = sessionStorage.getItem("customers_scroll_top");
+      if (savedScroll) {
+        const scrollTop = parseInt(savedScroll, 10);
+        if (!isNaN(scrollTop) && scrollTop > 0) {
+          const attemptRestore = () => {
+            const contentBody = document.querySelector(".content-body");
+            if (contentBody) {
+              contentBody.scrollTop = scrollTop;
+            }
+          };
+
+          attemptRestore();
+          requestAnimationFrame(attemptRestore);
+          setTimeout(attemptRestore, 50);
+          setTimeout(attemptRestore, 150);
+        }
+      }
+    }
+  }, [users]);
+
+  const handleCustomerClick = (userId: string) => {
+    isNavigatingRef.current = true;
+    const contentBody = document.querySelector(".content-body");
+    if (contentBody) {
+      sessionStorage.setItem("customers_scroll_top", contentBody.scrollTop.toString());
+    }
+    router.push(`/customers/${userId}`);
+  };
 
   const sortedUsers = users
     ? [...users].sort((a: any, b: any) => {
@@ -198,7 +316,7 @@ export default function CustomersView() {
                 const isGoogle = u.provider === "google" || u.os === "Android";
 
                 return (
-                  <tr key={u._id} onClick={() => router.push(`/customers/${u._id}`)}>
+                  <tr key={u._id} onClick={() => handleCustomerClick(u._id)}>
                     <td>
                       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                         <div className="avatar-circle">
@@ -270,7 +388,7 @@ export default function CustomersView() {
                         className="btn-secondary"
                         onClick={(e) => {
                           e.stopPropagation();
-                          router.push(`/customers/${u._id}`);
+                          handleCustomerClick(u._id);
                         }}
                         style={{ padding: "6px 12px", fontSize: 12 }}
                       >
@@ -287,3 +405,4 @@ export default function CustomersView() {
     </div>
   );
 }
+
