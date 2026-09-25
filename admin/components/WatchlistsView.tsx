@@ -1,24 +1,20 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
-import { Id } from "@convex/_generated/dataModel";
+import { useQuery } from "convex/react";
 import {
-  Search,
-  Eye,
-  Globe,
-  Clock,
-  ShieldCheck,
-  ArrowUpDown,
-  ArrowUp,
   ArrowDown,
-  Radio,
-  MessageSquare,
+  ArrowUp,
+  ArrowUpDown,
   Bell,
-  Tag,
+  Clock,
+  Eye,
+  MessageSquare,
+  Radio,
+  Search,
 } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 
 function formatTimeAgo(timestamp: number) {
   if (!timestamp) return "Never";
@@ -52,7 +48,9 @@ export default function WatchlistsView() {
     const param = searchParams.get("search");
     if (param !== null) return param;
     try {
-      const saved = JSON.parse(sessionStorage.getItem("watchlists_state") || "{}");
+      const saved = JSON.parse(
+        sessionStorage.getItem("watchlists_state") || "{}",
+      );
       return saved.search || "";
     } catch {
       return "";
@@ -64,7 +62,9 @@ export default function WatchlistsView() {
     const param = searchParams.get("status");
     if (param !== null) return param;
     try {
-      const saved = JSON.parse(sessionStorage.getItem("watchlists_state") || "{}");
+      const saved = JSON.parse(
+        sessionStorage.getItem("watchlists_state") || "{}",
+      );
       return saved.statusFilter || "all";
     } catch {
       return "all";
@@ -76,7 +76,9 @@ export default function WatchlistsView() {
     const param = searchParams.get("sortBy");
     if (param !== null) return param as SortField;
     try {
-      const saved = JSON.parse(sessionStorage.getItem("watchlists_state") || "{}");
+      const saved = JSON.parse(
+        sessionStorage.getItem("watchlists_state") || "{}",
+      );
       return saved.sortBy || "created";
     } catch {
       return "created";
@@ -88,7 +90,9 @@ export default function WatchlistsView() {
     const param = searchParams.get("sortOrder");
     if (param !== null) return param as "asc" | "desc";
     try {
-      const saved = JSON.parse(sessionStorage.getItem("watchlists_state") || "{}");
+      const saved = JSON.parse(
+        sessionStorage.getItem("watchlists_state") || "{}",
+      );
       return saved.sortOrder || "desc";
     } catch {
       return "desc";
@@ -101,7 +105,7 @@ export default function WatchlistsView() {
 
     sessionStorage.setItem(
       "watchlists_state",
-      JSON.stringify({ search, statusFilter, sortBy, sortOrder })
+      JSON.stringify({ search, statusFilter, sortBy, sortOrder }),
     );
 
     const params = new URLSearchParams();
@@ -123,7 +127,10 @@ export default function WatchlistsView() {
 
     const handleScroll = () => {
       if (isNavigatingRef.current) return;
-      sessionStorage.setItem("watchlists_scroll_top", contentBody.scrollTop.toString());
+      sessionStorage.setItem(
+        "watchlists_scroll_top",
+        contentBody.scrollTop.toString(),
+      );
     };
 
     contentBody.addEventListener("scroll", handleScroll, { passive: true });
@@ -142,7 +149,11 @@ export default function WatchlistsView() {
   // Restore scroll height when data finishes loading
   const hasRestoredScroll = useRef(false);
   useEffect(() => {
-    if (watchlists !== undefined && watchlists.length > 0 && !hasRestoredScroll.current) {
+    if (
+      watchlists !== undefined &&
+      watchlists.length > 0 &&
+      !hasRestoredScroll.current
+    ) {
       hasRestoredScroll.current = true;
       const savedScroll = sessionStorage.getItem("watchlists_scroll_top");
       if (savedScroll) {
@@ -168,7 +179,10 @@ export default function WatchlistsView() {
     isNavigatingRef.current = true;
     const contentBody = document.querySelector(".content-body");
     if (contentBody) {
-      sessionStorage.setItem("watchlists_scroll_top", contentBody.scrollTop.toString());
+      sessionStorage.setItem(
+        "watchlists_scroll_top",
+        contentBody.scrollTop.toString(),
+      );
     }
     router.push(`/watchlists/${watchlistId}`);
   };
@@ -177,7 +191,10 @@ export default function WatchlistsView() {
     isNavigatingRef.current = true;
     const contentBody = document.querySelector(".content-body");
     if (contentBody) {
-      sessionStorage.setItem("watchlists_scroll_top", contentBody.scrollTop.toString());
+      sessionStorage.setItem(
+        "watchlists_scroll_top",
+        contentBody.scrollTop.toString(),
+      );
     }
     router.push(`/customers/${userId}`);
   };
@@ -228,9 +245,13 @@ export default function WatchlistsView() {
   const renderSortIcon = (field: SortField) => {
     if (sortBy !== field) return null;
     return sortOrder === "asc" ? (
-      <ArrowUp style={{ width: 12, height: 12, marginLeft: 4, display: "inline" }} />
+      <ArrowUp
+        style={{ width: 12, height: 12, marginLeft: 4, display: "inline" }}
+      />
     ) : (
-      <ArrowDown style={{ width: 12, height: 12, marginLeft: 4, display: "inline" }} />
+      <ArrowDown
+        style={{ width: 12, height: 12, marginLeft: 4, display: "inline" }}
+      />
     );
   };
 
@@ -243,14 +264,17 @@ export default function WatchlistsView() {
               Watchlists Directory
             </h3>
             {watchlists && (
-              <span className="badge badge-muted">
-                {watchlists.length}{" "}
-                {watchlists.length === 1 ? "Watchlist" : "Watchlists"}
-              </span>
+              <>
+                <span className="badge badge-muted">
+                  {watchlists.length}{" "}
+                  {watchlists.length === 1 ? "Watchlist" : "Watchlists"}
+                </span>
+                <span className="badge badge-green" style={{ fontSize: 11 }}>
+                  {watchlists.filter((w: any) => w.status === "active").length}{" "}
+                  Active
+                </span>
+              </>
             )}
-            <span className="badge badge-muted" style={{ fontSize: 11 }}>
-              <ShieldCheck style={{ width: 12, height: 12 }} /> Proactive Snoopers
-            </span>
           </div>
 
           <div
@@ -381,12 +405,15 @@ export default function WatchlistsView() {
             <tbody>
               {sortedWatchlists.map((w: any) => {
                 return (
-                  <tr
-                    key={w._id}
-                    onClick={() => handleWatchlistClick(w._id)}
-                  >
+                  <tr key={w._id} onClick={() => handleWatchlistClick(w._id)}>
                     <td>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 4,
+                        }}
+                      >
                         <div
                           style={{
                             fontWeight: 700,
@@ -397,7 +424,14 @@ export default function WatchlistsView() {
                             gap: 8,
                           }}
                         >
-                          <Radio style={{ width: 14, height: 14, color: "var(--accent-milk)", flexShrink: 0 }} />
+                          <Radio
+                            style={{
+                              width: 14,
+                              height: 14,
+                              color: "var(--accent-milk)",
+                              flexShrink: 0,
+                            }}
+                          />
                           <span>{w.title}</span>
                         </div>
                         <div
@@ -426,11 +460,32 @@ export default function WatchlistsView() {
                         style={{ cursor: "pointer" }}
                         title={`View customer profile for ${w.owner_name}`}
                       >
-                        <div style={{ fontWeight: 600, fontSize: 13, color: "var(--accent-milk)", textDecoration: "underline" }}>
+                        <div
+                          style={{
+                            fontWeight: 600,
+                            fontSize: 13,
+                            color: "var(--accent-milk)",
+                            textDecoration: "underline",
+                          }}
+                        >
                           {w.owner_name}
                         </div>
-                        <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+                        <div
+                          style={{
+                            fontSize: 12,
+                            color: "var(--text-secondary)",
+                          }}
+                        >
                           {w.owner_email}
+                        </div>
+                        <div
+                          style={{
+                            fontSize: 11,
+                            color: "var(--text-secondary)",
+                            marginTop: 2,
+                          }}
+                        >
+                          Snoops left: {w.snoop_formatted || "0/30"}
                         </div>
                       </div>
                     </td>
@@ -440,8 +495,8 @@ export default function WatchlistsView() {
                           w.status === "active"
                             ? "badge-green"
                             : w.status === "completed"
-                            ? "badge-gold"
-                            : "badge-muted"
+                              ? "badge-gold"
+                              : "badge-muted"
                         }`}
                       >
                         {w.status.toUpperCase()}
@@ -457,7 +512,13 @@ export default function WatchlistsView() {
                           fontWeight: 600,
                         }}
                       >
-                        <MessageSquare style={{ width: 13, height: 13, color: "var(--accent-green)" }} />
+                        <MessageSquare
+                          style={{
+                            width: 13,
+                            height: 13,
+                            color: "var(--accent-green)",
+                          }}
+                        />
                         <span>{w.chat_count}</span>
                       </div>
                     </td>
@@ -471,7 +532,13 @@ export default function WatchlistsView() {
                           fontWeight: 600,
                         }}
                       >
-                        <Bell style={{ width: 13, height: 13, color: "var(--accent-warning)" }} />
+                        <Bell
+                          style={{
+                            width: 13,
+                            height: 13,
+                            color: "var(--accent-warning)",
+                          }}
+                        />
                         <span>{w.notification_count}</span>
                       </div>
                     </td>
@@ -486,7 +553,9 @@ export default function WatchlistsView() {
                         }}
                       >
                         <Clock style={{ width: 12, height: 12 }} />
-                        <span>{formatTimeAgo(w.last_checked || w._creationTime)}</span>
+                        <span>
+                          {formatTimeAgo(w.last_checked || w._creationTime)}
+                        </span>
                       </div>
                     </td>
                     <td style={{ textAlign: "right" }}>
@@ -511,4 +580,3 @@ export default function WatchlistsView() {
     </div>
   );
 }
-

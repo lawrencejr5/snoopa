@@ -1,22 +1,21 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
-import { Id } from "@convex/_generated/dataModel";
+import { useQuery } from "convex/react";
 import {
-  Search,
-  Eye,
-  Smartphone,
-  Globe,
   Apple,
-  Clock,
-  ShieldCheck,
-  ArrowUpDown,
-  ArrowUp,
   ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  Clock,
+  Eye,
+  Globe,
+  Search,
+  ShieldCheck,
+  Smartphone,
 } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 
 function formatTimeAgo(timestamp: number) {
   if (!timestamp) return "Never";
@@ -43,7 +42,9 @@ export default function CustomersView() {
     const param = searchParams.get("search");
     if (param !== null) return param;
     try {
-      const saved = JSON.parse(sessionStorage.getItem("customers_state") || "{}");
+      const saved = JSON.parse(
+        sessionStorage.getItem("customers_state") || "{}",
+      );
       return saved.search || "";
     } catch {
       return "";
@@ -55,7 +56,9 @@ export default function CustomersView() {
     const param = searchParams.get("tier");
     if (param !== null) return param;
     try {
-      const saved = JSON.parse(sessionStorage.getItem("customers_state") || "{}");
+      const saved = JSON.parse(
+        sessionStorage.getItem("customers_state") || "{}",
+      );
       return saved.tierFilter || "all";
     } catch {
       return "all";
@@ -67,7 +70,9 @@ export default function CustomersView() {
     const param = searchParams.get("sortBy");
     if (param !== null) return param as SortField;
     try {
-      const saved = JSON.parse(sessionStorage.getItem("customers_state") || "{}");
+      const saved = JSON.parse(
+        sessionStorage.getItem("customers_state") || "{}",
+      );
       return saved.sortBy || "created";
     } catch {
       return "created";
@@ -79,7 +84,9 @@ export default function CustomersView() {
     const param = searchParams.get("sortOrder");
     if (param !== null) return param as "asc" | "desc";
     try {
-      const saved = JSON.parse(sessionStorage.getItem("customers_state") || "{}");
+      const saved = JSON.parse(
+        sessionStorage.getItem("customers_state") || "{}",
+      );
       return saved.sortOrder || "desc";
     } catch {
       return "desc";
@@ -92,7 +99,7 @@ export default function CustomersView() {
 
     sessionStorage.setItem(
       "customers_state",
-      JSON.stringify({ search, tierFilter, sortBy, sortOrder })
+      JSON.stringify({ search, tierFilter, sortBy, sortOrder }),
     );
 
     const params = new URLSearchParams();
@@ -114,7 +121,10 @@ export default function CustomersView() {
 
     const handleScroll = () => {
       if (isNavigatingRef.current) return;
-      sessionStorage.setItem("customers_scroll_top", contentBody.scrollTop.toString());
+      sessionStorage.setItem(
+        "customers_scroll_top",
+        contentBody.scrollTop.toString(),
+      );
     };
 
     contentBody.addEventListener("scroll", handleScroll, { passive: true });
@@ -159,7 +169,10 @@ export default function CustomersView() {
     isNavigatingRef.current = true;
     const contentBody = document.querySelector(".content-body");
     if (contentBody) {
-      sessionStorage.setItem("customers_scroll_top", contentBody.scrollTop.toString());
+      sessionStorage.setItem(
+        "customers_scroll_top",
+        contentBody.scrollTop.toString(),
+      );
     }
     router.push(`/customers/${userId}`);
   };
@@ -204,9 +217,13 @@ export default function CustomersView() {
   const renderSortIcon = (field: SortField) => {
     if (sortBy !== field) return null;
     return sortOrder === "asc" ? (
-      <ArrowUp style={{ width: 12, height: 12, marginLeft: 4, display: "inline" }} />
+      <ArrowUp
+        style={{ width: 12, height: 12, marginLeft: 4, display: "inline" }}
+      />
     ) : (
-      <ArrowDown style={{ width: 12, height: 12, marginLeft: 4, display: "inline" }} />
+      <ArrowDown
+        style={{ width: 12, height: 12, marginLeft: 4, display: "inline" }}
+      />
     );
   };
 
@@ -224,11 +241,19 @@ export default function CustomersView() {
               </span>
             )}
             <span className="badge badge-muted" style={{ fontSize: 11 }}>
-              <ShieldCheck style={{ width: 12, height: 12 }} /> Convex Real-time DB
+              <ShieldCheck style={{ width: 12, height: 12 }} /> Convex Real-time
+              DB
             </span>
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+              flexWrap: "wrap",
+            }}
+          >
             <div className="search-input-wrap">
               <Search className="search-icon" />
               <input
@@ -268,7 +293,9 @@ export default function CustomersView() {
               <button
                 className="btn-secondary"
                 style={{ padding: "8px 12px", fontSize: 13 }}
-                onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
+                onClick={() =>
+                  setSortOrder(sortOrder === "asc" ? "desc" : "asc")
+                }
                 title={`Toggle order (${sortOrder === "asc" ? "Ascending" : "Descending"})`}
               >
                 <ArrowUpDown style={{ width: 14, height: 14 }} />
@@ -279,32 +306,59 @@ export default function CustomersView() {
         </div>
 
         {!users ? (
-          <div style={{ padding: 40, textAlign: "center", color: "var(--text-secondary)" }}>
+          <div
+            style={{
+              padding: 40,
+              textAlign: "center",
+              color: "var(--text-secondary)",
+            }}
+          >
             Loading Snoopa Customers...
           </div>
         ) : users.length === 0 ? (
-          <div style={{ padding: 40, textAlign: "center", color: "var(--text-secondary)" }}>
+          <div
+            style={{
+              padding: 40,
+              textAlign: "center",
+              color: "var(--text-secondary)",
+            }}
+          >
             No customers found matching search criteria.
           </div>
         ) : (
           <table className="data-table">
             <thead>
               <tr>
-                <th style={{ cursor: "pointer" }} onClick={() => handleHeaderSort("created")}>
+                <th
+                  style={{ cursor: "pointer" }}
+                  onClick={() => handleHeaderSort("created")}
+                >
                   Customer {renderSortIcon("created")}
                 </th>
                 <th>OS Platform</th>
-                <th style={{ cursor: "pointer" }} onClick={() => handleHeaderSort("country")}>
+                <th
+                  style={{ cursor: "pointer" }}
+                  onClick={() => handleHeaderSort("country")}
+                >
                   Country {renderSortIcon("country")}
                 </th>
                 <th>Sub Tier</th>
-                <th style={{ cursor: "pointer" }} onClick={() => handleHeaderSort("watchlists")}>
+                <th
+                  style={{ cursor: "pointer" }}
+                  onClick={() => handleHeaderSort("watchlists")}
+                >
                   Watchlists {renderSortIcon("watchlists")}
                 </th>
-                <th style={{ cursor: "pointer" }} onClick={() => handleHeaderSort("snoops")}>
+                <th
+                  style={{ cursor: "pointer" }}
+                  onClick={() => handleHeaderSort("snoops")}
+                >
                   Snoops {renderSortIcon("snoops")}
                 </th>
-                <th style={{ cursor: "pointer" }} onClick={() => handleHeaderSort("lastSeen")}>
+                <th
+                  style={{ cursor: "pointer" }}
+                  onClick={() => handleHeaderSort("lastSeen")}
+                >
                   Last Seen {renderSortIcon("lastSeen")}
                 </th>
                 <th style={{ textAlign: "right" }}>Actions</th>
@@ -318,15 +372,35 @@ export default function CustomersView() {
                 return (
                   <tr key={u._id} onClick={() => handleCustomerClick(u._id)}>
                     <td>
-                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 10,
+                        }}
+                      >
                         <div className="avatar-circle">
                           {(u.fullname || u.email).charAt(0).toUpperCase()}
                         </div>
                         <div>
-                          <div style={{ fontWeight: 600 }}>{u.fullname || "Anonymous User"}</div>
-                          <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>{u.email}</div>
+                          <div style={{ fontWeight: 600 }}>
+                            {u.fullname || "Anonymous User"}
+                          </div>
+                          <div
+                            style={{
+                              fontSize: 12,
+                              color: "var(--text-secondary)",
+                            }}
+                          >
+                            {u.email}
+                          </div>
                           {u.username && (
-                            <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                            <div
+                              style={{
+                                fontSize: 11,
+                                color: "var(--text-muted)",
+                              }}
+                            >
                               @{u.username}
                             </div>
                           )}
@@ -335,22 +409,38 @@ export default function CustomersView() {
                     </td>
                     <td>
                       {isApple ? (
-                        <span className="badge badge-green" style={{ fontSize: 11 }}>
-                          <Apple style={{ width: 11, height: 11 }} /> Apple (iOS)
+                        <span
+                          className="badge badge-muted"
+                          style={{ fontSize: 11 }}
+                        >
+                          <Apple style={{ width: 11, height: 11 }} /> iOS
                         </span>
                       ) : isGoogle ? (
-                        <span className="badge badge-gold" style={{ fontSize: 11 }}>
-                          <Smartphone style={{ width: 11, height: 11 }} /> Google (Android)
+                        <span
+                          className="badge badge-muted"
+                          style={{ fontSize: 11 }}
+                        >
+                          <Smartphone style={{ width: 11, height: 11 }} />{" "}
+                          Android
                         </span>
                       ) : (
-                        <span className="badge badge-muted" style={{ fontSize: 11 }}>
-                          <Globe style={{ width: 11, height: 11 }} /> {u.provider || u.os || "Email / Web"}
+                        <span
+                          className="badge badge-muted"
+                          style={{ fontSize: 11 }}
+                        >
+                          <Globe style={{ width: 11, height: 11 }} />{" "}
+                          {u.provider || u.os || "Email / Web"}
                         </span>
                       )}
                     </td>
                     <td>
-                      <span className="badge badge-muted" style={{ fontWeight: 700, fontSize: 11 }}>
-                        <Globe style={{ width: 11, height: 11, marginRight: 4 }} />
+                      <span
+                        className="badge badge-muted"
+                        style={{ fontWeight: 700, fontSize: 11 }}
+                      >
+                        <Globe
+                          style={{ width: 11, height: 11, marginRight: 4 }}
+                        />
                         {u.country || "US"}
                       </span>
                     </td>
@@ -360,27 +450,41 @@ export default function CustomersView() {
                           u.sub_tier === "max"
                             ? "badge-danger"
                             : u.sub_tier === "supa"
-                            ? "badge-gold"
-                            : u.sub_tier === "pro"
-                            ? "badge-green"
-                            : "badge-muted"
+                              ? "badge-gold"
+                              : u.sub_tier === "pro"
+                                ? "badge-green"
+                                : "badge-muted"
                         }`}
                       >
                         {u.sub_tier.toUpperCase()}
                       </span>
                     </td>
                     <td>
-                      <span style={{ fontWeight: 600 }}>{u.watchlistCount}</span>
-                    </td>
-                    <td>
-                      <span style={{ fontWeight: 600, color: "var(--accent-milk)" }}>
-                        {u.snoopsRemaining}
+                      <span style={{ fontWeight: 600 }}>
+                        {u.watchlistCount}
                       </span>
                     </td>
                     <td>
-                      <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--accent-lightgreen)" }}>
+                      <span
+                        style={{ fontWeight: 600, color: "var(--accent-milk)" }}
+                      >
+                        {u.snoopsFormatted || `${u.snoopsRemaining || 0}/30`}
+                      </span>
+                    </td>
+                    <td>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 6,
+                          fontSize: 12,
+                          color: "var(--accent-lightgreen)",
+                        }}
+                      >
                         <Clock style={{ width: 12, height: 12 }} />
-                        <span>{formatTimeAgo(u.lastSeen || u._creationTime)}</span>
+                        <span>
+                          {formatTimeAgo(u.lastSeen || u._creationTime)}
+                        </span>
                       </div>
                     </td>
                     <td style={{ textAlign: "right" }}>
@@ -405,4 +509,3 @@ export default function CustomersView() {
     </div>
   );
 }
-

@@ -1,30 +1,24 @@
 "use client";
 
-import { useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
+import { useQuery } from "convex/react";
+import { Bell, CreditCard, Eye, Globe, Radio, Users } from "lucide-react";
+import { useRouter } from "next/navigation";
 import {
-  Users,
-  CreditCard,
-  Smartphone,
-  Globe,
-  Eye,
-  MessageSquare,
-  CheckCircle2,
-} from "lucide-react";
-import {
-  PieChart,
-  Pie,
-  Cell,
-  Tooltip,
-  ResponsiveContainer,
-  BarChart,
   Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
   XAxis,
   YAxis,
-  CartesianGrid,
 } from "recharts";
 
 export default function AnalyticsView() {
+  const router = useRouter();
   const stats = useQuery(api.admin.getAdminStats);
 
   if (!stats) {
@@ -84,9 +78,7 @@ export default function AnalyticsView() {
           <div className="metric-header">
             <span className="metric-title">Active Subscriptions</span>
             <div className="metric-icon-wrap">
-              <CreditCard
-                style={{ width: 18, height: 18, color: "var(--accent-green)" }}
-              />
+              <CreditCard style={{ width: 18, height: 18 }} />
             </div>
           </div>
           <div className="metric-value">{stats.totalPremiumUsers}</div>
@@ -96,30 +88,28 @@ export default function AnalyticsView() {
           </div>
         </div>
 
-        {/* Card 3: Snoops Used (This Month vs All Time) */}
+        {/* Card 3: Total Active Watchlists */}
         <div className="card">
           <div className="metric-header">
-            <span className="metric-title">Snoops Used (This Month)</span>
+            <span className="metric-title">Total Active Watchlists</span>
             <div className="metric-icon-wrap">
-              <MessageSquare
+              <Radio
                 style={{
                   width: 18,
                   height: 18,
-                  color: "var(--accent-warning)",
                 }}
               />
             </div>
           </div>
-          <div className="metric-value">{stats.snoopsUsedThisMonth}</div>
+          <div className="metric-value">{stats.watchlistStatus.active}</div>
           <div
             className="metric-sub"
             style={{ fontSize: 11, color: "var(--text-secondary)" }}
           >
-            Total Snoops Used:{" "}
+            Total Snoops Used for the Month:{" "}
             <strong style={{ color: "var(--text-primary)" }}>
-              {stats.totalSnoopsUsedAllTime}
-            </strong>{" "}
-            All-Time
+              {stats.snoopsUsedThisMonth}
+            </strong>
           </div>
         </div>
 
@@ -210,9 +200,14 @@ export default function AnalyticsView() {
                   paddingAngle={5}
                   dataKey="value"
                 >
-                  {storeData.map((entry: { name: string; value: number; color: string }, index: number) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
+                  {storeData.map(
+                    (
+                      entry: { name: string; value: number; color: string },
+                      index: number,
+                    ) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ),
+                  )}
                 </Pie>
                 <Tooltip
                   contentStyle={{
@@ -233,27 +228,29 @@ export default function AnalyticsView() {
               marginTop: 10,
             }}
           >
-            {storeData.map((item: { name: string; value: number; color: string }) => (
-              <div
-                key={item.name}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  fontSize: 13,
-                }}
-              >
-                <span
+            {storeData.map(
+              (item: { name: string; value: number; color: string }) => (
+                <div
+                  key={item.name}
                   style={{
-                    width: 10,
-                    height: 10,
-                    borderRadius: "50%",
-                    backgroundColor: item.color,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    fontSize: 13,
                   }}
-                />
-                <span>{`${item.name}: ${item.value}`}</span>
-              </div>
-            ))}
+                >
+                  <span
+                    style={{
+                      width: 10,
+                      height: 10,
+                      borderRadius: "50%",
+                      backgroundColor: item.color,
+                    }}
+                  />
+                  <span>{`${item.name}: ${item.value}`}</span>
+                </div>
+              ),
+            )}
           </div>
         </div>
       </div>
@@ -313,105 +310,41 @@ export default function AnalyticsView() {
             <h3 className="card-title font-header">
               Watchlists & Snoopa Activity
             </h3>
-            <span className="badge badge-muted">Fact Hunting</span>
-          </div>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(3, 1fr)",
-              gap: 16,
-              marginBottom: 20,
-            }}
-          >
-            <div
-              style={{
-                padding: 16,
-                backgroundColor: "var(--bg-input)",
-                borderRadius: 10,
-                border: "1px solid var(--border-color)",
-              }}
-            >
-              <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>
-                Total Watchlists
-              </div>
-              <div
-                style={{
-                  fontSize: 24,
-                  fontWeight: 700,
-                  fontFamily: "var(--font-header)",
-                }}
-              >
-                {stats.totalWatchlists}
-              </div>
-            </div>
-            <div
-              style={{
-                padding: 16,
-                backgroundColor: "var(--bg-input)",
-                borderRadius: 10,
-                border: "1px solid var(--border-color)",
-              }}
-            >
-              <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>
-                Active Tracking
-              </div>
-              <div
-                style={{
-                  fontSize: 24,
-                  fontWeight: 700,
-                  color: "var(--accent-green)",
-                  fontFamily: "var(--font-header)",
-                }}
-              >
-                {stats.watchlistStatus.active}
-              </div>
-            </div>
-            <div
-              style={{
-                padding: 16,
-                backgroundColor: "var(--bg-input)",
-                borderRadius: 10,
-                border: "1px solid var(--border-color)",
-              }}
-            >
-              <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>
-                Completed Tracking
-              </div>
-              <div
-                style={{
-                  fontSize: 24,
-                  fontWeight: 700,
-                  color: "var(--accent-milk)",
-                  fontFamily: "var(--font-header)",
-                }}
-              >
-                {stats.watchlistStatus.completed}
-              </div>
-            </div>
+            <span className="badge badge-muted">
+              Best Performing (This Month)
+            </span>
           </div>
 
           <div
             style={{
               fontSize: 14,
               fontWeight: 600,
-              marginBottom: 10,
+              marginBottom: 12,
               color: "var(--text-secondary)",
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
             }}
           >
-            Recent Watchlists
+            <Bell
+              style={{ width: 15, height: 15, color: "var(--accent-warning)" }}
+            />
+            <span>Best Performing Watchlists for the Month</span>
           </div>
+
           <div className="table-container">
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>Topic / Watchlist</th>
+                  <th>Watchlist & Snoop Target</th>
                   <th>Customer</th>
                   <th>Status</th>
-                  <th>Date</th>
+                  <th>Alerts (This Month)</th>
+                  <th>Total Alerts</th>
                 </tr>
               </thead>
               <tbody>
-                {(stats.recentWatchlists || []).length === 0 ? (
+                {(stats.bestPerformingWatchlists || []).length === 0 ? (
                   <tr>
                     <td
                       colSpan={5}
@@ -421,13 +354,41 @@ export default function AnalyticsView() {
                         padding: 20,
                       }}
                     >
-                      No watchlists created yet.
+                      No watchlist notification activity recorded this month.
                     </td>
                   </tr>
                 ) : (
-                  (stats.recentWatchlists || []).map((w: any) => (
-                    <tr key={w.id}>
-                      <td style={{ fontWeight: 600 }}>{w.title}</td>
+                  (stats.bestPerformingWatchlists || []).map((w: any) => (
+                    <tr
+                      key={w.id}
+                      style={{ cursor: "pointer" }}
+                      onClick={() => router.push(`/watchlists/${w.id}`)}
+                    >
+                      <td>
+                        <div
+                          style={{
+                            fontWeight: 600,
+                            fontSize: 13,
+                            color: "var(--accent-milk)",
+                          }}
+                        >
+                          {w.title}
+                        </div>
+                        <div
+                          style={{
+                            fontSize: 11,
+                            color: "var(--text-secondary)",
+                            display: "-webkit-box",
+                            WebkitLineClamp: 1,
+                            WebkitBoxOrient: "vertical",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                          }}
+                          title={`Condition: "${w.condition}"`}
+                        >
+                          Condition: "{w.condition}"
+                        </div>
+                      </td>
                       <td style={{ fontSize: 13 }}>
                         <div style={{ fontWeight: 500 }}>{w.user_name}</div>
                         <div
@@ -438,13 +399,42 @@ export default function AnalyticsView() {
                       </td>
                       <td>
                         <span
-                          className={`badge ${w.status === "active" ? "badge-green" : "badge-muted"}`}
+                          className={`badge ${
+                            w.status === "active"
+                              ? "badge-green"
+                              : w.status === "completed"
+                                ? "badge-gold"
+                                : "badge-muted"
+                          }`}
                         >
                           {w.status.toUpperCase()}
                         </span>
                       </td>
-                      <td style={{ fontSize: 12, color: "var(--text-muted)" }}>
-                        {new Date(w.created_at).toLocaleDateString()}
+                      <td>
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 6,
+                            fontWeight: 700,
+                            color: "var(--accent-warning)",
+                            fontSize: 13,
+                          }}
+                        >
+                          <Bell style={{ width: 13, height: 13 }} />
+                          <span>{w.notificationsThisMonth}</span>
+                        </div>
+                      </td>
+                      <td>
+                        <span
+                          style={{
+                            fontWeight: 600,
+                            color: "var(--text-secondary)",
+                            fontSize: 13,
+                          }}
+                        >
+                          {w.notificationsAllTime}
+                        </span>
                       </td>
                     </tr>
                   ))

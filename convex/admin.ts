@@ -165,7 +165,7 @@ export const getAdminStats = query({
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
 
-    const [users, watchlists, feedbacks, snoops, adViews, authAccounts, chats] = await Promise.all([
+    const [users, watchlists, feedbacks, snoops, adViews, authAccounts, chats, notifications] = await Promise.all([
       ctx.db.query("users").collect(),
       ctx.db.query("watchlist").collect(),
       ctx.db.query("feedbacks").collect(),
@@ -173,6 +173,7 @@ export const getAdminStats = query({
       ctx.db.query("ad_views").collect(),
       ctx.db.query("authAccounts").collect(),
       ctx.db.query("chats").collect(),
+      ctx.db.query("notifications").collect(),
     ]);
 
     const tierCounts = {
@@ -259,6 +260,47 @@ export const getAdminStats = query({
 
     const usersMap = new Map(users.map((u: any) => [u._id.toString(), u]));
 
+    // 5. Notifications & Best Performing Watchlists for the Month
+    const notifCountThisMonthMap = new Map<string, number>();
+    const notifCountAllTimeMap = new Map<string, number>();
+
+    notifications.forEach((n) => {
+      if (n.watchlist_id) {
+        const wIdStr = n.watchlist_id.toString();
+        notifCountAllTimeMap.set(wIdStr, (notifCountAllTimeMap.get(wIdStr) || 0) + 1);
+        if (n._creationTime >= startOfMonth) {
+          notifCountThisMonthMap.set(wIdStr, (notifCountThisMonthMap.get(wIdStr) || 0) + 1);
+        }
+      }
+    });
+
+    const bestPerformingWatchlists = watchlists
+      .map((w: any) => {
+        const u: any = usersMap.get(w.user_id?.toString());
+        const wIdStr = w._id.toString();
+        return {
+          id: w._id,
+          title: w.title,
+          condition: w.condition,
+          status: w.status,
+          user_email: u ? u.email : "Unknown",
+          user_name: u ? u.fullname || u.email : "User",
+          notificationsThisMonth: notifCountThisMonthMap.get(wIdStr) || 0,
+          notificationsAllTime: notifCountAllTimeMap.get(wIdStr) || 0,
+          created_at: w._creationTime,
+        };
+      })
+      .sort((a, b) => {
+        if (b.notificationsThisMonth !== a.notificationsThisMonth) {
+          return b.notificationsThisMonth - a.notificationsThisMonth;
+        }
+        if (b.notificationsAllTime !== a.notificationsAllTime) {
+          return b.notificationsAllTime - a.notificationsAllTime;
+        }
+        return b.created_at - a.created_at;
+      })
+      .slice(0, 5);
+
     const recentWatchlists = watchlists
       .sort((a: any, b: any) => b._creationTime - a._creationTime)
       .slice(0, 5)
@@ -299,9 +341,70 @@ export const getAdminStats = query({
           created_at: u._creationTime,
         })),
       recentWatchlists,
+      bestPerformingWatchlists,
     };
   },
 });
+
+// Helper to compute active snoop balance and total for a user for the current month/period
+export function computeUserSnoopStats(user: any, userSnoops: any[]) {
+  const now = Date.now();
+  const nowObj = new Date(now);
+  const startOfMonth = new Date(Date.UTC(nowObj.getUTCFullYear(), nowObj.getUTCMonth(), 1, 0, 0, 0, 0)).getTime();
+
+  const allSnoops = userSnoops || [];
+
+  // 1. Get monthly / free snoop grants for the current month
+  const monthlyGrants = allSnoops
+    .filter((g: any) => {
+      if (g.type === "top_up") return false;
+      if (g.expiration_date !== undefined && g.expiration_date !== null) {
+        return g.expiration_date > now || g.expiration_date >= startOfMonth || g._creationTime >= startOfMonth;
+      }
+      return g._creationTime >= startOfMonth;
+    })
+    .sort((a: any, b: any) => b._creationTime - a._creationTime);
+
+  // Take the LATEST recorded monthly/free grant for the current month
+  const latestMonthlyGrant = monthlyGrants.length > 0 ? monthlyGrants[0] : null;
+
+  // 2. Get active top-up grants
+  const activeTopUpGrants = allSnoops.filter(
+    (g: any) => g.type === "top_up" && (g.remaining > 0 || g._creationTime >= startOfMonth)
+  );
+
+  // Combine latest monthly grant + active top-ups
+  const activeGrants = [
+    ...(latestMonthlyGrant ? [latestMonthlyGrant] : []),
+    ...activeTopUpGrants,
+  ];
+
+  const tier = user?.sub_tier || user?.plan || "free";
+  let defaultTotal = 30;
+  if (tier === "pro") defaultTotal = 1000;
+  else if (tier === "supa") defaultTotal = 4000;
+  else if (tier === "max") defaultTotal = 12000;
+
+  if (activeGrants.length === 0) {
+    return {
+      remaining: 0,
+      total: defaultTotal,
+      snoopsFormatted: `0/${defaultTotal}`,
+    };
+  }
+
+  const remainingSum = activeGrants.reduce((sum: number, g: any) => sum + (g.remaining || 0), 0);
+  const totalSum = activeGrants.reduce((sum: number, g: any) => sum + (g.snoops || 0), 0);
+
+  const displayTotal = totalSum > 0 ? totalSum : defaultTotal;
+  const displayRemaining = Math.min(remainingSum, displayTotal);
+
+  return {
+    remaining: displayRemaining,
+    total: displayTotal,
+    snoopsFormatted: `${displayRemaining}/${displayTotal}`,
+  };
+}
 
 // ==========================================
 // CUSTOMER EXPLORER
@@ -345,10 +448,14 @@ export const getUsers = query({
       if (uId) wlCountMap.set(uId, (wlCountMap.get(uId) || 0) + 1);
     });
 
-    const snoopsMap = new Map<string, number>();
+    const userSnoopsMap = new Map<string, any[]>();
     snoops.forEach((s: any) => {
       const uId = s.user_id?.toString();
-      if (uId) snoopsMap.set(uId, (snoopsMap.get(uId) || 0) + (s.remaining || 0));
+      if (uId) {
+        const list = userSnoopsMap.get(uId) || [];
+        list.push(s);
+        userSnoopsMap.set(uId, list);
+      }
     });
 
     const lastSeenMap = new Map<string, number>();
@@ -386,12 +493,16 @@ export const getUsers = query({
       }
 
       const lastSeen = u.last_seen || lastSeenMap.get(uIdStr) || u._creationTime;
+      const userSnoops = userSnoopsMap.get(uIdStr) || [];
+      const snoopStats = computeUserSnoopStats(u, userSnoops);
 
       return {
         ...u,
         provider: provider || (u.os === "ios" ? "apple" : u.os === "android" ? "google" : "email"),
         watchlistCount: wlCountMap.get(uIdStr) || 0,
-        snoopsRemaining: snoopsMap.get(uIdStr) || 0,
+        snoopsRemaining: snoopStats.remaining,
+        snoopsTotal: snoopStats.total,
+        snoopsFormatted: snoopStats.snoopsFormatted,
         sub_tier: u.sub_tier || u.plan || "free",
         lastSeen: lastSeen,
         os: os,
@@ -443,8 +554,15 @@ export const getUserDetails = query({
       chats = chatArrays.flat();
     }
 
+    const snoopStats = computeUserSnoopStats(user, snoopsList || []);
+
     return {
-      user,
+      user: {
+        ...user,
+        snoopsRemaining: snoopStats.remaining,
+        snoopsTotal: snoopStats.total,
+        snoopsFormatted: snoopStats.snoopsFormatted,
+      },
       watchlists,
       snoopsList,
       adViews,
@@ -546,14 +664,25 @@ export const getWatchlists = query({
   handler: async (ctx, args) => {
     let watchlists = await ctx.db.query("watchlist").collect();
 
-    // Join user data, chat count, and notification count
-    const [users, chats, notifications] = await Promise.all([
+    // Join user data, chat count, notification count, and snoops
+    const [users, chats, notifications, snoops] = await Promise.all([
       ctx.db.query("users").collect(),
       ctx.db.query("chats").collect(),
       ctx.db.query("notifications").collect(),
+      ctx.db.query("snoops").collect(),
     ]);
 
     const users_map = new Map(users.map((u) => [u._id.toString(), u]));
+
+    const userSnoopsMap = new Map<string, any[]>();
+    snoops.forEach((s: any) => {
+      const uId = s.user_id?.toString();
+      if (uId) {
+        const list = userSnoopsMap.get(uId) || [];
+        list.push(s);
+        userSnoopsMap.set(uId, list);
+      }
+    });
 
     const chat_count_map = new Map<string, number>();
     chats.forEach((c) => {
@@ -574,10 +703,16 @@ export const getWatchlists = query({
     let results = watchlists.map((w) => {
       const owner = users_map.get(w.user_id.toString());
       const w_id_str = w._id.toString();
+      const ownerSnoops = userSnoopsMap.get(w.user_id.toString()) || [];
+      const snoopStats = computeUserSnoopStats(owner, ownerSnoops);
+
       return {
         ...w,
         owner_name: owner ? owner.fullname || owner.email : "Unknown User",
         owner_email: owner ? owner.email : "Unknown",
+        snoop_balance: snoopStats.remaining,
+        snoop_total: snoopStats.total,
+        snoop_formatted: snoopStats.snoopsFormatted,
         chat_count: chat_count_map.get(w_id_str) || 0,
         notification_count: notif_count_map.get(w_id_str) || 0,
       };
