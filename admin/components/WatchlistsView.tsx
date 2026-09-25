@@ -415,24 +415,6 @@ export default function WatchlistsView() {
                         >
                           Condition: "{w.condition}"
                         </div>
-                        {w.keywords && w.keywords.length > 0 && (
-                          <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 2 }}>
-                            {w.keywords.slice(0, 3).map((kw: string, idx: number) => (
-                              <span
-                                key={idx}
-                                className="badge badge-muted"
-                                style={{ fontSize: 10, padding: "2px 6px" }}
-                              >
-                                #{kw}
-                              </span>
-                            ))}
-                            {w.keywords.length > 3 && (
-                              <span style={{ fontSize: 10, color: "var(--text-muted)" }}>
-                                +{w.keywords.length - 3} more
-                              </span>
-                            )}
-                          </div>
-                        )}
                       </div>
                     </td>
                     <td>
