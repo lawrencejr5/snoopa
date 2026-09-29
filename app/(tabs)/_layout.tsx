@@ -29,29 +29,30 @@ const TABS = [
 ];
 
 const IOSTabsLayout = () => {
-  const { theme } = useTheme();
+  // Always force dark theme for the liquid glass tab bar — we don't have a light theme.
+  const darkColors = Colors.dark;
 
   return (
-    <View style={{ backgroundColor: Colors[theme].background, flex: 1 }}>
+    <View style={{ backgroundColor: darkColors.background, flex: 1 }}>
       <NativeTabs
-        tintColor={Colors[theme].milk}
+        tintColor={darkColors.milk}
         iconColor={{
-          default: Colors[theme].text_secondary,
-          selected: Colors[theme].milk,
+          default: darkColors.text_secondary,
+          selected: darkColors.milk,
         }}
         labelStyle={{
           default: {
-            color: Colors[theme].text_secondary,
+            color: darkColors.text_secondary,
             fontFamily: "FontMedium",
             fontSize: 10,
           },
           selected: {
-            color: Colors[theme].milk,
+            color: darkColors.milk,
             fontFamily: "FontMedium",
             fontSize: 10,
           },
         }}
-        backgroundColor={Colors[theme].background}
+        backgroundColor={darkColors.background}
         blurEffect="systemChromeMaterialDark"
         shadowColor="transparent"
         {...({

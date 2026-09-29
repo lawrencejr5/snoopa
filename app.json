@@ -12,7 +12,7 @@
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "com.lawrencejr.snoopa",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "dark",
     "splash": {
       "image": "./assets/images/splash-icon.png",
       "resizeMode": "contain",
@@ -22,8 +22,10 @@
       "supportsTablet": false,
       "bundleIdentifier": "com.lawrencejr.snoopa",
       "icon": "./assets/images/icon-ios.png",
+      "userInterfaceStyle": "dark",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "UIUserInterfaceStyle": "Dark"
       }
     },
     "android": {
@@ -72,7 +74,8 @@
           "iosAppId": "ca-app-pub-7078901325871517~9953396692"
         }
       ],
-      "expo-tracking-transparency"
+      "expo-tracking-transparency",
+      "expo-localization"
     ],
     "experiments": {
       "typedRoutes": true
