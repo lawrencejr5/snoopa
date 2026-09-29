@@ -1649,7 +1649,7 @@ export default function SnoopDetailsScreen() {
             placeholder="Talk to me boss..."
             placeholderTextColor={Colors[theme].text_secondary + "60"}
             editable={!sending}
-            maxLength={300}
+            maxLength={1000}
             multiline={true}
             onFocus={() => setIsFocused(true)}
             onBlur={() => setIsFocused(false)}

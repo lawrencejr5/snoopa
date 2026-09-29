@@ -250,7 +250,7 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
                 }
               }}
               multiline
-              maxLength={500}
+              maxLength={1500}
               placeholder={`e.g. "${placeholder}"`}
               placeholderTextColor={Colors[theme].text_secondary + "80"}
               editable={!isProcessing}
@@ -274,7 +274,7 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
                 marginRight: 4,
               }}
             >
-              {prompt.length}/500
+              {prompt.length}/1500
             </Text>
           </View>
 
