@@ -99,6 +99,44 @@ export const updateUser = mutation({
   },
 });
 
+export const update_app_load_metadata = mutation({
+  args: {
+    os: v.optional(v.union(v.literal("ios"), v.literal("android"), v.literal("web"))),
+    country: v.optional(
+      v.union(
+        v.string(),
+        v.object({
+          name: v.string(),
+          code: v.string(),
+          flag: v.string(),
+        })
+      )
+    ),
+    last_seen: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const user_id = await getAuthUserId(ctx);
+    if (!user_id) return;
+
+    const user = await ctx.db.get(user_id);
+    if (!user) return;
+
+    const updates: {
+      os?: "ios" | "android" | "web";
+      country?: string | { name: string; code: string; flag: string };
+      last_seen?: number;
+    } = {};
+
+    if (args.os !== undefined) updates.os = args.os;
+    if (args.country !== undefined) updates.country = args.country;
+    if (args.last_seen !== undefined) updates.last_seen = args.last_seen;
+
+    if (Object.keys(updates).length > 0) {
+      await ctx.db.patch(user_id, updates);
+    }
+  },
+});
+
 export const deleteUser = mutation({
   args: {},
   handler: async (ctx) => {

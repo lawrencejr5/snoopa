@@ -1,6 +1,7 @@
 import React, { createContext, FC, ReactNode, useContext, useEffect } from "react";
 import Purchases from "react-native-purchases";
-import { Platform } from "react-native";
+import { AppState, AppStateStatus, Platform } from "react-native";
+import * as Localization from "expo-localization";
 
 import { api } from "@/convex/_generated/api";
 import { Doc } from "@/convex/_generated/dataModel";
@@ -17,6 +18,106 @@ const UserProvider: FC<{ children: ReactNode }> = ({ children }) => {
   const currentUser = useQuery(api.users.get_current_user);
   const signedIn = currentUser as UserData;
   const syncSubscription = useMutation(api.snoops.sync_user_subscription);
+  const updateAppLoadMetadata = useMutation(api.users.update_app_load_metadata);
+
+  useEffect(() => {
+    if (!signedIn?._id) return;
+
+    const getCountryName = (code: string): string => {
+      try {
+        const displayNames = new Intl.DisplayNames(["en"], { type: "region" });
+        return displayNames.of(code.toUpperCase()) || code.toUpperCase();
+      } catch {
+        return code.toUpperCase();
+      }
+    };
+
+    const getFlagUrl = (code: string): string => {
+      return `https://flagcdn.com/w80/${code.toLowerCase()}.png`;
+    };
+
+    const fetchIpLocation = async (): Promise<{ name: string; code: string; flag: string } | undefined> => {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3500);
+        const res = await fetch("https://ipapi.co/json/", { signal: controller.signal });
+        clearTimeout(timeoutId);
+        if (res.ok) {
+          const data = await res.json();
+          const code = data.country_code || data.country;
+          const name = data.country_name || (code ? getCountryName(code) : undefined);
+          if (code && name) {
+            return {
+              name,
+              code: code.toUpperCase(),
+              flag: getFlagUrl(code),
+            };
+          }
+        }
+      } catch {
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 3500);
+          const res = await fetch("https://api.country.is", { signal: controller.signal });
+          clearTimeout(timeoutId);
+          if (res.ok) {
+            const data = await res.json();
+            const code = data.country;
+            if (code) {
+              return {
+                name: getCountryName(code),
+                code: code.toUpperCase(),
+                flag: getFlagUrl(code),
+              };
+            }
+          }
+        } catch {
+          // ignore fallback failure
+        }
+      }
+
+      // Fallback to device locale region if IP lookup fails
+      const locales = Localization.getLocales();
+      const regionCode = locales && locales.length > 0 ? locales[0].regionCode : undefined;
+      if (regionCode) {
+        return {
+          name: getCountryName(regionCode),
+          code: regionCode.toUpperCase(),
+          flag: getFlagUrl(regionCode),
+        };
+      }
+
+      return undefined;
+    };
+
+    const syncMetadata = async () => {
+      try {
+        const location = await fetchIpLocation();
+        const os = Platform.OS === "ios" ? "ios" : Platform.OS === "android" ? "android" : "web";
+        const last_seen = Date.now();
+
+        await updateAppLoadMetadata({
+          os,
+          country: location,
+          last_seen,
+        });
+      } catch (err) {
+        console.error("Error updating user app load metadata:", err);
+      }
+    };
+
+    syncMetadata();
+
+    const subscription = AppState.addEventListener("change", (nextState: AppStateStatus) => {
+      if (nextState === "active") {
+        syncMetadata();
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [signedIn?._id]);
 
   useEffect(() => {
     if (Platform.OS === "web") return;
