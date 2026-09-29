@@ -34,8 +34,11 @@ const schema = defineSchema({
     emailVerificationTime: v.optional(v.number()),
     pushTokens: v.optional(v.array(v.string())),
     memory: v.optional(v.string()),
-    os: v.optional(v.union(v.literal("ios"), v.literal("android"), v.literal("web"))),
+    os: v.optional(
+      v.union(v.literal("ios"), v.literal("android"), v.literal("web")),
+    ),
     country: v.optional(v.string()),
+    countryCode: v.optional(v.string()),
     last_seen: v.optional(v.number()),
   }).index("email", ["email"]),
 
@@ -158,7 +161,7 @@ const schema = defineSchema({
     images: v.optional(v.array(v.id("_storage"))),
     timestamp: v.number(),
     status: v.optional(
-      v.union(v.literal("unread"), v.literal("read"), v.literal("fulfilled"))
+      v.union(v.literal("unread"), v.literal("read"), v.literal("fulfilled")),
     ),
   })
     .index("by_user", ["user_id"])
@@ -168,11 +171,7 @@ const schema = defineSchema({
     user_id: v.id("users"),
     snoops: v.number(),
     remaining: v.number(),
-    type: v.union(
-      v.literal("free"),
-      v.literal("monthly"),
-      v.literal("top_up"),
-    ),
+    type: v.union(v.literal("free"), v.literal("monthly"), v.literal("top_up")),
     expiration_date: v.optional(v.number()),
   })
     .index("by_user", ["user_id"])

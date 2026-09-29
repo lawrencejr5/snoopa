@@ -101,8 +101,11 @@ export const updateUser = mutation({
 
 export const update_app_load_metadata = mutation({
   args: {
-    os: v.optional(v.union(v.literal("ios"), v.literal("android"), v.literal("web"))),
+    os: v.optional(
+      v.union(v.literal("ios"), v.literal("android"), v.literal("web")),
+    ),
     country: v.optional(v.string()),
+    countryCode: v.optional(v.string()),
     last_seen: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
@@ -115,11 +118,13 @@ export const update_app_load_metadata = mutation({
     const updates: {
       os?: "ios" | "android" | "web";
       country?: string;
+      countryCode?: string;
       last_seen?: number;
     } = {};
 
     if (args.os !== undefined) updates.os = args.os;
     if (args.country !== undefined) updates.country = args.country;
+    if (args.countryCode !== undefined) updates.countryCode = args.countryCode;
     if (args.last_seen !== undefined) updates.last_seen = args.last_seen;
 
     if (Object.keys(updates).length > 0) {
@@ -145,13 +150,38 @@ export const deleteUser = mutation({
 
     for (const wl of watchlists) {
       // For each watchlist, find all related data
-      const [logs, chats, sources, monitoredSources, notifications, processedHeadlines] = await Promise.all([
-        ctx.db.query("logs").withIndex("by_watchlist", (q) => q.eq("watchlist_id", wl._id)).collect(),
-        ctx.db.query("chats").withIndex("by_watchlist", (q) => q.eq("watchlist_id", wl._id)).collect(),
-        ctx.db.query("sources").withIndex("by_watchlist", (q) => q.eq("watchlist_id", wl._id)).collect(),
-        ctx.db.query("monitored_sources").withIndex("by_watchlist", (q) => q.eq("watchlist_id", wl._id)).collect(),
-        ctx.db.query("notifications").withIndex("by_watchlist", (q) => q.eq("watchlist_id", wl._id)).collect(),
-        ctx.db.query("processed_headlines").withIndex("by_watchlist", (q) => q.eq("watchlist_id", wl._id)).collect(),
+      const [
+        logs,
+        chats,
+        sources,
+        monitoredSources,
+        notifications,
+        processedHeadlines,
+      ] = await Promise.all([
+        ctx.db
+          .query("logs")
+          .withIndex("by_watchlist", (q) => q.eq("watchlist_id", wl._id))
+          .collect(),
+        ctx.db
+          .query("chats")
+          .withIndex("by_watchlist", (q) => q.eq("watchlist_id", wl._id))
+          .collect(),
+        ctx.db
+          .query("sources")
+          .withIndex("by_watchlist", (q) => q.eq("watchlist_id", wl._id))
+          .collect(),
+        ctx.db
+          .query("monitored_sources")
+          .withIndex("by_watchlist", (q) => q.eq("watchlist_id", wl._id))
+          .collect(),
+        ctx.db
+          .query("notifications")
+          .withIndex("by_watchlist", (q) => q.eq("watchlist_id", wl._id))
+          .collect(),
+        ctx.db
+          .query("processed_headlines")
+          .withIndex("by_watchlist", (q) => q.eq("watchlist_id", wl._id))
+          .collect(),
       ]);
 
       await Promise.all([
@@ -167,8 +197,14 @@ export const deleteUser = mutation({
 
     // 2. Delete user-level data (sessions and general notifications)
     const [sessions, userNotifications] = await Promise.all([
-      ctx.db.query("sessions").withIndex("by_user", (q) => q.eq("user_id", user_id)).collect(),
-      ctx.db.query("notifications").withIndex("by_user", (q) => q.eq("user_id", user_id)).collect(),
+      ctx.db
+        .query("sessions")
+        .withIndex("by_user", (q) => q.eq("user_id", user_id))
+        .collect(),
+      ctx.db
+        .query("notifications")
+        .withIndex("by_user", (q) => q.eq("user_id", user_id))
+        .collect(),
     ]);
 
     await Promise.all([
@@ -195,7 +231,7 @@ export const check_apple_user = query({
     const account = await ctx.db
       .query("authAccounts")
       .withIndex("providerAndAccountId", (q) =>
-        q.eq("provider", "apple").eq("providerAccountId", args.apple_user_id)
+        q.eq("provider", "apple").eq("providerAccountId", args.apple_user_id),
       )
       .unique();
 

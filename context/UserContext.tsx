@@ -1,11 +1,17 @@
-import React, { createContext, FC, ReactNode, useContext, useEffect } from "react";
-import Purchases from "react-native-purchases";
-import { AppState, AppStateStatus, Platform } from "react-native";
 import * as Localization from "expo-localization";
+import React, {
+  createContext,
+  FC,
+  ReactNode,
+  useContext,
+  useEffect,
+} from "react";
+import { AppState, AppStateStatus, Platform } from "react-native";
+import Purchases from "react-native-purchases";
 
 import { api } from "@/convex/_generated/api";
 import { Doc } from "@/convex/_generated/dataModel";
-import { useQuery, useMutation } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 
 type UserData = Doc<"users"> & { profile_url?: string | null };
 interface UserContextType {
@@ -32,28 +38,35 @@ const UserProvider: FC<{ children: ReactNode }> = ({ children }) => {
       }
     };
 
-    const fetchIpLocation = async (): Promise<string | undefined> => {
+    const fetchIpLocation = async (): Promise<
+      { name: string; code: string } | undefined
+    > => {
       try {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 3500);
-        const res = await fetch("https://ipapi.co/json/", { signal: controller.signal });
+        const res = await fetch("https://ipapi.co/json/", {
+          signal: controller.signal,
+        });
         clearTimeout(timeoutId);
         if (res.ok) {
           const data = await res.json();
           const code = data.country_code || data.country;
-          const name = data.country_name || (code ? getCountryName(code) : undefined);
-          if (name) return name;
+          const name =
+            data.country_name || (code ? getCountryName(code) : undefined);
+          if (code) return { name, code };
         }
       } catch {
         try {
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), 3500);
-          const res = await fetch("https://api.country.is", { signal: controller.signal });
+          const res = await fetch("https://api.country.is", {
+            signal: controller.signal,
+          });
           clearTimeout(timeoutId);
           if (res.ok) {
             const data = await res.json();
             const code = data.country;
-            if (code) return getCountryName(code);
+            if (code) return { name: getCountryName(code), code };
           }
         } catch {
           // ignore fallback failure
@@ -62,19 +75,28 @@ const UserProvider: FC<{ children: ReactNode }> = ({ children }) => {
 
       // Fallback to device locale region if IP lookup fails
       const locales = Localization.getLocales();
-      const regionCode = locales && locales.length > 0 ? locales[0].regionCode : undefined;
-      return regionCode ? getCountryName(regionCode) : undefined;
+      const regionCode =
+        locales && locales.length > 0 ? locales[0].regionCode : undefined;
+      return regionCode
+        ? { name: getCountryName(regionCode), code: regionCode }
+        : undefined;
     };
 
     const syncMetadata = async () => {
       try {
         const location = await fetchIpLocation();
-        const os = Platform.OS === "ios" ? "ios" : Platform.OS === "android" ? "android" : "web";
+        const os =
+          Platform.OS === "ios"
+            ? "ios"
+            : Platform.OS === "android"
+              ? "android"
+              : "web";
         const last_seen = Date.now();
 
         await updateAppLoadMetadata({
           os,
-          country: location,
+          country: location?.name,
+          countryCode: location?.code,
           last_seen,
         });
       } catch (err) {
@@ -84,11 +106,14 @@ const UserProvider: FC<{ children: ReactNode }> = ({ children }) => {
 
     syncMetadata();
 
-    const subscription = AppState.addEventListener("change", (nextState: AppStateStatus) => {
-      if (nextState === "active") {
-        syncMetadata();
-      }
-    });
+    const subscription = AppState.addEventListener(
+      "change",
+      (nextState: AppStateStatus) => {
+        if (nextState === "active") {
+          syncMetadata();
+        }
+      },
+    );
 
     return () => {
       subscription.remove();
@@ -101,7 +126,8 @@ const UserProvider: FC<{ children: ReactNode }> = ({ children }) => {
 
     const handleCustomerInfo = async (customerInfo: any) => {
       try {
-        const entitlement = customerInfo.entitlements.active["snoopa_premium_monthly"];
+        const entitlement =
+          customerInfo.entitlements.active["snoopa_premium_monthly"];
         if (entitlement) {
           const prodId = entitlement.productIdentifier || "";
           let tier: "pro" | "supa" | "max" = "pro";
