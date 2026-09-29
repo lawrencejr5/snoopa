@@ -35,16 +35,7 @@ const schema = defineSchema({
     pushTokens: v.optional(v.array(v.string())),
     memory: v.optional(v.string()),
     os: v.optional(v.union(v.literal("ios"), v.literal("android"), v.literal("web"))),
-    country: v.optional(
-      v.union(
-        v.string(),
-        v.object({
-          name: v.string(),
-          code: v.string(),
-          flag: v.string(),
-        })
-      )
-    ),
+    country: v.optional(v.string()),
     last_seen: v.optional(v.number()),
   }).index("email", ["email"]),
 

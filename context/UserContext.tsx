@@ -32,11 +32,7 @@ const UserProvider: FC<{ children: ReactNode }> = ({ children }) => {
       }
     };
 
-    const getFlagUrl = (code: string): string => {
-      return `https://flagcdn.com/w80/${code.toLowerCase()}.png`;
-    };
-
-    const fetchIpLocation = async (): Promise<{ name: string; code: string; flag: string } | undefined> => {
+    const fetchIpLocation = async (): Promise<string | undefined> => {
       try {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 3500);
@@ -46,13 +42,7 @@ const UserProvider: FC<{ children: ReactNode }> = ({ children }) => {
           const data = await res.json();
           const code = data.country_code || data.country;
           const name = data.country_name || (code ? getCountryName(code) : undefined);
-          if (code && name) {
-            return {
-              name,
-              code: code.toUpperCase(),
-              flag: getFlagUrl(code),
-            };
-          }
+          if (name) return name;
         }
       } catch {
         try {
@@ -63,13 +53,7 @@ const UserProvider: FC<{ children: ReactNode }> = ({ children }) => {
           if (res.ok) {
             const data = await res.json();
             const code = data.country;
-            if (code) {
-              return {
-                name: getCountryName(code),
-                code: code.toUpperCase(),
-                flag: getFlagUrl(code),
-              };
-            }
+            if (code) return getCountryName(code);
           }
         } catch {
           // ignore fallback failure
@@ -79,15 +63,7 @@ const UserProvider: FC<{ children: ReactNode }> = ({ children }) => {
       // Fallback to device locale region if IP lookup fails
       const locales = Localization.getLocales();
       const regionCode = locales && locales.length > 0 ? locales[0].regionCode : undefined;
-      if (regionCode) {
-        return {
-          name: getCountryName(regionCode),
-          code: regionCode.toUpperCase(),
-          flag: getFlagUrl(regionCode),
-        };
-      }
-
-      return undefined;
+      return regionCode ? getCountryName(regionCode) : undefined;
     };
 
     const syncMetadata = async () => {

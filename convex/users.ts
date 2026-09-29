@@ -102,16 +102,7 @@ export const updateUser = mutation({
 export const update_app_load_metadata = mutation({
   args: {
     os: v.optional(v.union(v.literal("ios"), v.literal("android"), v.literal("web"))),
-    country: v.optional(
-      v.union(
-        v.string(),
-        v.object({
-          name: v.string(),
-          code: v.string(),
-          flag: v.string(),
-        })
-      )
-    ),
+    country: v.optional(v.string()),
     last_seen: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
@@ -123,7 +114,7 @@ export const update_app_load_metadata = mutation({
 
     const updates: {
       os?: "ios" | "android" | "web";
-      country?: string | { name: string; code: string; flag: string };
+      country?: string;
       last_seen?: number;
     } = {};
 
