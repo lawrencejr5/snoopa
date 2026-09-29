@@ -45,3 +45,6 @@ firebase-private-key.json
 
 #landing page
 /landing
+
+#admin
+/admin
