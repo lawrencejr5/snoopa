@@ -1560,11 +1560,21 @@ export const initialize_watchlist = action({
   args: { prompt: v.string() },
   returns: v.object({
     watchlist_id: v.optional(v.id("watchlist")),
+    title: v.optional(v.string()),
+    condition: v.optional(v.string()),
+    canonical_topic: v.optional(v.string()),
+    tier: v.optional(v.number()),
   }),
   handler: async (
     ctx,
     args,
-  ): Promise<{ watchlist_id: Id<"watchlist"> | undefined }> => {
+  ): Promise<{
+    watchlist_id: Id<"watchlist"> | undefined;
+    title?: string;
+    condition?: string;
+    canonical_topic?: string;
+    tier?: number;
+  }> => {
     const user_id = await getAuthUserId(ctx);
     if (!user_id) throw new Error("Not authenticated");
 
@@ -1599,7 +1609,13 @@ export const initialize_watchlist = action({
         payload,
       );
 
-      return { watchlist_id: wl_id };
+      return {
+        watchlist_id: wl_id,
+        title: payload?.title,
+        condition: payload?.condition,
+        canonical_topic: payload?.canonical_topic,
+        tier: payload?.tier,
+      };
     } catch (err) {
       console.error(err);
       throw new Error("Failed generating tracking intelligence.");
