@@ -622,9 +622,23 @@ function _buildSystemPrompt(intent: Intent, user: any): string {
     instructions += `\n\nYou are being provided with web search results. Always cite your sources when giving news or factual information. Please be very minimal, dont be too detailed, try to go straight to the point`;
   } else if (intent === "WATCHLIST") {
     instructions += `
-      \n\nThe user wants to track something new, but they are currently inside an existing snoop (watchlist).
-      DIRECTIVE: Tell the user that since they are already in a specific snoop, if they want to track something entirely separate, they should create a new snoop from the home dashboard. We keep each snoop focused on one primary goal. 
-      Response should be short, friendly, and direct. Do NOT use the ---WATCHLIST_DATA--- format.`;
+      \n\nThe user wants to create a new watchlist item or track a new target. Extract the watchlist item details and respond in two parts:
+
+      PART 1: A friendly 1-2 sentence confirmation message in Snoopa's voice.
+      PART 2: On a new line, write EXACTLY this separator (copy it character-for-character, no spaces, no markdown): ---WATCHLIST-DATA-SEPARATOR--- then on the next line output a single JSON object with these fields: title, keywords, condition, canonical_topic, tier, search_type, time_range.
+
+      Example JSON shape (fill in real values):
+      {"title": "Bitcoin Price Movement", "keywords": ["Bitcoin", "BTC", "price", "drop", "crash"], "condition": "Alert when Bitcoin drops below $80,000", "canonical_topic": "Bitcoin price", "tier": 1, "search_type": "general", "time_range": "day"}
+
+      Rules:
+      - The title should be clear and specific (e.g. "Bitcoin Price Movement", "iPhone 16 Pro Deals")
+      - The keywords array should contain 4-6 1-2-worded atomic keywords for this watchlist.
+      - The condition should be a precise, actionable rule (e.g. "Alert when Bitcoin price drops below $80,000")
+      - The canonical_topic must be a short 2-4 word label, most likely the first keyword.
+      - The tier is a priority level (1-4) that determines how frequently Snoopa checks for updates: Tier 1 (4x/day), Tier 2 (2x/day), Tier 3 (1x/day), Tier 4 (1x/3 days). Default to 3.
+      - search_type: "general" or "news" (default "general").
+      - time_range: "day" or "any_time" (default "day").
+      - Do NOT include markdown formatting or backticks around the separator.`;
   } else {
     instructions += `\n\nBe conversational and friendly for general chat, but incredibly minimal and straight to the point. Avoid long explanations.`;
   }

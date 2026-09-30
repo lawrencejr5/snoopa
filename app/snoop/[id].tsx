@@ -54,6 +54,33 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 
+interface WatchlistCardData {
+  title: string;
+  keywords: string[];
+  condition: string;
+  canonical_topic?: string;
+  tier?: number;
+  search_type?: "general" | "news";
+  time_range?: "day" | "any_time";
+}
+
+const parseWatchlistMessage = (content: string) => {
+  const DELIMITER_REGEX = /---\s*WATCHLIST-DATA-SEPARATOR\s*---/;
+  const match = content.match(DELIMITER_REGEX);
+  if (!match || match.index === undefined) {
+    return { text: content, watchlistData: null };
+  }
+  const text = content.substring(0, match.index).trim();
+  const jsonStr = content.substring(match.index + match[0].length).trim();
+  try {
+    const watchlistData: WatchlistCardData = JSON.parse(jsonStr);
+    return { text, watchlistData };
+  } catch (err) {
+    console.warn("Failed to parse watchlist JSON in chat message:", err);
+    return { text: content, watchlistData: null };
+  }
+};
+
 // ---------------------------------------------------------------------------
 // Terminal Cursor Blink
 // ---------------------------------------------------------------------------
@@ -449,6 +476,61 @@ export default function SnoopDetailsScreen() {
   );
   const detectIntent = useAction(api.chat.detect_intent);
   const sendMessage = useAction(api.chat.send_message);
+  const confirmAndCreateWatchlist = useAction(
+    api.chat.confirm_and_create_watchlist,
+  );
+  const [creatingWatchlistId, setCreatingWatchlistId] = useState<string | null>(
+    null,
+  );
+
+  const handleCreateWatchlistFromChat = async (
+    chatId: string,
+    promptText: string,
+    data: {
+      title: string;
+      keywords: string[];
+      condition: string;
+      canonical_topic?: string;
+      tier?: number;
+      search_type?: "general" | "news";
+      time_range?: "day" | "any_time";
+    },
+  ) => {
+    if (creatingWatchlistId || !signedIn?._id) return;
+    setCreatingWatchlistId(chatId);
+    haptics.impact("medium");
+
+    try {
+      const result = await confirmAndCreateWatchlist({
+        prompt: promptText,
+        title: data.title,
+        keywords: data.keywords || [],
+        condition: data.condition,
+        canonical_topic: data.canonical_topic,
+        tier: data.tier,
+        search_type: data.search_type,
+        time_range: data.time_range,
+      });
+
+      if (result?.watchlist_id) {
+        showCustomAlert("New watchlist created", "success");
+        router.push({
+          pathname: "/snoop/[id]",
+          params: { id: result.watchlist_id },
+        });
+      } else {
+        throw new Error("Failed to create watchlist");
+      }
+    } catch (error: any) {
+      console.error("Failed to create watchlist from chat:", error);
+      const msg = error?.message?.includes("FREE_LIMIT_REACHED")
+        ? "You have reached the maximum limit of 2 watchlists on a free account. Upgrade to Pro for unlimited watchlists! 🔒"
+        : "Failed to create watchlist. Please try again.";
+      showCustomAlert(msg, "danger");
+    } finally {
+      setCreatingWatchlistId(null);
+    }
+  };
 
   const [isScreenFocused, setIsScreenFocused] = useState(false);
 
@@ -1377,7 +1459,180 @@ export default function SnoopDetailsScreen() {
                     </View>
                   ) : (
                     <View style={{ width: "100%" }}>
-                      <FormatText>{entry.content}</FormatText>
+                      {(() => {
+                        const parsed = parseWatchlistMessage(entry.content);
+                        return (
+                          <>
+                            <FormatText>{parsed.text}</FormatText>
+
+                            {parsed.watchlistData && (
+                              <View
+                                style={{
+                                  backgroundColor: Colors[theme].surface,
+                                  borderColor: Colors[theme].border,
+                                  borderWidth: 1,
+                                  borderRadius: 14,
+                                  padding: 12,
+                                  marginTop: 10,
+                                  width: "100%",
+                                }}
+                              >
+                                <View
+                                  style={{
+                                    flexDirection: "row",
+                                    justifyContent: "space-between",
+                                    alignItems: "center",
+                                    marginBottom: 6,
+                                  }}
+                                >
+                                  <View
+                                    style={{
+                                      flexDirection: "row",
+                                      alignItems: "center",
+                                      gap: 6,
+                                      backgroundColor:
+                                        Colors[theme].primary + "20",
+                                      paddingHorizontal: 8,
+                                      paddingVertical: 3,
+                                      borderRadius: 6,
+                                    }}
+                                  >
+                                    <View
+                                      style={{
+                                        width: 5,
+                                        height: 5,
+                                        borderRadius: 2.5,
+                                        backgroundColor: Colors[theme].primary,
+                                      }}
+                                    />
+                                    <Text
+                                      style={{
+                                        color: Colors[theme].milk,
+                                        fontFamily: "FontBold",
+                                        fontSize: 10,
+                                      }}
+                                    >
+                                      Tier {parsed.watchlistData.tier ?? 3} Tracker
+                                    </Text>
+                                  </View>
+
+                                  {parsed.watchlistData.canonical_topic ? (
+                                    <Text
+                                      style={{
+                                        color: Colors[theme].text_secondary,
+                                        fontFamily: "FontMedium",
+                                        fontSize: 10,
+                                      }}
+                                    >
+                                      #{parsed.watchlistData.canonical_topic}
+                                    </Text>
+                                  ) : null}
+                                </View>
+
+                                <Text
+                                  style={{
+                                    color: Colors[theme].text,
+                                    fontFamily: "FontBold",
+                                    fontSize: 14,
+                                    marginBottom: 6,
+                                    lineHeight: 18,
+                                  }}
+                                  numberOfLines={2}
+                                >
+                                  {parsed.watchlistData.title}
+                                </Text>
+
+                                {parsed.watchlistData.condition ? (
+                                  <View
+                                    style={{
+                                      backgroundColor: Colors[theme].card,
+                                      padding: 8,
+                                      borderRadius: 8,
+                                      marginBottom: 10,
+                                    }}
+                                  >
+                                    <Text
+                                      style={{
+                                        color: Colors[theme].text_secondary,
+                                        fontFamily: "FontBold",
+                                        fontSize: 8,
+                                        letterSpacing: 0.8,
+                                        marginBottom: 2,
+                                      }}
+                                    >
+                                      CONDITION
+                                    </Text>
+                                    <Text
+                                      style={{
+                                        color: Colors[theme].text,
+                                        fontFamily: "FontRegular",
+                                        fontSize: 11,
+                                        lineHeight: 15,
+                                      }}
+                                      numberOfLines={2}
+                                    >
+                                      {parsed.watchlistData.condition}
+                                    </Text>
+                                  </View>
+                                ) : null}
+
+                                <Pressable
+                                  disabled={creatingWatchlistId === entry.id}
+                                  onPress={() =>
+                                    handleCreateWatchlistFromChat(
+                                      entry.id,
+                                      parsed.text || entry.content,
+                                      parsed.watchlistData!,
+                                    )
+                                  }
+                                  style={({ pressed }) => [
+                                    {
+                                      backgroundColor: Colors[theme].primary,
+                                      paddingVertical: 10,
+                                      borderRadius: 10,
+                                      flexDirection: "row",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                      gap: 8,
+                                      opacity:
+                                        pressed || creatingWatchlistId === entry.id
+                                          ? 0.75
+                                          : 1,
+                                    },
+                                  ]}
+                                >
+                                  {creatingWatchlistId === entry.id ? (
+                                    <ActivityIndicator
+                                      size="small"
+                                      color={Colors[theme].background}
+                                    />
+                                  ) : (
+                                    <>
+                                      <Text
+                                        style={{
+                                          color: Colors[theme].background,
+                                          fontFamily: "FontBold",
+                                          fontSize: 13,
+                                        }}
+                                      >
+                                        Start tracking
+                                      </Text>
+                                      <Image
+                                        source={require("@/assets/icons/tracked.png")}
+                                        style={{
+                                          width: 14,
+                                          height: 14,
+                                          tintColor: Colors[theme].background,
+                                        }}
+                                      />
+                                    </>
+                                  )}
+                                </Pressable>
+                              </View>
+                            )}
+                          </>
+                        );
+                      })()}
 
                       {/* Sources pill + feedback buttons on the same row */}
                       <View
