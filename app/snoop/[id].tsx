@@ -533,38 +533,31 @@ export default function SnoopDetailsScreen() {
   };
 
   const [isScreenFocused, setIsScreenFocused] = useState(false);
+  const [initialUnseenId, setInitialUnseenId] = useState<
+    string | null | undefined
+  >(undefined);
+  const initialUnseenCaptured = useRef(false);
+  const itemYPositions = useRef<Record<number, number>>({});
+  const hasScrolledInitial = useRef(false);
+
+  // Reset tracking state when switching watchlist ID
+  useEffect(() => {
+    initialUnseenCaptured.current = false;
+    hasScrolledInitial.current = false;
+    itemYPositions.current = {};
+    setInitialUnseenId(undefined);
+  }, [id]);
 
   useFocusEffect(
     useCallback(() => {
       setIsScreenFocused(true);
-      if (id) {
-        markLogsSeen({ watchlist_id: id as Id<"watchlist"> }).catch(() => {});
-        markChatsSeen({ watchlist_id: id as Id<"watchlist"> }).catch(() => {});
-      }
       return () => {
         setIsScreenFocused(false);
       };
-    }, [id]),
+    }, []),
   );
 
-  // Automatically mark new messages and logs as seen while the screen is focused
-  useEffect(() => {
-    if (!isScreenFocused || !id) return;
-
-    const hasUnseenChats = chatMessages?.some(
-      (msg) => msg.role === "snoopa" && !msg.seen,
-    );
-    const hasUnseenLogs = logs?.some((log) => !log.seen);
-
-    if (hasUnseenChats) {
-      markChatsSeen({ watchlist_id: id as Id<"watchlist"> }).catch(() => {});
-    }
-    if (hasUnseenLogs) {
-      markLogsSeen({ watchlist_id: id as Id<"watchlist"> }).catch(() => {});
-    }
-  }, [chatMessages, logs, isScreenFocused, id]);
-
-  // Merge logs + chat into a unified timeline
+  // Merge logs + chat into a unified timeline with seen flags
   const timeline = useMemo(() => {
     const entries: Array<{
       id: string;
@@ -574,6 +567,7 @@ export default function SnoopDetailsScreen() {
       logType?: "success" | "error";
       feedback?: "like" | "dislike";
       gateType?: "top_up" | "upgrade";
+      seen: boolean;
     }> = [];
 
     // Add logs
@@ -585,6 +579,7 @@ export default function SnoopDetailsScreen() {
           content: log.action,
           timestamp: log.timestamp,
           logType: log.type as "success" | "error",
+          seen: log.seen ?? false,
         });
       }
     }
@@ -626,6 +621,7 @@ export default function SnoopDetailsScreen() {
             content: displayContent,
             timestamp: msg._creationTime,
             gateType: is_premium_gate ? "upgrade" : "top_up",
+            seen: msg.seen ?? false,
           });
           continue;
         }
@@ -636,6 +632,7 @@ export default function SnoopDetailsScreen() {
           content: cleanContent,
           timestamp: msg._creationTime,
           feedback: (msg as any).feedback,
+          seen: msg.role === "user" ? true : (msg.seen ?? false),
         });
       }
     }
@@ -645,15 +642,74 @@ export default function SnoopDetailsScreen() {
     return entries;
   }, [logs, chatMessages]);
 
+  // Capture the first unseen message ID on initial timeline load
+  useEffect(() => {
+    if (timeline.length > 0 && !initialUnseenCaptured.current) {
+      initialUnseenCaptured.current = true;
+      const firstUnseen = timeline.find((item) => !item.seen);
+      setInitialUnseenId(firstUnseen ? firstUnseen.id : null);
+    }
+  }, [timeline]);
+
+  // Mark logs & chats as seen in DB after capturing the initial unseen marker
+  useEffect(() => {
+    if (initialUnseenCaptured.current && id && isScreenFocused) {
+      markLogsSeen({ watchlist_id: id as Id<"watchlist"> }).catch(() => {});
+      markChatsSeen({ watchlist_id: id as Id<"watchlist"> }).catch(() => {});
+    }
+  }, [initialUnseenId, id, isScreenFocused]);
+
+  const scrollToInitialPosition = useCallback(() => {
+    if (hasScrolledInitial.current || initialUnseenId === undefined) return;
+
+    if (initialUnseenId === null) {
+      // All messages seen -> scroll to bottom
+      hasScrolledInitial.current = true;
+      setTimeout(() => {
+        scrollRef.current?.scrollToEnd({ animated: false });
+      }, 100);
+    } else {
+      const unseenIndex = timeline.findIndex(
+        (item) => item.id === initialUnseenId,
+      );
+      if (unseenIndex !== -1) {
+        hasScrolledInitial.current = true;
+        // Scroll to last seen message (unseenIndex - 1) or first unseen message (0)
+        const targetIndex = Math.max(0, unseenIndex - 1);
+        setTimeout(() => {
+          const targetY =
+            itemYPositions.current[targetIndex] ??
+            itemYPositions.current[unseenIndex] ??
+            0;
+          scrollRef.current?.scrollTo({
+            y: Math.max(0, targetY - 10),
+            animated: false,
+          });
+        }, 100);
+      }
+    }
+  }, [initialUnseenId, timeline]);
+
+  useEffect(() => {
+    if (initialUnseenId !== undefined && !hasScrolledInitial.current) {
+      scrollToInitialPosition();
+    }
+  }, [initialUnseenId, scrollToInitialPosition]);
+
   const prevMessagesLength = useRef(0);
   const prevLogsLength = useRef(0);
 
-  // Auto-scroll to bottom when new messages/logs arrive
+  // Auto-scroll to bottom ONLY when new messages arrive after initial scroll
   useEffect(() => {
+    if (!hasScrolledInitial.current) {
+      prevMessagesLength.current = chatMessages?.length ?? 0;
+      prevLogsLength.current = logs?.length ?? 0;
+      return;
+    }
+
     const currentMessagesLength = chatMessages?.length ?? 0;
     const currentLogsLength = logs?.length ?? 0;
 
-    // Only scroll to end if a new message or log was added
     if (
       currentMessagesLength > prevMessagesLength.current ||
       currentLogsLength > prevLogsLength.current
@@ -1266,12 +1322,20 @@ export default function SnoopDetailsScreen() {
         >
           {/* Timeline entries */}
           {timeline.map((entry, index) => {
+            const firstUnseenIndex =
+              initialUnseenId !== null && initialUnseenId !== undefined
+                ? timeline.findIndex((e) => e.id === initialUnseenId)
+                : -1;
+            const isFirstUnseen =
+              firstUnseenIndex !== -1 && index === firstUnseenIndex;
+
             const currentDateStr = formatDateHeader(entry.timestamp);
             const previousDateStr =
               index > 0
                 ? formatDateHeader(timeline[index - 1].timestamp)
                 : null;
-            const showDateHeader = currentDateStr !== previousDateStr;
+            const showDateHeader =
+              currentDateStr !== previousDateStr || isFirstUnseen;
 
             const entrySources =
               chatSources
@@ -1282,7 +1346,15 @@ export default function SnoopDetailsScreen() {
                 })) || [];
 
             return (
-              <React.Fragment key={entry.id}>
+              <View
+                key={entry.id}
+                onLayout={(e) => {
+                  itemYPositions.current[index] = e.nativeEvent.layout.y;
+                  if (!hasScrolledInitial.current) {
+                    scrollToInitialPosition();
+                  }
+                }}
+              >
                 {showDateHeader && (
                   <View style={{ marginVertical: 16, alignItems: "center" }}>
                     <View
@@ -1301,6 +1373,18 @@ export default function SnoopDetailsScreen() {
                       >
                         {currentDateStr}
                       </Text>
+                      {isFirstUnseen && (
+                        <Text
+                          style={{
+                            fontFamily: "FontMedium",
+                            fontSize: 12,
+                            color: Colors[theme].text_secondary,
+                            marginLeft: 2,
+                          }}
+                        >
+                          (unread)
+                        </Text>
+                      )}
                     </View>
                   </View>
                 )}
@@ -1512,7 +1596,8 @@ export default function SnoopDetailsScreen() {
                                         fontSize: 10,
                                       }}
                                     >
-                                      Tier {parsed.watchlistData.tier ?? 3} Tracker
+                                      Tier {parsed.watchlistData.tier ?? 3}{" "}
+                                      Tracker
                                     </Text>
                                   </View>
 
@@ -1595,7 +1680,8 @@ export default function SnoopDetailsScreen() {
                                       justifyContent: "center",
                                       gap: 8,
                                       opacity:
-                                        pressed || creatingWatchlistId === entry.id
+                                        pressed ||
+                                        creatingWatchlistId === entry.id
                                           ? 0.75
                                           : 1,
                                     },
@@ -1794,7 +1880,7 @@ export default function SnoopDetailsScreen() {
                     </View>
                   )}
                 </Animated.View>
-              </React.Fragment>
+              </View>
             );
           })}
 
