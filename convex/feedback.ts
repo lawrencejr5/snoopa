@@ -120,3 +120,41 @@ export const deleteFeedbackAdmin = mutation({
   },
 });
 
+export const get_user_feedbacks = query({
+  args: {
+    user_id: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    const feedbacks = await ctx.db
+      .query("feedbacks")
+      .withIndex("by_user", (q) => q.eq("user_id", args.user_id))
+      .collect();
+
+    const results = await Promise.all(
+      feedbacks.map(async (f) => {
+        let image_urls: string[] = [];
+
+        if (f.images && f.images.length > 0) {
+          const urls = await Promise.all(
+            f.images.map((img_id) => ctx.storage.getUrl(img_id))
+          );
+          image_urls = urls.filter((url): url is string => url !== null);
+        }
+
+        return {
+          ...f,
+          status: f.status || "unread",
+          image_urls,
+        };
+      })
+    );
+
+    results.sort(
+      (a, b) => (b.timestamp || b._creationTime) - (a.timestamp || a._creationTime)
+    );
+
+    return results;
+  },
+});
+
+
