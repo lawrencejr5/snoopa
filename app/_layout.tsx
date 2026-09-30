@@ -17,7 +17,7 @@ import { StatusBar } from "expo-status-bar";
 import { CustomAlertProvider } from "@/context/CustomAlertContext";
 import HapticsProvider from "@/context/HapticsContext";
 import LoadingProvider from "@/context/LoadingContext";
-import { PushNotificationProvider } from "@/context/PushNotification";
+import { PushNotificationProvider, usePushNotification } from "@/context/PushNotification";
 import DeviceThemeProvider from "@/context/ThemeContext";
 import UserProvider from "@/context/UserContext";
 import RewardModal from "@/components/RewardModal";
@@ -174,6 +174,52 @@ const WithinContext = ({ loaded }: { loaded: boolean }) => {
     );
     return () => subscription.remove();
   }, [pending_reward, isAuthenticated]);
+
+  const { notificationResponse } = usePushNotification();
+  const last_handled_notification_id_ref = useRef<string | null>(null);
+
+  // Handle push notification tap routing
+  useEffect(() => {
+    if (!notificationResponse) return;
+    if (!loaded || isLoading || showSplash || !isAuthenticated) return;
+
+    const response_id =
+      notificationResponse.notification.request.identifier;
+    if (last_handled_notification_id_ref.current === response_id) return;
+
+    last_handled_notification_id_ref.current = response_id;
+
+    const data = notificationResponse.notification.request.content.data as
+      | {
+          watchlist_id?: string;
+          watchlistId?: string;
+          notification_id?: string;
+          type?: string;
+        }
+      | undefined;
+    const watchlist_id = data?.watchlist_id || data?.watchlistId;
+
+    if (watchlist_id) {
+      router.push({
+        pathname: "/snoop/[id]",
+        params: { id: String(watchlist_id) },
+      } as any);
+    } else if (data?.notification_id) {
+      router.push({
+        pathname: "/notifications/[id]",
+        params: { id: String(data.notification_id) },
+      } as any);
+    } else if (data?.type === "snoops" || data?.type === "reward") {
+      router.push("/notifications" as any);
+    }
+  }, [
+    notificationResponse,
+    loaded,
+    isLoading,
+    showSplash,
+    isAuthenticated,
+    router,
+  ]);
 
   if (!loaded || showSplash || isFirstLaunch === null) {
     return <CustomSplash />;

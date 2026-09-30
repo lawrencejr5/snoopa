@@ -588,7 +588,10 @@ async function _dispatchAlerts(
       pushBody = words.slice(0, 15).join(" ") + "...";
     }
 
-    await sendExpoPush(pushTokens, pushTitle, pushBody);
+    await sendExpoPush(pushTokens, pushTitle, pushBody, {
+      watchlist_id: item._id,
+      type: "alert",
+    });
   }
 
   return totalAlerts;
@@ -835,13 +838,19 @@ export const run_simulated_firehose = internalAction({
     const pushTitle = `New intel on ${item.title}`;
 
     if (args.push_tokens.length > 0) {
-      await sendExpoPush(args.push_tokens, pushTitle, args.briefing);
+      await sendExpoPush(args.push_tokens, pushTitle, args.briefing, {
+        watchlist_id: item._id,
+        type: "alert",
+      });
     } else {
       // Fallback: look up user's push tokens if none provided
       const pushTokens = await ctx.runQuery(internal.users.get_push_tokens, {
         user_id: item.user_id,
       });
-      await sendExpoPush(pushTokens, pushTitle, args.briefing);
+      await sendExpoPush(pushTokens, pushTitle, args.briefing, {
+        watchlist_id: item._id,
+        type: "alert",
+      });
     }
 
     // Update last_checked for this item

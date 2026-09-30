@@ -172,6 +172,7 @@ export async function sendExpoPush(
   pushTokens: string[],
   title: string,
   message: string,
+  data?: Record<string, any>,
 ) {
   if (pushTokens.length === 0) return;
 
@@ -188,7 +189,7 @@ export async function sendExpoPush(
         sound: "dog_bark_single.wav",
         title,
         body: message,
-        data: { type: "alert" },
+        data: data ?? { type: "alert" },
       }),
     });
 

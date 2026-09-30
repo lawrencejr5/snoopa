@@ -49,6 +49,14 @@ export const PushNotificationProvider: React.FC<
   );
   const responseListener = useRef<Notifications.EventSubscription | null>(null);
 
+  const lastNotificationResponse = Notifications.useLastNotificationResponse();
+
+  useEffect(() => {
+    if (lastNotificationResponse) {
+      setNotificationResponse(lastNotificationResponse);
+    }
+  }, [lastNotificationResponse]);
+
   useEffect(() => {
     // 1. Register for the Token immediately on mount
     registerForPushNotificationsAsync()
