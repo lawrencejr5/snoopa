@@ -1320,16 +1320,23 @@ async function _buildWatchlistPrompt(
 }
 
 /**
- * Calls the AI (DeepSeek → Gemini fallback) to parse the user prompt,
- * extracts the WATCHLIST_DATA payload, creates the watchlist record,
- * and saves the user's initial message.
- * Returns { wl_id, final_snoop_text, payload }.
+ * Calls the AI (DeepSeek → Gemini fallback) to parse the user prompt
+ * and extract the WATCHLIST_DATA payload without saving to DB.
  */
-async function _parseAndCreateWatchlist(
+async function _parseWatchlistPrompt(
   ctx: any,
   prompt: string,
   instructions: string,
-): Promise<{ wl_id: Id<"watchlist">; final_snoop_text: string; payload: any }> {
+): Promise<{
+  title: string;
+  keywords: string[];
+  condition: string;
+  canonical_topic: string;
+  tier: number;
+  search_type?: "general" | "news";
+  time_range?: "day" | "any_time";
+  final_snoop_text: string;
+}> {
   const { openai } = _initAIClients();
 
   let response_text = "";
@@ -1370,10 +1377,8 @@ async function _parseAndCreateWatchlist(
     }
   }
 
-  // Parse the WATCHLIST_DATA separator — use a regex to tolerate any spacing
-  // the AI may insert around the dashes (e.g. "--- WATCHLIST-DATA-SEPARATOR ---")
-  const DELIMITER_REGEX =
-    /---\s*WATCHLIST-DATA-SEPARATOR\s*---/;
+  // Parse the WATCHLIST_DATA separator
+  const DELIMITER_REGEX = /---\s*WATCHLIST-DATA-SEPARATOR\s*---/;
   const delimiterMatch = response_text.match(DELIMITER_REGEX);
   if (!delimiterMatch || delimiterMatch.index === undefined)
     throw new Error("Could not map WATCHLIST_DATA dynamically.");
@@ -1384,25 +1389,16 @@ async function _parseAndCreateWatchlist(
   const jsonBody = response_text.substring(delimiterEnd).trim();
   const payload = JSON.parse(jsonBody);
 
-  // Create the watchlist record
-  const wl_id = await ctx.runMutation(api.watchlist.add_watchlist_item, {
-    title: payload.title,
-    keywords: payload.keywords,
-    condition: payload.condition,
-    canonical_topic: payload.canonical_topic,
-    tier: payload.tier,
+  return {
+    title: payload.title || prompt,
+    keywords: payload.keywords || [],
+    condition: payload.condition || prompt,
+    canonical_topic: payload.canonical_topic || "",
+    tier: payload.tier ?? 3,
     search_type: payload.search_type,
     time_range: payload.time_range,
-  });
-
-  // Save the user's opening message
-  await ctx.runMutation(internal.chat.save_message, {
-    watchlist_id: wl_id,
-    role: "user",
-    content: prompt,
-  });
-
-  return { wl_id, final_snoop_text, payload };
+    final_snoop_text,
+  };
 }
 
 /**
@@ -1554,7 +1550,135 @@ async function _attachInitialIntel(
 // ===========================================================================
 
 /**
+ * Action to parse a watchlist prompt using AI and return the generated metadata preview
+ * WITHOUT saving anything to the database.
+ */
+export const generate_watchlist_preview = action({
+  args: { prompt: v.string() },
+  returns: v.object({
+    title: v.string(),
+    keywords: v.array(v.string()),
+    condition: v.string(),
+    canonical_topic: v.string(),
+    tier: v.number(),
+    search_type: v.optional(v.union(v.literal("general"), v.literal("news"))),
+    time_range: v.optional(v.union(v.literal("day"), v.literal("any_time"))),
+    final_snoop_text: v.optional(v.string()),
+  }),
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{
+    title: string;
+    keywords: string[];
+    condition: string;
+    canonical_topic: string;
+    tier: number;
+    search_type?: "general" | "news";
+    time_range?: "day" | "any_time";
+    final_snoop_text?: string;
+  }> => {
+    const user_id = await getAuthUserId(ctx);
+    if (!user_id) throw new Error("Not authenticated");
+
+    const user_record = await ctx.runQuery(internal.users.get_user_internal, {
+      user_id,
+    });
+    const is_premium = user_record?.is_premium === true;
+    if (!is_premium) {
+      const existing = await ctx.runQuery(api.watchlist.get_watchlists);
+      if (existing.length >= 2) {
+        throw new Error(
+          "FREE_LIMIT_REACHED: You have reached the maximum limit of 2 watchlists on a free account. Upgrade to Pro for unlimited watchlists! 🔒",
+        );
+      }
+    }
+
+    try {
+      const { instructions } = await _buildWatchlistPrompt(ctx);
+      const parsed = await _parseWatchlistPrompt(ctx, args.prompt, instructions);
+      return parsed;
+    } catch (err: any) {
+      console.error("Error generating watchlist preview:", err);
+      throw new Error(err.message || "Failed generating tracking intelligence.");
+    }
+  },
+});
+
+/**
+ * Action to save a generated watchlist to the database and attach initial intel.
+ */
+export const confirm_and_create_watchlist = action({
+  args: {
+    prompt: v.string(),
+    title: v.string(),
+    keywords: v.array(v.string()),
+    condition: v.string(),
+    canonical_topic: v.optional(v.string()),
+    tier: v.optional(v.number()),
+    search_type: v.optional(v.union(v.literal("general"), v.literal("news"))),
+    time_range: v.optional(v.union(v.literal("day"), v.literal("any_time"))),
+    final_snoop_text: v.optional(v.string()),
+  },
+  returns: v.object({
+    watchlist_id: v.id("watchlist"),
+  }),
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{
+    watchlist_id: Id<"watchlist">;
+  }> => {
+    const user_id = await getAuthUserId(ctx);
+    if (!user_id) throw new Error("Not authenticated");
+
+    const user_record = await ctx.runQuery(internal.users.get_user_internal, {
+      user_id,
+    });
+    const is_premium = user_record?.is_premium === true;
+    if (!is_premium) {
+      const existing = await ctx.runQuery(api.watchlist.get_watchlists);
+      if (existing.length >= 2) {
+        throw new Error(
+          "FREE_LIMIT_REACHED: You have reached the maximum limit of 2 watchlists on a free account. Upgrade to Pro for unlimited watchlists! 🔒",
+        );
+      }
+    }
+
+    // 1. Create watchlist record
+    const wl_id = await ctx.runMutation(api.watchlist.add_watchlist_item, {
+      title: args.title,
+      keywords: args.keywords,
+      condition: args.condition,
+      canonical_topic: args.canonical_topic,
+      tier: args.tier,
+      search_type: args.search_type,
+      time_range: args.time_range,
+    });
+
+    // 2. Save user opening message
+    await ctx.runMutation(internal.chat.save_message, {
+      watchlist_id: wl_id,
+      role: "user",
+      content: args.prompt,
+    });
+
+    // 3. Attach initial intel (source scrape or search brief) + snoopa message
+    const final_snoop_text =
+      args.final_snoop_text || "I'm on it. Tracking this target for you.";
+    await _attachInitialIntel(ctx, args.prompt, wl_id, final_snoop_text, {
+      condition: args.condition,
+      canonical_topic: args.canonical_topic,
+      title: args.title,
+    });
+
+    return { watchlist_id: wl_id };
+  },
+});
+
+/**
  * Automates the initial AI parsing and native watchlist instantiation flow.
+ * (Maintained for backwards compatibility)
  */
 export const initialize_watchlist = action({
   args: { prompt: v.string() },
@@ -1578,7 +1702,6 @@ export const initialize_watchlist = action({
     const user_id = await getAuthUserId(ctx);
     if (!user_id) throw new Error("Not authenticated");
 
-    // Watchlist limit check for free users (max 2 watchlists)
     const user_record = await ctx.runQuery(internal.users.get_user_internal, {
       user_id,
     });
@@ -1593,28 +1716,39 @@ export const initialize_watchlist = action({
     }
 
     try {
-      // 1. Build the AI system prompt
       const { instructions } = await _buildWatchlistPrompt(ctx);
+      const parsed = await _parseWatchlistPrompt(ctx, args.prompt, instructions);
 
-      // 2. Call AI, parse response, create watchlist record + save user message
-      const { wl_id, final_snoop_text, payload } =
-        await _parseAndCreateWatchlist(ctx, args.prompt, instructions);
+      const wl_id = await ctx.runMutation(api.watchlist.add_watchlist_item, {
+        title: parsed.title,
+        keywords: parsed.keywords,
+        condition: parsed.condition,
+        canonical_topic: parsed.canonical_topic,
+        tier: parsed.tier,
+        search_type: parsed.search_type,
+        time_range: parsed.time_range,
+      });
 
-      // 3. Attach initial intel (source scrape or search brief) + snoopa message
+      await ctx.runMutation(internal.chat.save_message, {
+        watchlist_id: wl_id,
+        role: "user",
+        content: args.prompt,
+      });
+
       await _attachInitialIntel(
         ctx,
         args.prompt,
         wl_id,
-        final_snoop_text,
-        payload,
+        parsed.final_snoop_text,
+        parsed,
       );
 
       return {
         watchlist_id: wl_id,
-        title: payload?.title,
-        condition: payload?.condition,
-        canonical_topic: payload?.canonical_topic,
-        tier: payload?.tier,
+        title: parsed.title,
+        condition: parsed.condition,
+        canonical_topic: parsed.canonical_topic,
+        tier: parsed.tier,
       };
     } catch (err) {
       console.error(err);

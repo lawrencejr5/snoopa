@@ -1,8 +1,8 @@
 import Colors from "@/constants/Colors";
+import { useCustomAlert } from "@/context/CustomAlertContext";
 import { useTheme } from "@/context/ThemeContext";
 import { useUser } from "@/context/UserContext";
 import { api } from "@/convex/_generated/api";
-import { Id } from "@/convex/_generated/dataModel";
 import {
   BottomSheetBackdrop,
   BottomSheetModal,
@@ -38,12 +38,15 @@ interface Props {
 
 type StepPhase = "input" | "generating" | "completed";
 
-interface CreatedWatchlist {
-  watchlist_id: Id<"watchlist">;
-  title?: string;
-  condition?: string;
-  canonical_topic?: string;
-  tier?: number;
+interface WatchlistPreview {
+  title: string;
+  keywords: string[];
+  condition: string;
+  canonical_topic: string;
+  tier: number;
+  search_type?: "general" | "news";
+  time_range?: "day" | "any_time";
+  final_snoop_text?: string;
 }
 
 const PROGRESS_STEPS = [
@@ -112,20 +115,27 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
   const { theme } = useTheme();
   const router = useRouter();
   const { signedIn } = useUser();
+  const { showCustomAlert } = useCustomAlert();
   const bottomSheetRef = useRef<BottomSheetModal>(null);
   const inputRef = useRef<any>(null);
 
   const [prompt, setPrompt] = useState("");
   const [phase, setPhase] = useState<StepPhase>("input");
   const [validationError, setValidationError] = useState<string | null>(null);
-  const [createdWatchlist, setCreatedWatchlist] =
-    useState<CreatedWatchlist | null>(null);
+  const [watchlistPreview, setWatchlistPreview] =
+    useState<WatchlistPreview | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
   const [progressIndex, setProgressIndex] = useState(0);
   const [errorText, setErrorText] = useState<string | null>(null);
 
-  const snapPoints = useMemo(() => ["55%", "85%"], []);
+  const snapPoints = useMemo(() => ["45%", "55%", "85%"], []);
 
-  const initializeWatchlist = useAction(api.chat.initialize_watchlist);
+  const generateWatchlistPreview = useAction(
+    api.chat.generate_watchlist_preview,
+  );
+  const confirmAndCreateWatchlist = useAction(
+    api.chat.confirm_and_create_watchlist,
+  );
 
   const EXAMPLES = useMemo(
     () =>
@@ -150,10 +160,12 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
     setPrompt("");
     setPhase("input");
     setValidationError(null);
-    setCreatedWatchlist(null);
+    setWatchlistPreview(null);
+    setIsSaving(false);
     setProgressIndex(0);
     setErrorText(null);
     inputRef.current?.clear();
+    inputRef.current?.setNativeProps({ text: "" });
   }, []);
 
   useEffect(() => {
@@ -187,8 +199,14 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
   }, [phase]);
 
   useEffect(() => {
-    if (phase === "completed") {
+    if (phase == "input") {
       bottomSheetRef.current?.snapToIndex(0);
+    }
+    if (phase == "generating") {
+      bottomSheetRef.current?.snapToIndex(0);
+    }
+    if (phase === "completed") {
+      bottomSheetRef.current?.snapToIndex(1);
     }
   }, [phase]);
 
@@ -222,17 +240,29 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
   };
 
   const handleInputChange = (text: string) => {
-    setPrompt(text);
     if (validationError) {
       setValidationError(null);
     }
+    setPrompt(text);
+  };
+
+  const cleanUrlInText = (text: string) => {
+    const urlRegex =
+      /(?:https?:\/\/)?([a-zA-Z0-9][-a-zA-Z0-9]*\.[a-zA-Z][-a-zA-Z0-9.]*[a-zA-Z]{2,}(?:\/[^\s]*)?)/g;
+
+    return text.replace(urlRegex, (match) => {
+      if (match.length > 200 && match.includes("?")) {
+        return match.split("?")[0];
+      }
+      return match;
+    });
   };
 
   const handleStartTracking = async () => {
-    const trimmed = prompt.trim();
-    if (!trimmed || !signedIn?._id) return;
+    const cleaned = cleanUrlInText(prompt.trim());
+    if (!cleaned || !signedIn?._id) return;
 
-    const words = trimmed.split(/\s+/).filter(Boolean);
+    const words = cleaned.split(/\s+/).filter(Boolean);
     if (words.length < 5) {
       setValidationError(
         "Snoopa needs a bit more detail (at least 5 words) to set up an accurate tracker.",
@@ -247,24 +277,27 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
     setPhase("generating");
 
     try {
-      const result = await initializeWatchlist({
-        prompt: trimmed,
+      const result = await generateWatchlistPreview({
+        prompt: cleaned,
       });
 
-      if (result?.watchlist_id) {
-        setCreatedWatchlist({
-          watchlist_id: result.watchlist_id,
-          title: result.title || trimmed,
-          condition: result.condition || trimmed,
-          canonical_topic: result.canonical_topic,
+      if (result?.title) {
+        setWatchlistPreview({
+          title: result.title,
+          keywords: result.keywords || [],
+          condition: result.condition,
+          canonical_topic: result.canonical_topic || "",
           tier: result.tier ?? 3,
+          search_type: result.search_type,
+          time_range: result.time_range,
+          final_snoop_text: result.final_snoop_text,
         });
         setPhase("completed");
       } else {
-        throw new Error("Failed to initialize watchlist");
+        throw new Error("Failed to generate watchlist preview");
       }
     } catch (error: any) {
-      console.error("Failed to create watchlist:", error);
+      console.error("Failed to generate watchlist preview:", error);
       const msg = error?.message?.includes("FREE_LIMIT_REACHED")
         ? "You have reached the maximum limit of 2 watchlists on a free account. Upgrade to Pro for unlimited watchlists! 🔒"
         : "Failed to generate tracking intelligence. Please try again.";
@@ -273,14 +306,51 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
     }
   };
 
-  const handleContinueToWatchlist = () => {
-    if (!createdWatchlist?.watchlist_id) return;
-    const targetId = createdWatchlist.watchlist_id;
-    handleClose();
-    router.push({
-      pathname: "/snoop/[id]",
-      params: { id: targetId },
-    });
+  const handleEditPrompt = () => {
+    setPhase("input");
+    setErrorText(null);
+    setTimeout(() => {
+      inputRef.current?.setNativeProps({ text: prompt });
+    }, 50);
+  };
+
+  const handleContinueToWatchlist = async () => {
+    if (!watchlistPreview || isSaving) return;
+    setIsSaving(true);
+    setErrorText(null);
+
+    try {
+      const result = await confirmAndCreateWatchlist({
+        prompt: prompt.trim(),
+        title: watchlistPreview.title,
+        keywords: watchlistPreview.keywords,
+        condition: watchlistPreview.condition,
+        canonical_topic: watchlistPreview.canonical_topic,
+        tier: watchlistPreview.tier,
+        search_type: watchlistPreview.search_type,
+        time_range: watchlistPreview.time_range,
+        final_snoop_text: watchlistPreview.final_snoop_text,
+      });
+
+      if (result?.watchlist_id) {
+        const targetId = result.watchlist_id;
+        handleClose();
+        showCustomAlert("New watchlist created", "success");
+        router.push({
+          pathname: "/snoop/[id]",
+          params: { id: targetId },
+        });
+      } else {
+        throw new Error("Failed to confirm watchlist creation");
+      }
+    } catch (error: any) {
+      console.error("Failed to save watchlist:", error);
+      const msg = error?.message?.includes("FREE_LIMIT_REACHED")
+        ? "You have reached the maximum limit of 2 watchlists on a free account. Upgrade to Pro for unlimited watchlists! 🔒"
+        : "Failed to save watchlist. Please try again.";
+      setErrorText(msg);
+      setIsSaving(false);
+    }
   };
 
   const wordCount = prompt.trim().split(/\s+/).filter(Boolean).length;
@@ -403,10 +473,10 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
                 <View style={{ width: "100%" }}>
                   <BottomSheetTextInput
                     ref={inputRef}
-                    value={prompt}
+                    defaultValue={prompt}
                     onChangeText={handleInputChange}
                     onFocus={() => {
-                      bottomSheetRef.current?.snapToIndex(1);
+                      bottomSheetRef.current?.snapToIndex(2);
                     }}
                     multiline
                     maxLength={1500}
@@ -590,7 +660,7 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
           )}
 
           {/* PHASE 3: COMPLETED (WATCHLIST PREVIEW CARD) */}
-          {phase === "completed" && createdWatchlist && (
+          {phase === "completed" && watchlistPreview && (
             <View
               style={{
                 flex: 1,
@@ -628,7 +698,7 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
                 <Text
                   style={[styles.completedTitle, { color: Colors[theme].text }]}
                 >
-                  Watchlist Created!
+                  Target Generated!
                 </Text>
                 <Text
                   style={[
@@ -636,8 +706,34 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
                     { color: Colors[theme].text_secondary },
                   ]}
                 >
-                  Snoopa is now actively monitoring this target in real-time.
+                  Review the target details below. You can refine your prompt or
+                  continue.
                 </Text>
+
+                {errorText && (
+                  <View
+                    style={[
+                      styles.errorBanner,
+                      {
+                        backgroundColor: "rgba(255, 69, 58, 0.12)",
+                        borderColor: "rgba(255, 69, 58, 0.3)",
+                        width: "100%",
+                        marginTop: 6,
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={{
+                        color: "#FF453A",
+                        fontFamily: "FontMedium",
+                        fontSize: 12,
+                        textAlign: "center",
+                      }}
+                    >
+                      {errorText}
+                    </Text>
+                  </View>
+                )}
 
                 {/* WATCHLIST CARD PREVIEW */}
                 <View
@@ -668,30 +764,30 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
                           { color: Colors[theme].milk },
                         ]}
                       >
-                        Tier {createdWatchlist.tier ?? 3} Tracker
+                        Tier {watchlistPreview.tier ?? 3} Tracker
                       </Text>
                     </View>
 
-                    {createdWatchlist.canonical_topic && (
+                    {watchlistPreview.canonical_topic ? (
                       <Text
                         style={[
                           styles.topicTag,
                           { color: Colors[theme].text_secondary },
                         ]}
                       >
-                        #{createdWatchlist.canonical_topic}
+                        #{watchlistPreview.canonical_topic}
                       </Text>
-                    )}
+                    ) : null}
                   </View>
 
                   <Text
                     style={[styles.cardTitle, { color: Colors[theme].text }]}
                     numberOfLines={2}
                   >
-                    {createdWatchlist.title}
+                    {watchlistPreview.title}
                   </Text>
 
-                  {createdWatchlist.condition && (
+                  {watchlistPreview.condition ? (
                     <View
                       style={[
                         styles.conditionBox,
@@ -713,39 +809,73 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
                         ]}
                         numberOfLines={2}
                       >
-                        {createdWatchlist.condition}
+                        {watchlistPreview.condition}
                       </Text>
                     </View>
-                  )}
+                  ) : null}
                 </View>
               </View>
 
-              {/* CONTINUE BUTTON */}
-              <Pressable
-                onPress={handleContinueToWatchlist}
-                style={[
-                  styles.continueBtn,
-                  { backgroundColor: Colors[theme].primary },
-                ]}
-              >
-                <Text
-                  style={{
-                    color: Colors[theme].background,
-                    fontFamily: "FontBold",
-                    fontSize: 14,
-                  }}
+              {/* ACTIONS */}
+              <View style={styles.actions}>
+                <Pressable
+                  onPress={handleEditPrompt}
+                  disabled={isSaving}
+                  style={[
+                    styles.cancelBtn,
+                    { borderColor: Colors[theme].border },
+                  ]}
                 >
-                  Continue to Snoop
-                </Text>
-                <Image
-                  source={require("@/assets/icons/tracked.png")}
-                  style={{
-                    width: 14,
-                    height: 14,
-                    tintColor: Colors[theme].background,
-                  }}
-                />
-              </Pressable>
+                  <Text
+                    style={{
+                      color: Colors[theme].text_secondary,
+                      fontFamily: "FontMedium",
+                      fontSize: 14,
+                    }}
+                  >
+                    Refine prompt
+                  </Text>
+                </Pressable>
+
+                <Pressable
+                  onPress={handleContinueToWatchlist}
+                  disabled={isSaving}
+                  style={[
+                    styles.proceedBtn,
+                    {
+                      backgroundColor: Colors[theme].primary,
+                      opacity: isSaving ? 0.7 : 1,
+                    },
+                  ]}
+                >
+                  {isSaving ? (
+                    <ActivityIndicator
+                      size="small"
+                      color={Colors[theme].background}
+                    />
+                  ) : (
+                    <>
+                      <Text
+                        style={{
+                          color: Colors[theme].background,
+                          fontFamily: "FontBold",
+                          fontSize: 14,
+                        }}
+                      >
+                        Continue
+                      </Text>
+                      <Image
+                        source={require("@/assets/icons/tracked.png")}
+                        style={{
+                          width: 14,
+                          height: 14,
+                          tintColor: Colors[theme].background,
+                        }}
+                      />
+                    </>
+                  )}
+                </Pressable>
+              </View>
             </View>
           )}
         </Pressable>
@@ -841,8 +971,8 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
   },
   lottieWrapper: {
-    width: 90,
-    height: 90,
+    width: 150,
+    height: 150,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 6,
