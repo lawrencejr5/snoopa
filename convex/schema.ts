@@ -182,14 +182,26 @@ const schema = defineSchema({
     viewed_at: v.number(), // Unix timestamp (ms) when the ad was watched
   }).index("by_user", ["user_id"]),
 
+  active_countries: defineTable({
+    name: v.string(), // e.g., "United States"
+    code: v.string(), // e.g., "US"
+    gl: v.string(), // e.g., "US"
+    hl: v.string(), // e.g., "en-US"
+    status: v.union(v.literal("active"), v.literal("inactive")),
+    last_refreshed_at: v.optional(v.number()),
+  })
+    .index("by_status", ["status"])
+    .index("by_code", ["code"]),
+
   trending_cache: defineTable({
+    country_code: v.string(),
     topic: v.string(),
     category: v.string(),
     summary: v.string(),
     suggested_condition: v.string(),
     keywords: v.array(v.string()),
     refreshed_at: v.number(),
-  }),
+  }).index("by_country", ["country_code"]),
 
   admin_users: defineTable({
     email: v.string(),

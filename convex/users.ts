@@ -124,7 +124,27 @@ export const update_app_load_metadata = mutation({
 
     if (args.os !== undefined) updates.os = args.os;
     if (args.country !== undefined) updates.country = args.country;
-    if (args.countryCode !== undefined) updates.countryCode = args.countryCode;
+    if (args.countryCode !== undefined) {
+      updates.countryCode = args.countryCode;
+      
+      // Dynamically register the country in active_countries if not exists
+      if (args.country) {
+        const existingCountry = await ctx.db
+          .query("active_countries")
+          .withIndex("by_code", (q) => q.eq("code", args.countryCode as string))
+          .first();
+
+        if (!existingCountry) {
+          await ctx.db.insert("active_countries", {
+            name: args.country,
+            code: args.countryCode,
+            gl: args.countryCode,
+            hl: `en-${args.countryCode}`,
+            status: "active",
+          });
+        }
+      }
+    }
     if (args.last_seen !== undefined) updates.last_seen = args.last_seen;
 
     if (Object.keys(updates).length > 0) {

@@ -305,10 +305,28 @@ export const reactivate_watchlist = mutation({
 export const get_trending_topics = query({
   args: {},
   handler: async (ctx) => {
-    const cached = await ctx.db
+    const user_id = await getAuthUserId(ctx);
+    let countryCode = "WORLD";
+    if (user_id) {
+      const user = await ctx.db.get(user_id);
+      if (user?.countryCode) {
+        countryCode = user.countryCode;
+      }
+    }
+
+    let cached = await ctx.db
       .query("trending_cache")
+      .withIndex("by_country", (q) => q.eq("country_code", countryCode))
       .order("desc")
       .collect();
+
+    if (cached.length === 0 && countryCode !== "WORLD") {
+      cached = await ctx.db
+        .query("trending_cache")
+        .withIndex("by_country", (q) => q.eq("country_code", "WORLD"))
+        .order("desc")
+        .collect();
+    }
 
     // Deduplicate by topic name (keep newest), cap at 10
     const seen = new Set<string>();
@@ -338,9 +356,17 @@ export const get_trending_topics = query({
  * Called by trending.refresh_trending_topics before inserting fresh data.
  */
 export const clear_trending_cache = internalMutation({
-  args: {},
-  handler: async (ctx) => {
-    const all = await ctx.db.query("trending_cache").collect();
+  args: { country_code: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    const all = args.country_code
+      ? await ctx.db
+          .query("trending_cache")
+          .withIndex("by_country", (q) =>
+            q.eq("country_code", args.country_code as string),
+          )
+          .collect()
+      : await ctx.db.query("trending_cache").collect();
+      
     await Promise.all(all.map((r) => ctx.db.delete(r._id)));
   },
 });
@@ -353,6 +379,7 @@ export const insert_trending_topics = internalMutation({
   args: {
     topics: v.array(
       v.object({
+        country_code: v.string(),
         topic: v.string(),
         category: v.string(),
         summary: v.string(),

@@ -52,7 +52,7 @@ if (process.env.RUN_CRONS === "true") {
   // Refresh trending topics every 12 hours (scrapes Google News → DeepSeek)
   crons.interval(
     "refresh-trending-topics",
-    { hours: 12 },
+    { hours: 24 },
     internal.trending.refresh_trending_topics,
     {},
   );
