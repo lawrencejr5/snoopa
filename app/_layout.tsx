@@ -237,6 +237,13 @@ const WithinContext = ({ loaded }: { loaded: boolean }) => {
       >
         <Stack.Screen name="onboarding" dangerouslySingular />
         <Stack.Screen name="welcome" dangerouslySingular />
+        <Stack.Screen
+          name="trending-modal"
+          options={{
+            presentation: "modal",
+            animation: "slide_from_bottom",
+          }}
+        />
       </Stack>
 
       {/* Reward modal — shown when a premium grant is detected */}

@@ -307,10 +307,19 @@ export const reactivate_watchlist = mutation({
   },
 });
 
+function getFlagEmoji(countryCode: string): string {
+  if (!countryCode || countryCode === "WORLD") return "🌐";
+  const codePoints = countryCode
+    .toUpperCase()
+    .split("")
+    .map((char) => 127397 + char.charCodeAt(0));
+  return String.fromCodePoint(...codePoints);
+}
+
 /**
  * Read trending topics from the cache table.
  * Populated by refresh_trending_topics (internalAction).
- * Returns up to 10 topics sorted newest-first.
+ * Returns up to 10 topics sorted newest-first for the user's active country or worldwide fallback.
  */
 export const get_trending_topics = query({
   args: {
@@ -318,17 +327,29 @@ export const get_trending_topics = query({
   },
   handler: async (ctx, args) => {
     const user_id = await getAuthUserId(ctx);
-    let countryCode = args.country_code || "WORLD";
+    let countryCode = "WORLD";
+    let countryName = "Worldwide";
+    let requestedCountryName: string | undefined = undefined;
 
-    if (!args.country_code && user_id) {
+    if (args.country_code && args.country_code !== "WORLD") {
+      const countryRecord = await ctx.db
+        .query("active_countries")
+        .withIndex("by_code", (q) => q.eq("code", args.country_code as string))
+        .first();
+      if (countryRecord && countryRecord.status === "active") {
+        countryCode = countryRecord.code;
+        requestedCountryName = countryRecord.name;
+      }
+    } else if (!args.country_code && user_id) {
       const user = await ctx.db.get(user_id);
       if (user?.country) {
         const countryRecord = await ctx.db
           .query("active_countries")
           .withIndex("by_name", (q) => q.eq("name", user.country as string))
           .first();
-        if (countryRecord?.code) {
+        if (countryRecord && countryRecord.status === "active") {
           countryCode = countryRecord.code;
+          requestedCountryName = countryRecord.name;
         }
       }
     }
@@ -339,12 +360,26 @@ export const get_trending_topics = query({
       .order("desc")
       .collect();
 
-    if (cached.length === 0 && countryCode !== "WORLD") {
-      cached = await ctx.db
-        .query("trending_cache")
-        .withIndex("by_country", (q) => q.eq("country_code", "WORLD"))
-        .order("desc")
-        .collect();
+    let isFallback = false;
+
+    if (cached.length === 0 || countryCode === "WORLD") {
+      if (cached.length === 0) {
+        cached = await ctx.db
+          .query("trending_cache")
+          .withIndex("by_country", (q) => q.eq("country_code", "WORLD"))
+          .order("desc")
+          .collect();
+      }
+      if (cached.length === 0) {
+        cached = await ctx.db.query("trending_cache").order("desc").collect();
+      }
+      if (countryCode !== "WORLD" || requestedCountryName) {
+        isFallback = true;
+      }
+      countryCode = "WORLD";
+      countryName = "Worldwide";
+    } else {
+      countryName = requestedCountryName || "Worldwide";
     }
 
     // Deduplicate by topic name (keep newest), cap at 10
@@ -358,15 +393,24 @@ export const get_trending_topics = query({
       if (results.length === 10) break;
     }
 
-    return results.map((r) => ({
-      topic: r.topic,
-      category: r.category,
-      summary: r.summary,
-      suggested_condition: r.suggested_condition,
-      keywords: r.keywords,
-      tracker_count: 0, // kept for UI compatibility; real trackers come from watchlist
-      refreshed_at: r.refreshed_at,
-    }));
+    const displayCode = isFallback ? "WORLD" : countryCode;
+    const displayName = isFallback ? "Worldwide" : countryName;
+
+    return {
+      country_code: displayCode,
+      country_name: displayName,
+      flag_emoji: getFlagEmoji(displayCode),
+      is_fallback: isFallback,
+      topics: results.map((r) => ({
+        topic: r.topic,
+        category: r.category,
+        summary: r.summary,
+        suggested_condition: r.suggested_condition,
+        keywords: r.keywords,
+        tracker_count: 0, // kept for UI compatibility; real trackers come from watchlist
+        refreshed_at: r.refreshed_at,
+      })),
+    };
   },
 });
 

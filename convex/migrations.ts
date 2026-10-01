@@ -65,6 +65,21 @@ export const remove_country_code_from_users = mutation({
   },
 });
 
+export const backfill_trending_cache_country_code = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const items = await ctx.db.query("trending_cache").collect();
+    let count = 0;
+    for (const item of items) {
+      if (!item.country_code) {
+        await ctx.db.patch(item._id, { country_code: "WORLD" });
+        count++;
+      }
+    }
+    return `Backfilled country_code: WORLD on ${count} trending_cache rows.`;
+  },
+});
+
 export const migrateWatchlist = internalMutation({
   args: {},
   handler: async (ctx) => {

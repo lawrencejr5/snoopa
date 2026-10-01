@@ -24,7 +24,10 @@ import {
   BottomSheetView,
 } from "@gorhom/bottom-sheet";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
-import { useFocusEffect, useNavigation, useRouter } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from "expo-router";
+import TrendingTopicsSheet, {
+  TrendingTopicsSheetRef,
+} from "@/components/TrendingTopicsSheet";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Image,
@@ -710,9 +713,68 @@ export default function HomeScreen() {
 
   // Data queries
   const watchlistData = useQuery(api.watchlist.get_watchlists) || [];
+  const trendingQueryResult = useQuery(api.watchlist.get_trending_topics, {});
   const trendingTopics = (
-    useQuery(api.watchlist.get_trending_topics) || []
+    Array.isArray(trendingQueryResult)
+      ? trendingQueryResult
+      : trendingQueryResult?.topics || []
   ).slice(0, 10);
+
+  const trendingCountryName =
+    !Array.isArray(trendingQueryResult) && trendingQueryResult?.country_name
+      ? trendingQueryResult.country_name
+      : "Worldwide";
+
+  const trendingFlagEmoji =
+    !Array.isArray(trendingQueryResult) && trendingQueryResult?.flag_emoji
+      ? trendingQueryResult.flag_emoji
+      : "🌐";
+
+  const isTrendingFallback =
+    !Array.isArray(trendingQueryResult) && trendingQueryResult?.is_fallback
+      ? trendingQueryResult.is_fallback
+      : false;
+
+  const displayIsWorldwide =
+    isTrendingFallback ||
+    trendingCountryName === "Worldwide" ||
+    !trendingCountryName;
+  const displayFlagEmoji = displayIsWorldwide ? "🌐" : trendingFlagEmoji;
+  const displayHeaderText = displayIsWorldwide
+    ? "TRENDING WORLDWIDE"
+    : `TRENDING IN ${trendingCountryName.toUpperCase()}`;
+
+  const trendingSheetRef = useRef<TrendingTopicsSheetRef>(null);
+  const searchParams = useLocalSearchParams<{
+    track_topic?: string;
+    track_condition?: string;
+  }>();
+
+  useEffect(() => {
+    if (searchParams.track_topic) {
+      setSelectedTopic(searchParams.track_topic);
+      setSelectedTopicCondition(searchParams.track_condition || "");
+      setShowTrackModal(true);
+      router.setParams({
+        track_topic: undefined,
+        track_condition: undefined,
+      } as any);
+    }
+  }, [searchParams.track_topic]);
+
+  const handleOpenTrendingModal = () => {
+    if (Platform.OS === "ios") {
+      router.push("/trending-modal" as any);
+    } else {
+      trendingSheetRef.current?.present();
+    }
+  };
+
+  const handleTrackFromModal = (topic: string, suggestedCondition?: string) => {
+    setSelectedTopic(topic);
+    setSelectedTopicCondition(suggestedCondition || "");
+    setShowTrackModal(true);
+  };
   const unreadCount = useQuery(api.notifications.unread_count) ?? 0;
   const snoop_balance = useQuery(api.snoops.get_snoop_balance) ?? 0;
   const snoop_grants = useQuery(api.snoops.get_snoop_grants) ?? [];
@@ -836,15 +898,45 @@ export default function HomeScreen() {
         {/* Trending Topics */}
         {trendingTopics.length > 0 && (
           <Animated.View style={style2}>
-            <View style={styles.sectionHeader}>
-              <Text
-                style={[
-                  styles.sectionLabel,
-                  { color: Colors[theme].text_secondary },
-                ]}
+            <Pressable
+              onPress={handleOpenTrendingModal}
+              style={styles.sectionHeader}
+            >
+              <View
+                style={{
+                  flex: 1,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 6,
+                  flexWrap: "wrap",
+                  marginRight: 8,
+                }}
               >
-                TRENDING WORLDWIDE
-              </Text>
+                {displayIsWorldwide ? (
+                  <Image
+                    source={require("@/assets/icons/globe.png")}
+                    style={{
+                      width: 14,
+                      height: 14,
+                      tintColor: Colors[theme].text_secondary,
+                    }}
+                  />
+                ) : (
+                  <Text style={{ fontSize: 13 }}>{displayFlagEmoji}</Text>
+                )}
+                <Text
+                  style={[
+                    styles.sectionLabel,
+                    {
+                      color: Colors[theme].text_secondary,
+                      flexShrink: 1,
+                      lineHeight: 16,
+                    },
+                  ]}
+                >
+                  {displayHeaderText}
+                </Text>
+              </View>
               <View
                 style={{
                   flexDirection: "row",
@@ -869,10 +961,10 @@ export default function HomeScreen() {
                     opacity: 0.6,
                   }}
                 >
-                  {trendingTopics.length} topics · live
+                  {trendingTopics.length} topics · live ›
                 </Text>
               </View>
-            </View>
+            </Pressable>
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -1419,6 +1511,10 @@ export default function HomeScreen() {
           />
         </>
       )}
+      <TrendingTopicsSheet
+        ref={trendingSheetRef}
+        onTrackTopic={handleTrackFromModal}
+      />
     </Container>
   );
 }
