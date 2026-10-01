@@ -2,22 +2,12 @@
 
 import OpenAI from "openai";
 import { internal } from "./_generated/api";
-import { internalAction, internalQuery } from "./_generated/server";
+import { internalAction } from "./_generated/server";
 import { generateContentWithGemini } from "./openrouter";
 
 // ---------------------------------------------------------------------------
 // Main action — scrape + AI extraction
 // ---------------------------------------------------------------------------
-
-export const get_active_countries = internalQuery({
-  args: {},
-  handler: async (ctx) => {
-    return await ctx.db
-      .query("active_countries")
-      .withIndex("by_status", (q) => q.eq("status", "active"))
-      .collect();
-  },
-});
 
 /**
  * Scrape Google News RSS natively, then use DeepSeek to distil
@@ -40,7 +30,7 @@ export const refresh_trending_topics = internalAction({
     }
 
     const active_countries = await ctx.runQuery(
-      internal.trending.get_active_countries,
+      internal.watchlist.get_active_countries,
       {},
     );
     

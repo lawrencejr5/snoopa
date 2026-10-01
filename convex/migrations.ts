@@ -1,4 +1,69 @@
-import { internalMutation } from "./_generated/server";
+import { mutation, internalMutation } from "./_generated/server";
+
+/**
+ * Seed active_countries table with Nigeria and the US.
+ */
+export const seed_active_countries = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const defaultCountries = [
+      {
+        name: "Nigeria",
+        code: "NG",
+        gl: "NG",
+        hl: "en-NG",
+        status: "active" as const,
+      },
+      {
+        name: "United States",
+        code: "US",
+        gl: "US",
+        hl: "en-US",
+        status: "active" as const,
+      },
+    ];
+
+    const results = [];
+    for (const country of defaultCountries) {
+      const existing = await ctx.db
+        .query("active_countries")
+        .withIndex("by_code", (q) => q.eq("code", country.code))
+        .first();
+
+      if (!existing) {
+        const id = await ctx.db.insert("active_countries", country);
+        results.push({ action: "inserted", code: country.code, id });
+      } else {
+        await ctx.db.patch(existing._id, {
+          name: country.name,
+          gl: country.gl,
+          hl: country.hl,
+          status: country.status,
+        });
+        results.push({ action: "updated", code: country.code, id: existing._id });
+      }
+    }
+
+    return results;
+  },
+});
+
+export const remove_country_code_from_users = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const users = await ctx.db.query("users").collect();
+    let count = 0;
+    for (const u of users) {
+      const dbUser = { ...u } as any;
+      if (dbUser.countryCode) {
+        delete dbUser.countryCode;
+        await ctx.db.replace(u._id, dbUser);
+        count++;
+      }
+    }
+    return `Unset countryCode on ${count} users.`;
+  },
+});
 
 export const migrateWatchlist = internalMutation({
   args: {},

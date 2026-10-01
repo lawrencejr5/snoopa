@@ -118,31 +118,26 @@ export const update_app_load_metadata = mutation({
     const updates: {
       os?: "ios" | "android" | "web";
       country?: string;
-      countryCode?: string;
       last_seen?: number;
     } = {};
 
     if (args.os !== undefined) updates.os = args.os;
     if (args.country !== undefined) updates.country = args.country;
-    if (args.countryCode !== undefined) {
-      updates.countryCode = args.countryCode;
-      
+    if (args.countryCode !== undefined && args.country) {
       // Dynamically register the country in active_countries if not exists
-      if (args.country) {
-        const existingCountry = await ctx.db
-          .query("active_countries")
-          .withIndex("by_code", (q) => q.eq("code", args.countryCode as string))
-          .first();
+      const existingCountry = await ctx.db
+        .query("active_countries")
+        .withIndex("by_code", (q) => q.eq("code", args.countryCode as string))
+        .first();
 
-        if (!existingCountry) {
-          await ctx.db.insert("active_countries", {
-            name: args.country,
-            code: args.countryCode,
-            gl: args.countryCode,
-            hl: `en-${args.countryCode}`,
-            status: "active",
-          });
-        }
+      if (!existingCountry) {
+        await ctx.db.insert("active_countries", {
+          name: args.country,
+          code: args.countryCode,
+          gl: args.countryCode,
+          hl: `en-${args.countryCode}`,
+          status: "active",
+        });
       }
     }
     if (args.last_seen !== undefined) updates.last_seen = args.last_seen;

@@ -1,6 +1,16 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
-import { internalMutation, mutation, query } from "./_generated/server";
+import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
+
+export const get_active_countries = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.db
+      .query("active_countries")
+      .withIndex("by_status", (q) => q.eq("status", "active"))
+      .collect();
+  },
+});
 
 // --- Queries ---
 
@@ -303,14 +313,23 @@ export const reactivate_watchlist = mutation({
  * Returns up to 10 topics sorted newest-first.
  */
 export const get_trending_topics = query({
-  args: {},
-  handler: async (ctx) => {
+  args: {
+    country_code: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
     const user_id = await getAuthUserId(ctx);
-    let countryCode = "WORLD";
-    if (user_id) {
+    let countryCode = args.country_code || "WORLD";
+
+    if (!args.country_code && user_id) {
       const user = await ctx.db.get(user_id);
-      if (user?.countryCode) {
-        countryCode = user.countryCode;
+      if (user?.country) {
+        const countryRecord = await ctx.db
+          .query("active_countries")
+          .withIndex("by_name", (q) => q.eq("name", user.country as string))
+          .first();
+        if (countryRecord?.code) {
+          countryCode = countryRecord.code;
+        }
       }
     }
 
@@ -393,6 +412,54 @@ export const insert_trending_topics = internalMutation({
     await Promise.all(
       args.topics.map((t) => ctx.db.insert("trending_cache", t)),
     );
+  },
+});
+
+/**
+ * Seed active_countries table with Nigeria and the US.
+ */
+export const seed_active_countries = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const defaultCountries = [
+      {
+        name: "Nigeria",
+        code: "NG",
+        gl: "NG",
+        hl: "en-NG",
+        status: "active" as const,
+      },
+      {
+        name: "United States",
+        code: "US",
+        gl: "US",
+        hl: "en-US",
+        status: "active" as const,
+      },
+    ];
+
+    const results = [];
+    for (const country of defaultCountries) {
+      const existing = await ctx.db
+        .query("active_countries")
+        .withIndex("by_code", (q) => q.eq("code", country.code))
+        .first();
+
+      if (!existing) {
+        const id = await ctx.db.insert("active_countries", country);
+        results.push({ action: "inserted", code: country.code, id });
+      } else {
+        await ctx.db.patch(existing._id, {
+          name: country.name,
+          gl: country.gl,
+          hl: country.hl,
+          status: country.status,
+        });
+        results.push({ action: "updated", code: country.code, id: existing._id });
+      }
+    }
+
+    return results;
   },
 });
 

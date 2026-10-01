@@ -38,7 +38,6 @@ const schema = defineSchema({
       v.union(v.literal("ios"), v.literal("android"), v.literal("web")),
     ),
     country: v.optional(v.string()),
-    countryCode: v.optional(v.string()),
     last_seen: v.optional(v.number()),
   }).index("email", ["email"]),
 
@@ -191,10 +190,11 @@ const schema = defineSchema({
     last_refreshed_at: v.optional(v.number()),
   })
     .index("by_status", ["status"])
-    .index("by_code", ["code"]),
+    .index("by_code", ["code"])
+    .index("by_name", ["name"]),
 
   trending_cache: defineTable({
-    country_code: v.string(),
+    country_code: v.optional(v.string()),
     topic: v.string(),
     category: v.string(),
     summary: v.string(),
