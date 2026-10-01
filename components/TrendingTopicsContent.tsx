@@ -1,17 +1,17 @@
-import React, { useState } from "react";
-import {
-  View,
-  Text,
-  Image,
-  ScrollView,
-  Pressable,
-  StyleSheet,
-  ActivityIndicator,
-} from "react-native";
-import { useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api";
 import Colors from "@/constants/Colors";
 import { useTheme } from "@/context/ThemeContext";
+import { api } from "@/convex/_generated/api";
+import { useQuery } from "convex/react";
+import React, { useState } from "react";
+import {
+  ActivityIndicator,
+  Image,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 
 interface TrendingTopicsContentProps {
   onTrackTopic: (topic: string, suggestedCondition?: string) => void;
@@ -23,6 +23,16 @@ export default function TrendingTopicsContent({
   onClose,
 }: TrendingTopicsContentProps) {
   const { theme } = useTheme();
+  const [expandedTopics, setExpandedTopics] = useState<Record<string, boolean>>(
+    {},
+  );
+
+  const toggleExpand = (key: string) => {
+    setExpandedTopics((prev) => ({
+      ...prev,
+      [key]: !prev[key],
+    }));
+  };
 
   // Query user country topics (defaults to user's country if set)
   const userTrendingResult = useQuery(api.watchlist.get_trending_topics, {});
@@ -103,15 +113,14 @@ export default function TrendingTopicsContent({
               },
             ]}
           >
-            <Text
+            <Image
+              source={require("@/assets/icons/chevron-down.png")}
               style={{
-                color: Colors[theme].text,
-                fontSize: 16,
-                fontFamily: "FontBold",
+                width: 14,
+                height: 14,
+                tintColor: Colors[theme].text,
               }}
-            >
-              ✕
-            </Text>
+            />
           </Pressable>
         )}
       </View>
@@ -260,98 +269,124 @@ export default function TrendingTopicsContent({
               </Text>
             </View>
           ) : (
-            activeTopics.map((item, index) => (
-              <View
-                key={item.topic + index}
-                style={[
-                  styles.card,
-                  {
-                    backgroundColor: Colors[theme].card,
-                    borderColor: Colors[theme].border,
-                  },
-                ]}
-              >
-                {/* Category Badge */}
-                <View style={styles.cardHeader}>
-                  <View
-                    style={[
-                      styles.categoryBadge,
-                      {
-                        backgroundColor: Colors[theme].surface,
-                        borderColor: Colors[theme].border,
-                      },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.categoryText,
-                        { color: Colors[theme].milk },
-                      ]}
-                    >
-                      {item.category?.toUpperCase() || "WORLD"}
-                    </Text>
-                  </View>
-                </View>
+            activeTopics.map((item, index) => {
+              const cardKey = item.topic + index;
+              const isExpanded = !!expandedTopics[cardKey];
 
-                {/* Topic Title */}
-                <Text
-                  style={[styles.topicTitle, { color: Colors[theme].text }]}
+              return (
+                <View
+                  key={cardKey}
+                  style={[
+                    styles.card,
+                    {
+                      backgroundColor: Colors[theme].card,
+                      borderColor: Colors[theme].border,
+                    },
+                  ]}
                 >
-                  {item.topic}
-                </Text>
-
-                {/* Summary */}
-                {item.summary ? (
-                  <Text
-                    style={[
-                      styles.summaryText,
-                      { color: Colors[theme].text_secondary },
-                    ]}
-                  >
-                    {item.summary}
-                  </Text>
-                ) : null}
-
-                {/* Suggested Condition & Track Button */}
-                <View style={styles.cardFooter}>
-                  {item.suggested_condition ? (
+                  {/* Category Badge */}
+                  <View style={styles.cardHeader}>
                     <View
                       style={[
-                        styles.conditionPill,
-                        { backgroundColor: Colors[theme].surface },
+                        styles.categoryBadge,
+                        {
+                          backgroundColor: Colors[theme].surface,
+                          borderColor: Colors[theme].border,
+                        },
                       ]}
                     >
                       <Text
-                        numberOfLines={1}
                         style={[
-                          styles.conditionText,
-                          { color: Colors[theme].lightgreen },
+                          styles.categoryText,
+                          { color: Colors[theme].milk },
                         ]}
                       >
-                        ⚡️ {item.suggested_condition}
+                        {item.category?.toUpperCase() || "WORLD"}
                       </Text>
                     </View>
-                  ) : (
-                    <View style={{ flex: 1 }} />
-                  )}
+                  </View>
 
-                  <Pressable
-                    onPress={() =>
-                      onTrackTopic(item.topic, item.suggested_condition)
-                    }
-                    style={({ pressed }) => [
-                      styles.trackBtn,
-                      {
-                        backgroundColor: Colors[theme].primary,
-                        opacity: pressed ? 0.8 : 1,
-                      },
-                    ]}
+                  {/* Topic Title */}
+                  <Text
+                    style={[styles.topicTitle, { color: Colors[theme].text }]}
                   >
-                    <Text style={styles.trackBtnText}>+ Track</Text>
-                  </Pressable>
+                    {item.topic}
+                  </Text>
+
+                  {/* Summary (1 line max by default, full when expanded) */}
+                  {item.summary ? (
+                    <Text
+                      numberOfLines={isExpanded ? undefined : 1}
+                      style={[
+                        styles.summaryText,
+                        { color: Colors[theme].text_secondary },
+                      ]}
+                    >
+                      {item.summary}
+                    </Text>
+                  ) : null}
+
+                  {/* See More & Track Button */}
+                  <View style={styles.cardFooter}>
+                    <Pressable
+                      onPress={() => toggleExpand(cardKey)}
+                      hitSlop={8}
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 4,
+                        paddingVertical: 4,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontFamily: "FontMedium",
+                          fontSize: 12,
+                          color: Colors[theme].text_secondary,
+                        }}
+                      >
+                        {isExpanded ? "See Less" : "See More"}
+                      </Text>
+                      <Image
+                        source={
+                          isExpanded
+                            ? require("@/assets/icons/chevron-up.png")
+                            : require("@/assets/icons/chevron-down.png")
+                        }
+                        style={{
+                          width: 12,
+                          height: 12,
+                          tintColor: Colors[theme].text_secondary,
+                        }}
+                      />
+                    </Pressable>
+
+                    <Pressable
+                      onPress={() =>
+                        onTrackTopic(item.topic, item.suggested_condition)
+                      }
+                      style={({ pressed }) => [
+                        styles.trackBtn,
+                        {
+                          backgroundColor: "transparent",
+                          borderColor: Colors[theme].border,
+                          opacity: pressed ? 0.7 : 1,
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.trackBtnText,
+                          { color: Colors[theme].text },
+                        ]}
+                      >
+                        Track
+                      </Text>
+                    </Pressable>
+                  </View>
                 </View>
-              </View>
-            ))
+              );
+            })
           )}
         </ScrollView>
       )}
@@ -468,23 +503,13 @@ const styles = StyleSheet.create({
     gap: 10,
     marginTop: 4,
   },
-  conditionPill: {
-    flex: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
-  conditionText: {
-    fontFamily: "FontMedium",
-    fontSize: 11,
-  },
   trackBtn: {
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 10,
+    borderWidth: 1,
   },
   trackBtnText: {
-    color: "#141414",
     fontFamily: "FontBold",
     fontSize: 13,
   },

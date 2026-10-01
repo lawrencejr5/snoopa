@@ -4,6 +4,9 @@ import Loading from "@/components/Loading";
 import PremiumFeatureModal from "@/components/PremiumFeatureModal";
 import TopUpModal from "@/components/TopUpModal";
 import TrackTopicModal from "@/components/TrackTopicModal";
+import TrendingTopicsSheet, {
+  TrendingTopicsSheetRef,
+} from "@/components/TrendingTopicsSheet";
 import {
   CommandsModal,
   ConfirmationModal,
@@ -24,10 +27,12 @@ import {
   BottomSheetView,
 } from "@gorhom/bottom-sheet";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
-import { useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from "expo-router";
-import TrendingTopicsSheet, {
-  TrendingTopicsSheetRef,
-} from "@/components/TrendingTopicsSheet";
+import {
+  useFocusEffect,
+  useLocalSearchParams,
+  useNavigation,
+  useRouter,
+} from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Image,
@@ -937,33 +942,16 @@ export default function HomeScreen() {
                   {displayHeaderText}
                 </Text>
               </View>
-              <View
+              <Text
                 style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: 4,
+                  color: Colors[theme].text,
+                  fontFamily: "FontBold",
+                  fontSize: 11,
+                  letterSpacing: -0.2,
                 }}
               >
-                <Image
-                  source={require("@/assets/icons/tracked.png")}
-                  style={{
-                    width: 12,
-                    height: 12,
-                    tintColor: Colors[theme].text_secondary,
-                    opacity: 0.6,
-                  }}
-                />
-                <Text
-                  style={{
-                    color: Colors[theme].text_secondary,
-                    fontFamily: "FontMedium",
-                    fontSize: 11,
-                    opacity: 0.6,
-                  }}
-                >
-                  {trendingTopics.length} topics · live ›
-                </Text>
-              </View>
+                SEE ALL
+              </Text>
             </Pressable>
             <ScrollView
               horizontal
