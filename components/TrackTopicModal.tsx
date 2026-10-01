@@ -78,8 +78,8 @@ const isLottieSupported =
   Platform.OS !== "web" &&
   Boolean(
     UIManager.getViewManagerConfig &&
-      (UIManager.getViewManagerConfig("LottieAnimationView") ||
-        UIManager.getViewManagerConfig("LottieView")),
+    (UIManager.getViewManagerConfig("LottieAnimationView") ||
+      UIManager.getViewManagerConfig("LottieView")),
   );
 
 function SafeLottie({
@@ -387,7 +387,13 @@ export default function TrackTopicModal({
             <View style={{ flex: 1, justifyContent: "space-between" }}>
               <View>
                 {/* Topic Centered Icon & Subtitle */}
-                <View style={{ alignItems: "center", marginTop: 4, marginBottom: 12 }}>
+                <View
+                  style={{
+                    alignItems: "center",
+                    marginTop: 4,
+                    marginBottom: 12,
+                  }}
+                >
                   <View
                     style={[
                       styles.iconContainer,
@@ -403,11 +409,16 @@ export default function TrackTopicModal({
                       }}
                     />
                   </View>
-                  <Text style={[styles.topicTitle, { color: Colors[theme].text }]}>
+                  <Text
+                    style={[styles.topicTitle, { color: Colors[theme].text }]}
+                  >
                     {topic}
                   </Text>
                   <Text
-                    style={[styles.subtitle, { color: Colors[theme].text_secondary }]}
+                    style={[
+                      styles.subtitle,
+                      { color: Colors[theme].text_secondary },
+                    ]}
                   >
                     What exactly do you want to track on this topic?
                   </Text>
@@ -448,7 +459,7 @@ export default function TrackTopicModal({
                       bottomSheetRef.current?.snapToIndex(2);
                     }}
                     multiline
-                    maxLength={500}
+                    maxLength={1500}
                     placeholder={`e.g. "Notify me when ${topic} news leaks"`}
                     placeholderTextColor={Colors[theme].text_secondary + "80"}
                     style={[
@@ -483,7 +494,7 @@ export default function TrackTopicModal({
                         color: Colors[theme].text_secondary + "80",
                       }}
                     >
-                      {prompt.length}/500
+                      {prompt.length}/1500
                     </Text>
                   </View>
                 </View>

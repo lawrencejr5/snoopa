@@ -10,11 +10,15 @@ export default function TrendingModalScreen() {
   const router = useRouter();
 
   const handleTrackTopic = (topic: string, suggestedCondition?: string) => {
-    router.back();
-    router.setParams({
-      track_topic: topic,
-      track_condition: suggestedCondition || "",
-    } as any);
+    if (router.canGoBack()) {
+      router.back();
+    }
+    setTimeout(() => {
+      router.setParams({
+        track_topic: topic,
+        track_condition: suggestedCondition || "",
+      } as any);
+    }, 100);
   };
 
   return (
@@ -26,7 +30,11 @@ export default function TrendingModalScreen() {
     >
       <TrendingTopicsContent
         onTrackTopic={handleTrackTopic}
-        onClose={() => router.back()}
+        onClose={() => {
+          if (router.canGoBack()) {
+            router.back();
+          }
+        }}
       />
     </SafeAreaView>
   );

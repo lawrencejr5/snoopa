@@ -776,9 +776,12 @@ export default function HomeScreen() {
   };
 
   const handleTrackFromModal = (topic: string, suggestedCondition?: string) => {
-    setSelectedTopic(topic);
-    setSelectedTopicCondition(suggestedCondition || "");
-    setShowTrackModal(true);
+    trendingSheetRef.current?.dismiss();
+    setTimeout(() => {
+      setSelectedTopic(topic);
+      setSelectedTopicCondition(suggestedCondition || "");
+      setShowTrackModal(true);
+    }, 250);
   };
   const unreadCount = useQuery(api.notifications.unread_count) ?? 0;
   const snoop_balance = useQuery(api.snoops.get_snoop_balance) ?? 0;
