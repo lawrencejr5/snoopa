@@ -615,6 +615,7 @@ export default function HomeScreen() {
   );
   const [showTopUp, setShowTopUp] = useState(false);
   const [showPremiumModal, setShowPremiumModal] = useState(false);
+  const [showSnoopTooltip, setShowSnoopTooltip] = useState(false);
 
   const profileSheetRef = useRef<BottomSheetModal>(null);
 
@@ -787,9 +788,13 @@ export default function HomeScreen() {
   const snoop_balance = useQuery(api.snoops.get_snoop_balance) ?? 0;
   const snoop_grants = useQuery(api.snoops.get_snoop_grants) ?? [];
   const snoop_total =
-    snoop_grants.reduce((sum: number, g: any) => sum + g.snoops, 0) || 30;
-  const snoops_used = snoop_total - snoop_balance;
+    snoop_grants.reduce((sum: number, g: any) => sum + g.snoops, 0) || 10;
+  const snoops_used = Math.max(0, snoop_total - snoop_balance);
   const snoop_pct = snoop_total > 0 ? snoops_used / snoop_total : 0;
+  const is_low_on_snoops =
+    snoop_balance === 0 ||
+    snoop_grants.length === 0 ||
+    (snoop_total > 0 && snoop_pct >= 0.8);
   const is_locked = watchlistData.length >= 2 && signedIn?.is_premium !== true;
 
   const activeSnoops = watchlistData
@@ -981,6 +986,147 @@ export default function HomeScreen() {
                 />
               ))}
             </ScrollView>
+          </Animated.View>
+        )}
+
+        {/* Top Up Snoops Section (Low Snoops Alert) */}
+        {is_low_on_snoops && (
+          <Animated.View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <View
+                style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
+              >
+                <Text
+                  style={[
+                    styles.sectionLabel,
+                    { color: Colors[theme].text_secondary },
+                  ]}
+                >
+                  TOP UP SNOOPS
+                </Text>
+                <Pressable
+                  onPress={() => setShowSnoopTooltip(!showSnoopTooltip)}
+                  hitSlop={8}
+                >
+                  <Octicons
+                    name="question"
+                    size={13}
+                    color={
+                      showSnoopTooltip
+                        ? Colors[theme].text
+                        : Colors[theme].text_secondary
+                    }
+                  />
+                </Pressable>
+              </View>
+            </View>
+
+            {showSnoopTooltip && (
+              <View
+                style={{
+                  backgroundColor: Colors[theme].surface,
+                  borderColor: Colors[theme].border,
+                  borderWidth: 1,
+                  borderRadius: 10,
+                  paddingHorizontal: 12,
+                  paddingVertical: 8,
+                  marginBottom: 8,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 8,
+                }}
+              >
+                <Text
+                  style={{
+                    color: Colors[theme].text_secondary,
+                    fontFamily: "FontMedium",
+                    fontSize: 11,
+                    lineHeight: 15,
+                    flex: 1,
+                  }}
+                >
+                  💡 Snoopa uses snoops to query live web intel, run background checks, and send instant alerts when watchlist conditions trigger.
+                </Text>
+                <Pressable
+                  onPress={() => setShowSnoopTooltip(false)}
+                  hitSlop={8}
+                >
+                  <Octicons
+                    name="x"
+                    size={12}
+                    color={Colors[theme].text_secondary}
+                  />
+                </Pressable>
+              </View>
+            )}
+
+            <View
+              style={{
+                backgroundColor: Colors[theme].surface,
+                borderColor:
+                  snoop_balance === 0
+                    ? Colors[theme].danger + "60"
+                    : "#FF9500" + "40",
+                borderWidth: 1,
+                borderRadius: 12,
+                paddingVertical: 10,
+                paddingHorizontal: 12,
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 10,
+              }}
+            >
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 6,
+                  flex: 1,
+                }}
+              >
+                <Text style={{ fontSize: 13 }}>
+                  {snoop_balance === 0 ? "💀" : "🪫"}
+                </Text>
+                <Text
+                  style={{
+                    color: Colors[theme].text,
+                    fontFamily: "FontMedium",
+                    fontSize: 12,
+                  }}
+                  numberOfLines={1}
+                >
+                  {snoop_balance === 0
+                    ? "Out of Snoops (0 left)"
+                    : `Low on Snoops (${snoop_balance} left)`}
+                </Text>
+              </View>
+
+              <Pressable
+                onPress={() => setShowTopUp(true)}
+                style={({ pressed }) => ({
+                  backgroundColor: Colors[theme].text,
+                  paddingVertical: 6,
+                  paddingHorizontal: 12,
+                  borderRadius: 8,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  opacity: pressed ? 0.8 : 1,
+                })}
+              >
+                <Text
+                  style={{
+                    color: Colors[theme].background,
+                    fontFamily: "FontBold",
+                    fontSize: 10,
+                    letterSpacing: 0.5,
+                  }}
+                >
+                  TOP UP
+                </Text>
+              </Pressable>
+            </View>
           </Animated.View>
         )}
         {activeSnoops.length > 0 && (
