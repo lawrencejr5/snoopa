@@ -346,8 +346,6 @@ export const add_top_up = mutation({
   },
 });
 
-
-
 // ---------------------------------------------------------------------------
 // Ad Reward — helpers
 // ---------------------------------------------------------------------------
@@ -361,8 +359,8 @@ function start_of_today_utc(): number {
 /** Snoops rewarded per completed ad, keyed by sub_tier. */
 const AD_REWARD_BY_TIER: Record<string, number> = {
   free: 2,
-  pro: 3,
-  supa: 5,
+  pro: 10,
+  supa: 10,
   max: 10,
 };
 
@@ -483,7 +481,7 @@ export const sync_user_subscription = mutation({
 
     const plan_val = args.tier === "free" ? "free" : "pro";
     const date_of_sub_val = args.is_premium
-      ? (is_new_sub_cycle && !current_is_premium)
+      ? is_new_sub_cycle && !current_is_premium
         ? Date.now()
         : user.date_of_sub || Date.now()
       : undefined;
@@ -540,7 +538,7 @@ export const sync_user_subscription = mutation({
             q.and(
               q.eq(q.field("type"), "reward"),
               q.eq(q.field("title"), expected_title),
-              q.gte(q.field("_creationTime"), Date.now() - 60 * 1000)
+              q.gte(q.field("_creationTime"), Date.now() - 60 * 1000),
             ),
           )
           .first();
@@ -574,11 +572,11 @@ export const sync_user_subscription = mutation({
         .first();
 
       if (!existing_free) {
-        // Provision 30 free snoops expiring at the end of the month
-          await ctx.db.insert("snoops", {
+        // Provision 10 free snoops expiring at the end of the month
+        await ctx.db.insert("snoops", {
           user_id,
-          snoops: 30,
-          remaining: 30,
+          snoops: 10,
+          remaining: 10,
           type: "free",
           expiration_date: end_of_month_timestamp(),
         });
@@ -588,7 +586,7 @@ export const sync_user_subscription = mutation({
 });
 
 /**
- * Creates a 30-snoop "free" grant expiring at the end of the current calendar
+ * Creates a 10-snoop "free" grant expiring at the end of the current calendar
  * month for every user that does not already have a free/monthly grant
  * active for this month.
  */
@@ -628,8 +626,8 @@ export const seed_free_snoops = internalMutation({
 
       await ctx.db.insert("snoops", {
         user_id: user._id,
-        snoops: 30,
-        remaining: 30,
+        snoops: 10,
+        remaining: 10,
         type: "free",
         expiration_date: end_of_month,
       });
@@ -671,12 +669,15 @@ export const refill_premium_snoops = internalMutation({
     for (const user of premium_users) {
       // Skip if subscription has already expired
       if (user.sub_end_date !== undefined && user.sub_end_date < now) {
-         skipped_expired++;
-         continue;
+        skipped_expired++;
+        continue;
       }
 
       // Skip if already refilled within the last 28 days
-      if (user.last_refill_at !== undefined && user.last_refill_at > refill_cutoff) {
+      if (
+        user.last_refill_at !== undefined &&
+        user.last_refill_at > refill_cutoff
+      ) {
         skipped_recent++;
         continue;
       }

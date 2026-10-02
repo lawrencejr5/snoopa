@@ -155,7 +155,7 @@ const WelcomePage = () => {
     setAppleLoading(true);
     try {
       if (Platform.OS !== "ios") {
-        showCustomAlert("Fuck off you android user", "danger");
+        showCustomAlert("Doesn't work on android bro", "warning");
         return;
       }
       const credential = await AppleAuthentication.signInAsync({
