@@ -1,10 +1,21 @@
+import { REFERRAL_OPTIONS, ReferralOptionIcon } from "@/components/ReferralModal";
 import Colors from "@/constants/Colors";
 import { useTheme } from "@/context/ThemeContext";
-import { Feather } from "@expo/vector-icons";
+import { useUser } from "@/context/UserContext";
+import { api } from "@/convex/_generated/api";
+import { Feather, Octicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useMutation } from "convex/react";
 import { useRouter } from "expo-router";
 import React, { useRef, useState } from "react";
-import { Dimensions, Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  Dimensions,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import Animated, {
   FadeIn,
   FadeInDown,
@@ -18,35 +29,48 @@ const { width, height } = Dimensions.get("window");
 const ONBOARDING_DATA = [
   {
     id: 1,
+    type: "slide",
     image: require("@/assets/onboarding/onboarding_1.png"),
     title: "Your Daily AI\nIntelligence Briefing.",
   },
   {
     id: 2,
+    type: "slide",
     image: require("@/assets/onboarding/onboarding_2.png"),
     title: "Track Anything.\nAutomatically.",
   },
   {
     id: 3,
+    type: "slide",
     image: require("@/assets/onboarding/onboarding_3.png"),
     title: "Managing Watchlists\nMade Simple.",
   },
   {
     id: 4,
+    type: "slide",
     image: require("@/assets/onboarding/onboarding_4.png"),
     title: "Back To Back Updates",
   },
   {
     id: 5,
+    type: "slide",
     image: require("@/assets/onboarding/onboarding_5.png"),
     title: "Personalize Snoopa.",
+  },
+  {
+    id: 6,
+    type: "referral",
+    title: "Where did you\nhear about us?",
   },
 ];
 
 const OnboardingScreen = () => {
   const { theme } = useTheme();
   const router = useRouter();
+  const { signedIn } = useUser();
+  const saveReferralSource = useMutation(api.users.save_referral_source);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [selectedReferral, setSelectedReferral] = useState<string | null>(null);
   const scrollX = useSharedValue(0);
   const flatListRef = useRef<Animated.FlatList<any>>(null);
 
@@ -64,6 +88,10 @@ const OnboardingScreen = () => {
 
   const viewConfig = useRef({ viewAreaCoveragePercentThreshold: 50 }).current;
 
+  const isLastSlide = currentIndex === ONBOARDING_DATA.length - 1;
+  const isReferralSlide = ONBOARDING_DATA[currentIndex]?.type === "referral";
+  const canProceed = !isReferralSlide || !!selectedReferral;
+
   const handleNext = async () => {
     if (currentIndex < ONBOARDING_DATA.length - 1) {
       flatListRef.current?.scrollToIndex({
@@ -71,8 +99,18 @@ const OnboardingScreen = () => {
         animated: true,
       });
     } else {
-      await AsyncStorage.setItem("hasSeenOnboarding", "true");
-      router.replace("/welcome");
+      if (!selectedReferral) return;
+
+      try {
+        await AsyncStorage.setItem("pending_referral_source", selectedReferral);
+        if (signedIn?._id) {
+          await saveReferralSource({ source: selectedReferral });
+        }
+        await AsyncStorage.setItem("hasSeenOnboarding", "true");
+        router.replace("/welcome");
+      } catch (err) {
+        console.error("Error saving onboarding completion:", err);
+      }
     }
   };
 
@@ -88,11 +126,145 @@ const OnboardingScreen = () => {
         showsHorizontalScrollIndicator={false}
         pagingEnabled
         bounces={false}
+        scrollEnabled={!isReferralSlide || !!selectedReferral}
         onScroll={onScroll}
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewConfig}
         renderItem={({ item, index }) => {
           const isActive = index === currentIndex;
+          if (item.type === "referral") {
+            return (
+              <View style={[styles.slide, { width }]}>
+                <View style={{ flex: 1, marginTop: 10 }}>
+                  <Text
+                    style={[
+                      styles.title,
+                      { color: Colors[theme].text, marginBottom: 4 },
+                    ]}
+                  >
+                    {item.title}
+                  </Text>
+                  <Text
+                    style={{
+                      color: Colors[theme].text_secondary,
+                      fontFamily: "FontRegular",
+                      fontSize: 14,
+                      marginBottom: 16,
+                    }}
+                  >
+                    Please select an option to continue
+                  </Text>
+
+                  <ScrollView
+                    showsVerticalScrollIndicator={false}
+                    contentContainerStyle={{ gap: 8, paddingBottom: 20 }}
+                  >
+                    {REFERRAL_OPTIONS.map((opt) => {
+                      const isSelected = selectedReferral === opt.id;
+                      const iconColor = isSelected
+                        ? Colors[theme].background
+                        : Colors[theme].text;
+                      return (
+                        <Pressable
+                          key={opt.id}
+                          onPress={() => setSelectedReferral(opt.id)}
+                          style={({ pressed }) => [
+                            styles.referralCard,
+                            {
+                              backgroundColor: isSelected
+                                ? Colors[theme].text
+                                : Colors[theme].surface,
+                              borderColor: isSelected
+                                ? Colors[theme].text
+                                : Colors[theme].border,
+                              opacity: pressed ? 0.85 : 1,
+                            },
+                          ]}
+                        >
+                          <View
+                            style={{
+                              flexDirection: "row",
+                              alignItems: "center",
+                              gap: 12,
+                            }}
+                          >
+                            <ReferralOptionIcon
+                              item={opt}
+                              isSelected={isSelected}
+                              iconColor={iconColor}
+                            />
+                            <Text
+                              style={{
+                                color: isSelected
+                                  ? Colors[theme].background
+                                  : Colors[theme].text,
+                                fontFamily: isSelected
+                                  ? "FontBold"
+                                  : "FontMedium",
+                                fontSize: 14,
+                              }}
+                            >
+                              {opt.label}
+                            </Text>
+                          </View>
+                          {isSelected && (
+                            <Octicons
+                              name="check-circle-fill"
+                              size={18}
+                              color={Colors[theme].background}
+                            />
+                          )}
+                        </Pressable>
+                      );
+                    })}
+                  </ScrollView>
+                </View>
+
+                {/* Bottom Bar */}
+                {isActive && (
+                  <View style={styles.bottomSectionReferral}>
+                    <View style={styles.pagination}>
+                      {ONBOARDING_DATA.map((_, dotIndex) => (
+                        <View
+                          key={dotIndex}
+                          style={[
+                            styles.dot,
+                            {
+                              backgroundColor: Colors[theme].text,
+                              width: currentIndex === dotIndex ? 24 : 8,
+                              opacity: currentIndex === dotIndex ? 1 : 0.3,
+                            },
+                          ]}
+                        />
+                      ))}
+                    </View>
+
+                    <Pressable
+                      onPress={handleNext}
+                      disabled={!canProceed}
+                      style={({ pressed }) => [
+                        styles.nextButton,
+                        {
+                          backgroundColor: canProceed
+                            ? Colors[theme].text
+                            : Colors[theme].border,
+                          borderColor: Colors[theme].surface,
+                          opacity: pressed || !canProceed ? 0.5 : 1,
+                        },
+                      ]}
+                    >
+                      <Feather
+                        name="arrow-right"
+                        size={28}
+                        color={Colors[theme].background}
+                      />
+                    </Pressable>
+                  </View>
+                )}
+              </View>
+            );
+          }
+
           return (
             <View style={[styles.slide, { width }]}>
               {/* Image Section */}
@@ -198,6 +370,12 @@ const styles = StyleSheet.create({
     minHeight: height * 0.32,
     justifyContent: "flex-end",
   },
+  bottomSectionReferral: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingTop: 12,
+  },
   pagination: {
     flexDirection: "row",
     alignItems: "center",
@@ -210,16 +388,24 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: "FontBold",
-    fontSize: 36,
-    lineHeight: 44,
+    fontSize: 34,
+    lineHeight: 42,
     marginBottom: 10,
     letterSpacing: -1,
+  },
+  referralCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 14,
+    borderWidth: 1,
   },
   nextButton: {
     padding: 18,
     borderRadius: 50,
     borderWidth: 1,
     alignSelf: "flex-end",
-    marginTop: 10,
   },
 });

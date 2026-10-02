@@ -2,6 +2,7 @@ import AddWatchlistModal from "@/components/AddWatchlistModal";
 import Container from "@/components/Container";
 import Loading from "@/components/Loading";
 import PremiumFeatureModal from "@/components/PremiumFeatureModal";
+import ReferralModal from "@/components/ReferralModal";
 import TopUpModal from "@/components/TopUpModal";
 import TrackTopicModal from "@/components/TrackTopicModal";
 import TrendingTopicsSheet, {
@@ -1410,6 +1411,8 @@ export default function HomeScreen() {
       />
 
       <TopUpModal visible={showTopUp} onClose={() => setShowTopUp(false)} />
+
+      <ReferralModal visible={!!signedIn && !signedIn.referral_source} />
 
       {/* Profile Detail Bottom Sheet */}
       <BottomSheetModal

@@ -39,6 +39,7 @@ const schema = defineSchema({
     ),
     country: v.optional(v.string()),
     last_seen: v.optional(v.number()),
+    referral_source: v.optional(v.string()),
   }).index("email", ["email"]),
 
   sessions: defineTable({

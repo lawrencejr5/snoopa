@@ -13,6 +13,8 @@ import { api } from "@/convex/_generated/api";
 import { Doc } from "@/convex/_generated/dataModel";
 import { useMutation, useQuery } from "convex/react";
 
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
 type UserData = Doc<"users"> & { profile_url?: string | null };
 interface UserContextType {
   signedIn: UserData | undefined;
@@ -25,6 +27,27 @@ const UserProvider: FC<{ children: ReactNode }> = ({ children }) => {
   const signedIn = currentUser as UserData;
   const syncSubscription = useMutation(api.snoops.sync_user_subscription);
   const updateAppLoadMetadata = useMutation(api.users.update_app_load_metadata);
+  const saveReferralSource = useMutation(api.users.save_referral_source);
+
+  useEffect(() => {
+    if (!signedIn?._id) return;
+
+    const checkPendingReferral = async () => {
+      try {
+        if (!signedIn.referral_source) {
+          const pending = await AsyncStorage.getItem("pending_referral_source");
+          if (pending) {
+            await saveReferralSource({ source: pending });
+            await AsyncStorage.removeItem("pending_referral_source");
+          }
+        }
+      } catch (e) {
+        console.error("Error syncing pending referral source:", e);
+      }
+    };
+
+    checkPendingReferral();
+  }, [signedIn?._id, signedIn?.referral_source]);
 
   useEffect(() => {
     if (!signedIn?._id) return;

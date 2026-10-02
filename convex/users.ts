@@ -99,6 +99,23 @@ export const updateUser = mutation({
   },
 });
 
+export const save_referral_source = mutation({
+  args: {
+    source: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const user_id = await getAuthUserId(ctx);
+    if (!user_id) return;
+
+    const user = await ctx.db.get(user_id);
+    if (!user) return;
+
+    await ctx.db.patch(user_id, {
+      referral_source: args.source,
+    });
+  },
+});
+
 export const update_app_load_metadata = mutation({
   args: {
     os: v.optional(

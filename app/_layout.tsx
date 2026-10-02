@@ -2,25 +2,28 @@ import { useFonts } from "expo-font";
 import { Stack, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect, useRef, useState } from "react";
+import { AppState, AppStateStatus, Platform } from "react-native";
+import Purchases from "react-native-purchases";
 import "react-native-reanimated";
 import CustomSplash from "./splashscreen";
-import Purchases from "react-native-purchases";
-import { AppState, AppStateStatus, Platform } from "react-native";
 
+import { api } from "@/convex/_generated/api";
 import { ConvexAuthProvider } from "@convex-dev/auth/react";
 import { ConvexReactClient, useConvexAuth, useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api";
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { StatusBar } from "expo-status-bar";
 
+import RewardModal from "@/components/RewardModal";
 import { CustomAlertProvider } from "@/context/CustomAlertContext";
 import HapticsProvider from "@/context/HapticsContext";
 import LoadingProvider from "@/context/LoadingContext";
-import { PushNotificationProvider, usePushNotification } from "@/context/PushNotification";
+import {
+  PushNotificationProvider,
+  usePushNotification,
+} from "@/context/PushNotification";
 import DeviceThemeProvider from "@/context/ThemeContext";
 import UserProvider from "@/context/UserContext";
-import RewardModal from "@/components/RewardModal";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
@@ -44,7 +47,6 @@ if (Platform.OS === "android") {
 }
 
 export default function RootLayout() {
-
   const [loaded, error] = useFonts({
     FontBold: require("../assets/fonts/SpaceGrotesk/SpaceGrotesk-Bold.ttf"),
     FontLight: require("../assets/fonts/SpaceGrotesk/SpaceGrotesk-Light.ttf"),
@@ -128,7 +130,8 @@ const WithinContext = ({ loaded }: { loaded: boolean }) => {
   useEffect(() => {
     if (!loaded || isLoading || isFirstLaunch === null) return;
 
-    const inAuthGroup = segments[0] === "welcome" || segments[0] === "onboarding";
+    const inAuthGroup =
+      segments[0] === "welcome" || segments[0] === "onboarding";
 
     if (!isAuthenticated && !inAuthGroup) {
       if (isFirstLaunch) {
@@ -183,8 +186,7 @@ const WithinContext = ({ loaded }: { loaded: boolean }) => {
     if (!notificationResponse) return;
     if (!loaded || isLoading || showSplash || !isAuthenticated) return;
 
-    const response_id =
-      notificationResponse.notification.request.identifier;
+    const response_id = notificationResponse.notification.request.identifier;
     if (last_handled_notification_id_ref.current === response_id) return;
 
     last_handled_notification_id_ref.current = response_id;
