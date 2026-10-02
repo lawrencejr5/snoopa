@@ -1330,7 +1330,7 @@ export default function HomeScreen() {
                   textTransform: "capitalize",
                 }}
               >
-                {signedIn?.plan} Plan
+                {signedIn?.sub_tier} Plan
               </Text>
               {((signedIn as any)?.plan !== "max" || signedIn?.is_premium) && (
                 <Pressable

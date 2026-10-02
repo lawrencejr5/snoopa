@@ -1,15 +1,19 @@
 import Google from "@auth/core/providers/google";
 import { ConvexCredentials } from "@convex-dev/auth/providers/ConvexCredentials";
-import { convexAuth, createAccount, retrieveAccount } from "@convex-dev/auth/server";
-import { api } from "./_generated/api";
+import {
+  convexAuth,
+  createAccount,
+  retrieveAccount,
+} from "@convex-dev/auth/server";
 import { MutationCtx } from "./_generated/server";
-import { end_of_month_timestamp } from "./snoops";
+import { end_of_month_timestamp, start_of_month_timestamp } from "./snoops";
 
 const decode_base64 = (str: string): string => {
   if (typeof atob === "function") {
     return atob(str);
   }
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  const chars =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
   let buffer = "";
   const clean_str = str.replace(/=+$/, "").replace(/[^A-Za-z0-9+/]/g, "");
   let bc = 0;
@@ -38,7 +42,8 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
           "shy",
           "swaga",
         ];
-        const randomAvatar = avatars[Math.floor(Math.random() * avatars.length)];
+        const randomAvatar =
+          avatars[Math.floor(Math.random() * avatars.length)];
         return {
           id: googleProfile.sub,
           email: googleProfile.email,
@@ -66,7 +71,10 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
           }
           const payload_b64url = parts[1];
           const base64 = payload_b64url.replace(/-/g, "+").replace(/_/g, "/");
-          const padded_base64 = base64.padEnd(base64.length + (4 - (base64.length % 4)) % 4, "=");
+          const padded_base64 = base64.padEnd(
+            base64.length + ((4 - (base64.length % 4)) % 4),
+            "=",
+          );
           const json_str = decode_base64(padded_base64);
           payload = JSON.parse(json_str);
         } catch (error) {
@@ -109,8 +117,6 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
           throw new Error("Email address is required for first-time sign-in");
         }
 
-
-
         // Check for full name in credentials (sent by client on first login)
         let full_name = credentials.fullName as string;
         if (!full_name) {
@@ -129,7 +135,8 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
             .join(" ");
         }
 
-        const username = (credentials.givenName as string) || email_address.split("@")[0];
+        const username =
+          (credentials.givenName as string) || email_address.split("@")[0];
 
         const avatars: Array<"chill" | "gay" | "relax" | "shy" | "swaga"> = [
           "chill",
@@ -138,7 +145,8 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
           "shy",
           "swaga",
         ];
-        const randomAvatar = avatars[Math.floor(Math.random() * avatars.length)];
+        const randomAvatar =
+          avatars[Math.floor(Math.random() * avatars.length)];
 
         const created = await createAccount(ctx, {
           provider: "apple",
@@ -173,20 +181,34 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
       throw new Error(`Security Block: Invalid redirect to ${redirectTo}`);
     },
     async afterUserCreatedOrUpdated(ctx: MutationCtx, args) {
-      const existing_free_grant = await ctx.db
-        .query("snoops")
-        .withIndex("by_user", (q) => q.eq("user_id", args.userId))
-        .filter((q) => q.eq(q.field("type"), "free"))
-        .first();
+      const user = await ctx.db.get(args.userId);
+      const is_free_user =
+        !user?.is_premium ||
+        user?.sub_tier === "free" ||
+        user?.plan === "free";
 
-      if (!existing_free_grant) {
-        await ctx.db.insert("snoops", {
-          user_id: args.userId,
-          snoops: 30,
-          remaining: 30,
-          type: "free",
-          expiration_date: end_of_month_timestamp(),
-        });
+      if (is_free_user) {
+        const start_timestamp = start_of_month_timestamp();
+        const existing_free_grant = await ctx.db
+          .query("snoops")
+          .withIndex("by_user", (q) => q.eq("user_id", args.userId))
+          .filter((q) =>
+            q.and(
+              q.eq(q.field("type"), "free"),
+              q.gte(q.field("expiration_date"), start_timestamp),
+            ),
+          )
+          .first();
+
+        if (!existing_free_grant) {
+          await ctx.db.insert("snoops", {
+            user_id: args.userId,
+            snoops: 10,
+            remaining: 10,
+            type: "free",
+            expiration_date: end_of_month_timestamp(),
+          });
+        }
       }
     },
   },
