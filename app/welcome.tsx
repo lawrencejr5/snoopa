@@ -21,6 +21,7 @@ import { api } from "@/convex/_generated/api";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useConvex, useMutation } from "convex/react";
 import * as AppleAuthentication from "expo-apple-authentication";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { makeRedirectUri } from "expo-auth-session";
 import * as WebBrowser from "expo-web-browser";
 
@@ -119,6 +120,8 @@ const WelcomePage = () => {
     if (!final.signingIn) {
       throw new Error("Authentication failed. Please try again.");
     }
+
+    await AsyncStorage.setItem("just_signed_in", "true");
 
     const token = await registerForPushNotificationsAsync();
     if (token) {
@@ -258,6 +261,8 @@ const WelcomePage = () => {
       if (!final.signingIn) {
         throw new Error("Authentication failed. Please try again.");
       }
+
+      await AsyncStorage.setItem("just_signed_in", "true");
 
       const token = await registerForPushNotificationsAsync();
       if (token) {

@@ -140,6 +140,7 @@ const WithinContext = ({ loaded }: { loaded: boolean }) => {
         router.replace("/welcome");
       }
     } else if (isAuthenticated && inAuthGroup) {
+      AsyncStorage.setItem("just_signed_in", "true").catch(() => {});
       router.replace("/(tabs)");
     }
   }, [isAuthenticated, isLoading, loaded, segments, isFirstLaunch]);

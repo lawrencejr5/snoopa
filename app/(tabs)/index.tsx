@@ -1,6 +1,7 @@
 import AddWatchlistModal from "@/components/AddWatchlistModal";
 import Container from "@/components/Container";
 import Loading from "@/components/Loading";
+import PaywallModal from "@/components/PaywallModal";
 import PremiumFeatureModal from "@/components/PremiumFeatureModal";
 import ReferralModal from "@/components/ReferralModal";
 import TopUpModal from "@/components/TopUpModal";
@@ -21,6 +22,7 @@ import { useUser } from "@/context/UserContext";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { getLastFocusedTab, setLastFocusedTab } from "@/utils/navigationState";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Octicons } from "@expo/vector-icons";
 import {
   BottomSheetBackdrop,
@@ -616,7 +618,30 @@ export default function HomeScreen() {
   );
   const [showTopUp, setShowTopUp] = useState(false);
   const [showPremiumModal, setShowPremiumModal] = useState(false);
+  const [showPaywallModal, setShowPaywallModal] = useState(false);
   const [showSnoopTooltip, setShowSnoopTooltip] = useState(false);
+
+  useEffect(() => {
+    if (!signedIn?._id) return;
+
+    const checkJustSignedIn = async () => {
+      try {
+        const justSignedIn = await AsyncStorage.getItem("just_signed_in");
+        if (justSignedIn === "true") {
+          await AsyncStorage.removeItem("just_signed_in");
+          const isFreeUser =
+            !signedIn.is_premium || signedIn.sub_tier === "free";
+          if (isFreeUser) {
+            setShowPaywallModal(true);
+          }
+        }
+      } catch (err) {
+        console.error("Error checking just_signed_in status:", err);
+      }
+    };
+
+    checkJustSignedIn();
+  }, [signedIn?._id, signedIn?.is_premium, signedIn?.sub_tier]);
 
   const profileSheetRef = useRef<BottomSheetModal>(null);
 
@@ -1413,6 +1438,11 @@ export default function HomeScreen() {
       <TopUpModal visible={showTopUp} onClose={() => setShowTopUp(false)} />
 
       <ReferralModal visible={!!signedIn && !signedIn.referral_source} />
+
+      <PaywallModal
+        visible={showPaywallModal}
+        onClose={() => setShowPaywallModal(false)}
+      />
 
       {/* Profile Detail Bottom Sheet */}
       <BottomSheetModal
