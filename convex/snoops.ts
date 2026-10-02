@@ -58,12 +58,27 @@ export async function check_and_trigger_snoop_alerts(
   ctx: any,
   user_id: Id<"users">,
 ) {
-  const grants = await _fetch_active_grants(ctx, user_id);
-  const remaining_total = grants.reduce(
+  // Fetch ALL grants for the user (not just active ones) so we can correctly
+  // compute allocated_total even after every grant has been fully consumed.
+  const now = Date.now();
+  const all_grants = await ctx.db
+    .query("snoops")
+    .withIndex("by_user", (q: any) => q.eq("user_id", user_id))
+    .collect();
+
+  // Only consider grants that haven't expired yet (or have no expiration)
+  const current_grants = (all_grants as any[]).filter(
+    (g) =>
+      g.expiration_date === undefined ||
+      g.expiration_date === null ||
+      g.expiration_date > now,
+  );
+
+  const remaining_total = current_grants.reduce(
     (sum: number, g: any) => sum + g.remaining,
     0,
   );
-  const allocated_total = grants.reduce(
+  const allocated_total = current_grants.reduce(
     (sum: number, g: any) => sum + g.snoops,
     0,
   );
@@ -92,7 +107,7 @@ export async function check_and_trigger_snoop_alerts(
         type: "snoops",
         title: expected_title,
         message:
-          "You've run out of snoops for this period. Top up or upgrade your plan to keep investigating.",
+          "You've run out of snoops for this period. Top up or upgrade your plan to keep tracking.",
         seen: false,
         read: false,
       });
@@ -106,7 +121,7 @@ export async function check_and_trigger_snoop_alerts(
         },
       );
     }
-  } else if (remaining_total / allocated_total <= 0.05) {
+  } else if (remaining_total / allocated_total <= 0.2) {
     const expected_title = "Running Low on Snoops 🪫";
     // Check if we already alerted this month
     const existing_low = await ctx.db
@@ -125,7 +140,7 @@ export async function check_and_trigger_snoop_alerts(
         user_id,
         type: "snoops",
         title: expected_title,
-        message: `You've used up to 95% of your snoops this month (${remaining_total} remaining). Top up or upgrade your plan to keep tracking.`,
+        message: `You're running low on snoops (${remaining_total} remaining). Top up to keep Snoopa on the scent.`,
         seen: false,
         read: false,
       });
