@@ -206,7 +206,7 @@ export default function AnalyticsView() {
         <div className="card chart-card-sm">
           <div className="card-title-row">
             <h3 className="card-title font-header">OS Platform Source</h3>
-            <span className="badge badge-muted">authAccounts</span>
+            <span className="badge badge-muted">users.os</span>
           </div>
           <div
             style={{

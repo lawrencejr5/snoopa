@@ -199,27 +199,26 @@ export const getAdminStats = query({
       countryCounts[c] = (countryCounts[c] || 0) + 1;
     });
 
-    // 1. Calculate OS Platform Source directly from authAccounts.provider field
-    let appleProviderCount = 0;
-    let googleProviderCount = 0;
-    let otherProviderCount = 0;
+    // 1. Calculate OS Platform Source directly from users.os field
+    let iosCount = 0;
+    let androidCount = 0;
+    let otherOsCount = 0;
 
-    authAccounts.forEach((acc) => {
-      if (acc.provider === "apple") appleProviderCount++;
-      else if (acc.provider === "google") googleProviderCount++;
-      else otherProviderCount++;
+    users.forEach((u: any) => {
+      const osVal = (u.os || "").toLowerCase();
+      if (osVal === "ios") {
+        iosCount++;
+      } else if (osVal === "android") {
+        androidCount++;
+      } else {
+        otherOsCount++;
+      }
     });
 
-    // Fallback if authAccounts is empty in dev
-    if (authAccounts.length === 0) {
-      appleProviderCount = users.filter((u: any) => u.os === "ios").length || 1;
-      googleProviderCount = users.filter((u: any) => u.os === "android").length || 1;
-    }
-
     const storeSplit = [
-      { name: "Apple (iOS)", value: appleProviderCount, color: "#6aaa66" },
-      { name: "Google (Android)", value: googleProviderCount, color: "#F4D03F" },
-      ...(otherProviderCount > 0 ? [{ name: "Email / Other", value: otherProviderCount, color: "#e2e2bb" }] : []),
+      { name: "Apple (iOS)", value: iosCount, color: "#6aaa66" },
+      { name: "Google (Android)", value: androidCount, color: "#F4D03F" },
+      ...(otherOsCount > 0 ? [{ name: "Web / Other", value: otherOsCount, color: "#e2e2bb" }] : []),
     ];
 
     const regionNames = new Intl.DisplayNames(["en"], { type: "region" });
