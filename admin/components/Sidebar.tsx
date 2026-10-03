@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useQuery, useMutation } from "convex/react";
-import { BarChart3, Database, MessageSquare, Radio, Users, X, LogOut } from "lucide-react";
+import { BarChart3, Database, MessageSquare, Radio, Users, X, LogOut, Bell } from "lucide-react";
 import { api } from "@convex/_generated/api";
 
 interface SidebarProps {
@@ -53,6 +53,13 @@ export default function Sidebar({ mobileOpen = false, onClose, token, onSignOut 
       label: "Watchlists & Intel",
       icon: Radio,
       isActive: pathname.startsWith("/watchlists"),
+    },
+    {
+      id: "notifications",
+      href: "/notifications",
+      label: "Notifications Feed",
+      icon: Bell,
+      isActive: pathname.startsWith("/notifications"),
     },
     {
       id: "reports_feedback",

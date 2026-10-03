@@ -917,4 +917,43 @@ export const deleteTableRecord = mutation({
   },
 });
 
+export const getAdminNotifications = query({
+  args: {},
+  handler: async (ctx) => {
+    const [notifications, users, watchlists] = await Promise.all([
+      ctx.db.query("notifications").collect(),
+      ctx.db.query("users").collect(),
+      ctx.db.query("watchlist").collect(),
+    ]);
+
+    const userMap = new Map(users.map((u) => [u._id.toString(), u]));
+    const watchlistMap = new Map(watchlists.map((w) => [w._id.toString(), w]));
+
+    const formatted = notifications.map((n) => {
+      const user = userMap.get(n.user_id.toString());
+      const watchlist = n.watchlist_id ? watchlistMap.get(n.watchlist_id.toString()) : null;
+
+      return {
+        id: n._id,
+        title: n.title,
+        message: n.message,
+        type: n.type,
+        seen: n.seen,
+        read: n.read,
+        reward_claimed: n.reward_claimed,
+        created_at: n._creationTime,
+        user_id: n.user_id,
+        user_email: user?.email || "Unknown User",
+        user_name: user?.fullname || user?.email || "Unknown User",
+        user_sub_tier: user?.sub_tier || user?.plan || "free",
+        watchlist_id: n.watchlist_id,
+        watchlist_title: watchlist?.title || null,
+        watchlist_status: watchlist?.status || null,
+      };
+    });
+
+    return formatted.sort((a, b) => b.created_at - a.created_at);
+  },
+});
+
 

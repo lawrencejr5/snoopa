@@ -90,6 +90,9 @@ export default function AdminShell({ children }: AdminShellProps) {
     if (pathname.startsWith("/crud")) {
       return "Database Table Manager";
     }
+    if (pathname.startsWith("/notifications")) {
+      return "Notifications Feed & Push Alerts History";
+    }
     if (pathname.startsWith("/reports-feedback")) {
       return "Customer Reports & Feedback Submissions";
     }
