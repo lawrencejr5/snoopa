@@ -4,22 +4,19 @@ import { useState } from "react";
 import Image from "next/image";
 import { useMutation } from "convex/react";
 import { api } from "@convex/_generated/api";
-import { Lock, Mail, User, ArrowRight, ShieldCheck } from "lucide-react";
+import { Lock, Mail, ArrowRight, ShieldCheck } from "lucide-react";
 
 interface AdminAuthProps {
   onAuthenticated: (token: string) => void;
 }
 
 export default function AdminAuth({ onAuthenticated }: AdminAuthProps) {
-  const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const signIn = useMutation(api.admin.signInAdmin);
-  const signUp = useMutation(api.admin.signUpAdmin);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,12 +30,7 @@ export default function AdminAuth({ onAuthenticated }: AdminAuthProps) {
     setLoading(true);
 
     try {
-      let res;
-      if (isSignUp) {
-        res = await signUp({ email, password, name: name || undefined });
-      } else {
-        res = await signIn({ email, password });
-      }
+      const res = await signIn({ email, password });
 
       if (res && res.token) {
         localStorage.setItem("snoopa_admin_token", res.token);
@@ -76,38 +68,13 @@ export default function AdminAuth({ onAuthenticated }: AdminAuthProps) {
           </div>
           <h1 className="auth-title font-header">Snoopa Admin</h1>
           <p className="auth-subtitle">
-            {isSignUp ? "Create a new admin investigator account" : "Enter your credentials to access intel"}
+            Enter your credentials to access intel
           </p>
         </div>
 
         {error && <div className="error-banner">{error}</div>}
 
         <form onSubmit={handleSubmit}>
-          {isSignUp && (
-            <div className="form-group">
-              <label className="form-label">Full Name</label>
-              <div style={{ position: "relative" }}>
-                <User
-                  style={{
-                    position: "absolute",
-                    left: 12,
-                    top: 12,
-                    width: 16,
-                    height: 16,
-                    color: "var(--text-secondary)",
-                  }}
-                />
-                <input
-                  type="text"
-                  className="input-field"
-                  placeholder="Admin Name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                />
-              </div>
-            </div>
-          )}
-
           <div className="form-group">
             <label className="form-label">Email Address</label>
             <div style={{ position: "relative" }}>
@@ -166,25 +133,12 @@ export default function AdminAuth({ onAuthenticated }: AdminAuthProps) {
               "Authenticating..."
             ) : (
               <>
-                {isSignUp ? "Create Admin Account" : "Access Dashboard"}
+                Access Dashboard
                 <ArrowRight style={{ width: 16, height: 16 }} />
               </>
             )}
           </button>
         </form>
-
-        <div className="auth-toggle-row">
-          <span>{isSignUp ? "Already have an admin account?" : "Need an admin account?"}</span>
-          <span
-            className="auth-toggle-link"
-            onClick={() => {
-              setIsSignUp(!isSignUp);
-              setError(null);
-            }}
-          >
-            {isSignUp ? "Sign In" : "Create Account"}
-          </span>
-        </div>
 
         <div style={{ marginTop: 24, textAlign: "center" }}>
           <span className="badge badge-muted" style={{ fontSize: 11 }}>
