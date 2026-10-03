@@ -47,9 +47,37 @@ export default function AnalyticsView() {
     { name: "Google (Android)", value: 1, color: "#F4D03F" },
   ];
 
-  const countries = stats.countryDistribution || [
-    { country: "United States", code: "US", count: stats.totalUsers },
-  ];
+  const rawCountries = stats.countryDistribution || [];
+
+  const topCountries = rawCountries
+    .filter(
+      (c: any) =>
+        c.code &&
+        c.code.toLowerCase() !== "unknown" &&
+        c.code.toLowerCase() !== "n/a" &&
+        c.country?.toLowerCase() !== "unknown"
+    )
+    .map((c: any) => {
+      const code = (c.code || c.country || "??").toUpperCase();
+      let name = c.name || c.country || code;
+
+      if (code.length === 2 && (name === code || !c.name)) {
+        try {
+          const regionNames = new Intl.DisplayNames(["en"], { type: "region" });
+          name = regionNames.of(code) || code;
+        } catch {
+          name = code;
+        }
+      }
+
+      return {
+        code,
+        name,
+        count: c.count,
+      };
+    })
+    .sort((a: any, b: any) => b.count - a.count)
+    .slice(0, 5);
 
   return (
     <div>
@@ -267,41 +295,54 @@ export default function AnalyticsView() {
             />
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {countries.map((c: { code: string; count: number }) => (
+            {topCountries.length === 0 ? (
               <div
-                key={c.code}
                 style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  padding: "10px 14px",
-                  backgroundColor: "var(--bg-input)",
-                  borderRadius: "var(--radius-md)",
-                  border: "1px solid var(--border-color)",
+                  textAlign: "center",
+                  color: "var(--text-secondary)",
+                  padding: "20px 10px",
+                  fontSize: 13,
                 }}
               >
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <span
-                    className="badge badge-muted"
-                    style={{ fontWeight: 700 }}
-                  >
-                    {c.code}
-                  </span>
-                  <span style={{ fontSize: 14, fontWeight: 500 }}>
-                    {c.code}
-                  </span>
-                </div>
-                <span
+                No country geolocation data recorded yet.
+              </div>
+            ) : (
+              topCountries.map((c: { code: string; name: string; count: number }) => (
+                <div
+                  key={c.code}
                   style={{
-                    fontSize: 14,
-                    fontWeight: 700,
-                    color: "var(--accent-milk)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "10px 14px",
+                    backgroundColor: "var(--bg-input)",
+                    borderRadius: "var(--radius-md)",
+                    border: "1px solid var(--border-color)",
                   }}
                 >
-                  {c.count} users
-                </span>
-              </div>
-            ))}
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <span
+                      className="badge badge-muted"
+                      style={{ fontWeight: 700 }}
+                    >
+                      {c.code}
+                    </span>
+                    <span style={{ fontSize: 14, fontWeight: 500 }}>
+                      {c.name}
+                    </span>
+                  </div>
+                  <span
+                    style={{
+                      fontSize: 14,
+                      fontWeight: 700,
+                      color: "var(--accent-milk)",
+                    }}
+                  >
+                    {c.count} {c.count === 1 ? "user" : "users"}
+                  </span>
+                </div>
+              ))
+            )}
           </div>
         </div>
 

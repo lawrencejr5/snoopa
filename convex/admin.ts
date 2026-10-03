@@ -195,7 +195,7 @@ export const getAdminStats = query({
         totalPremium++;
       }
 
-      const c = u.country || "US";
+      const c = u.country && u.country.trim() ? u.country.trim() : "Unknown";
       countryCounts[c] = (countryCounts[c] || 0) + 1;
     });
 
@@ -222,11 +222,29 @@ export const getAdminStats = query({
       ...(otherProviderCount > 0 ? [{ name: "Email / Other", value: otherProviderCount, color: "#e2e2bb" }] : []),
     ];
 
-    const countryDistribution = Object.entries(countryCounts).map(([code, count]) => ({
-      country: code === "US" ? "United States" : code === "GB" ? "United Kingdom" : code === "NG" ? "Nigeria" : code,
-      code,
-      count,
-    }));
+    const regionNames = new Intl.DisplayNames(["en"], { type: "region" });
+
+    const countryDistribution = Object.entries(countryCounts)
+      .filter(([code]) => code && code.toLowerCase() !== "unknown" && code.toLowerCase() !== "n/a")
+      .map(([code, count]) => {
+        let name = code;
+        let isoCode = code.length === 2 ? code.toUpperCase() : code.slice(0, 2).toUpperCase();
+        if (code.length === 2) {
+          try {
+            name = regionNames.of(isoCode) || code;
+          } catch {
+            name = code;
+          }
+        }
+        return {
+          country: name,
+          code: isoCode,
+          name,
+          count,
+        };
+      })
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
 
     // 2. Snoops Used (Month vs All Time) calculated from snoops table: (snoops - remaining)
     let totalSnoopsUsedAllTime = 0;
@@ -329,7 +347,7 @@ export const getAdminStats = query({
       adViewsThisMonth,
       totalAdViewsAllTime,
       storeSplit,
-      countryDistribution: countryDistribution.length > 0 ? countryDistribution : [{ country: "United States", code: "US", count: users.length }],
+      countryDistribution,
       recentUsers: users
         .sort((a, b) => b._creationTime - a._creationTime)
         .slice(0, 5)
@@ -495,7 +513,7 @@ export const getUsers = query({
         sub_tier: u.sub_tier || u.plan || "free",
         lastSeen: lastSeen,
         os: os,
-        country: u.country || "US",
+        country: u.country || "Unknown",
       };
     });
   },
