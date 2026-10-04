@@ -669,13 +669,21 @@ export const run_firehose = internalAction({
       return;
     }
 
-    // 2. Bulk-load processed hashes (single query, in-memory set)
+    // 2. Bulk-load processed hashes (chunked to respect Convex 8192 array return limit)
     const watchlistIds = itemsToProcess.map((i: any) => i._id);
-    const processedKeys = await ctx.runQuery(
-      internal.log.get_processed_hashes_for_items,
-      { watchlist_ids: watchlistIds },
-    );
-    const processedSet = new Set<string>(processedKeys);
+    const processedSet = new Set<string>();
+
+    const HASH_BATCH_SIZE = 25;
+    for (let i = 0; i < watchlistIds.length; i += HASH_BATCH_SIZE) {
+      const batch = watchlistIds.slice(i, i + HASH_BATCH_SIZE);
+      const chunkKeys = await ctx.runQuery(
+        internal.log.get_processed_hashes_for_items,
+        { watchlist_ids: batch },
+      );
+      for (const k of chunkKeys) {
+        processedSet.add(k);
+      }
+    }
 
     // Accumulator shared across phases
     const verifiedByItem = new Map<
@@ -714,11 +722,15 @@ export const run_firehose = internalAction({
       verifiedByItem,
     );
 
-    // 6. Flush processed headline entries
+    // 6. Flush processed headline entries (chunked to respect array limits)
     if (toMarkProcessed.length > 0) {
-      await ctx.runMutation(internal.log.batch_mark_processed, {
-        entries: toMarkProcessed,
-      });
+      const MARK_BATCH_SIZE = 500;
+      for (let i = 0; i < toMarkProcessed.length; i += MARK_BATCH_SIZE) {
+        const chunk = toMarkProcessed.slice(i, i + MARK_BATCH_SIZE);
+        await ctx.runMutation(internal.log.batch_mark_processed, {
+          entries: chunk,
+        });
+      }
     }
 
     // 7. Generate briefs + dispatch alerts (chat, notification, push)
@@ -746,10 +758,13 @@ export const run_firehose = internalAction({
       }
     }
 
-    // 9. Update last_checked for all processed items
-    await ctx.runMutation(internal.log.batch_update_last_checked, {
-      watchlist_ids: watchlistIds,
-    });
+    // 9. Update last_checked for all processed items (chunked)
+    for (let i = 0; i < watchlistIds.length; i += 500) {
+      const chunk = watchlistIds.slice(i, i + 500);
+      await ctx.runMutation(internal.log.batch_update_last_checked, {
+        watchlist_ids: chunk,
+      });
+    }
 
     console.log(
       `Firehose (tier ${args.tier}): complete. ${totalAlerts} alerts sent, ${toMarkProcessed.length} headlines marked processed.`,

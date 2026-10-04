@@ -40,7 +40,11 @@ export const seed_active_countries = mutation({
           hl: country.hl,
           status: country.status,
         });
-        results.push({ action: "updated", code: country.code, id: existing._id });
+        results.push({
+          action: "updated",
+          code: country.code,
+          id: existing._id,
+        });
       }
     }
 
@@ -89,23 +93,24 @@ export const migrateWatchlist = internalMutation({
     for (const item of items) {
       const dbItem: any = item;
       const updates: any = {};
-      
+
       if (dbItem.serper_type !== undefined) {
-        updates.search_type = dbItem.serper_type === "news" ? "news" : "general";
+        updates.search_type =
+          dbItem.serper_type === "news" ? "news" : "general";
         updates.serper_type = undefined; // Deletes the field
       }
-      
+
       if (dbItem.serper_date_range !== undefined) {
         updates.time_range = dbItem.serper_date_range;
         updates.serper_date_range = undefined; // Deletes the field
       }
-      
+
       if (Object.keys(updates).length > 0) {
         await ctx.db.patch(item._id, updates);
         count++;
       }
     }
-    
+
     return `Migrated ${count} watchlist items.`;
   },
 });
@@ -210,10 +215,10 @@ export const migrate_chats_session_to_watchlist = internalMutation({
     for (const watchlist of watchlists) {
       const dbWl = watchlist as any;
       if (dbWl.session_id) {
-        const chats = await ctx.db
-          .query("chats")
-          .collect();
-        const filteredChats = chats.filter((c: any) => c.session_id === dbWl.session_id);
+        const chats = await ctx.db.query("chats").collect();
+        const filteredChats = chats.filter(
+          (c: any) => c.session_id === dbWl.session_id,
+        );
 
         for (const chat of filteredChats) {
           if (!chat.watchlist_id) {
@@ -253,7 +258,10 @@ export const wipe_watchlist_ids = internalMutation({
     const items = await ctx.db.query("watchlist").collect();
     let count = 0;
     for (const item of items) {
-      if ((item as any).message_id !== undefined || (item as any).session_id !== undefined) {
+      if (
+        (item as any).message_id !== undefined ||
+        (item as any).session_id !== undefined
+      ) {
         await ctx.db.patch(item._id, {
           message_id: undefined,
           session_id: undefined,
@@ -312,7 +320,6 @@ export const seed_free_users = internalMutation({
   },
 });
 
-
 /**
  * Assigns a random avatar to every user that doesn't already have one.
  */
@@ -325,7 +332,8 @@ export const seed_user_avatars = internalMutation({
 
     for (const user of users) {
       if ((user as any).avatar === undefined) {
-        const random_avatar = avatars[Math.floor(Math.random() * avatars.length)];
+        const random_avatar =
+          avatars[Math.floor(Math.random() * avatars.length)];
         await ctx.db.patch(user._id, { avatar: random_avatar } as any);
         count++;
       }
@@ -373,8 +381,17 @@ export const migrate_snoop_expirations = internalMutation({
   },
 });
 
+export const deleteBatch = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const docs = await ctx.db.query("processed_headlines").take(500);
+    for (const doc of docs) {
+      await ctx.db.delete(doc._id);
+    }
+    return docs.length;
+  },
+});
+
 // ---------------------------------------------------------------------------
 // Monthly premium snoop refill
 // ---------------------------------------------------------------------------
-
-

@@ -205,10 +205,13 @@ export const get_processed_hashes_for_items = internalQuery({
       const entries = await ctx.db
         .query("processed_headlines")
         .withIndex("by_watchlist", (q) => q.eq("watchlist_id", watchlist_id))
-        .collect();
+        .order("desc")
+        .take(1000);
       for (const e of entries) {
         keys.push(`${e.urlHash}::${e.watchlist_id}`);
+        if (keys.length >= 8000) break;
       }
+      if (keys.length >= 8000) break;
     }
     return keys;
   },
