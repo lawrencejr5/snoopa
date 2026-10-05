@@ -3,6 +3,7 @@ import { useCustomAlert } from "@/context/CustomAlertContext";
 import { useHapitcs } from "@/context/HapticsContext";
 import { useTheme } from "@/context/ThemeContext";
 import { api } from "@/convex/_generated/api";
+import { isAdSupported, showRewardedAd } from "@/utils/adHelper";
 import {
   BottomSheetBackdrop,
   BottomSheetModal,
@@ -19,7 +20,6 @@ import {
   Text,
   View,
 } from "react-native";
-import { isAdSupported, showRewardedAd } from "@/utils/adHelper";
 import Purchases, { PURCHASE_TYPE } from "react-native-purchases";
 
 const AD_DAILY_LIMIT = 3;
@@ -33,22 +33,22 @@ const PACKS = [
   {
     id: "boost_pack",
     name: "Boost Pack",
-    price: "$4.99",
-    description: "200 Snoops",
+    price: "$2.99",
+    description: "100 Snoops",
     icon: require("@/assets/icons/tracked.png"),
   },
   {
     id: "fuel_pack",
     name: "Fuel Pack",
-    price: "$9.99",
-    description: "500 Snoops",
+    price: "$5.99",
+    description: "300 Snoops",
     icon: require("@/assets/icons/tracked.png"),
   },
   {
     id: "surge_pack",
     name: "Surge Pack",
-    price: "$19.99",
-    description: "1200 Snoops",
+    price: "$12.99",
+    description: "850 Snoops",
     icon: require("@/assets/icons/tracked.png"),
   },
 ];

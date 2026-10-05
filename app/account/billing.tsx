@@ -6,8 +6,6 @@ import { useCustomAlert } from "@/context/CustomAlertContext";
 import { useHapitcs } from "@/context/HapticsContext";
 import { useTheme } from "@/context/ThemeContext";
 import { useUser } from "@/context/UserContext";
-import { api } from "@/convex/_generated/api";
-import { useMutation } from "convex/react";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
@@ -26,12 +24,12 @@ const PLANS = [
   {
     id: "pro",
     name: "Snoopa Pro",
-    price: "$12",
+    price: "$3.99",
     features: [
-      "1,000 snoops per month",
-      "Unlimited watchlists",
-      "Customize watchlist conditions",
+      "250 snoops per month",
+      "Up to 7 active watch;ists",
       "Set source url",
+      "Customize watchlist conditions",
       "Prioritized customer support",
     ],
     highlight: false,
@@ -40,10 +38,10 @@ const PLANS = [
   {
     id: "supa",
     name: "Supa Snoopa",
-    price: "$29",
+    price: "$7.99",
     features: [
-      "Unlimited watchlists",
-      "4,000 snoops per month",
+      "600 snoops per month",
+      "At least 20 active watchlists",
       "Set source url",
       "Customize watchlist conditions",
       "Prioritized customer support",
@@ -54,10 +52,10 @@ const PLANS = [
   {
     id: "max",
     name: "Snoopa Max",
-    price: "$69",
+    price: "$14.99",
     features: [
-      "12,000 snoops per month",
-      "Unlimited watchlists",
+      "At least 1,500 snoops",
+      "Unlimited active watchlists",
       "Set source url",
       "Customize watchlist conditions",
       "Prioritized customer support",
@@ -405,10 +403,7 @@ export default function BillingScreen() {
                 </View>
                 <View>
                   <Text
-                    style={[
-                      styles.utilityTitle,
-                      { color: Colors[theme].text },
-                    ]}
+                    style={[styles.utilityTitle, { color: Colors[theme].text }]}
                   >
                     Change Plan Tier
                   </Text>
@@ -492,11 +487,15 @@ export default function BillingScreen() {
                     {
                       backgroundColor: Colors[theme].card,
                       borderColor:
-                        ((plan.highlight && !signedIn?.is_premium) || signedIn?.sub_tier === plan.id)
+                        (plan.highlight && !signedIn?.is_premium) ||
+                        signedIn?.sub_tier === plan.id
                           ? Colors[theme].primary
                           : Colors[theme].border,
                       borderWidth:
-                        ((plan.highlight && !signedIn?.is_premium) || signedIn?.sub_tier === plan.id) ? 2 : 1,
+                        (plan.highlight && !signedIn?.is_premium) ||
+                        signedIn?.sub_tier === plan.id
+                          ? 2
+                          : 1,
                     },
                   ]}
                 >
@@ -506,7 +505,8 @@ export default function BillingScreen() {
                         styles.badgeContainer,
                         {
                           backgroundColor:
-                            ((plan.highlight && !signedIn?.is_premium) || signedIn?.sub_tier === plan.id)
+                            (plan.highlight && !signedIn?.is_premium) ||
+                            signedIn?.sub_tier === plan.id
                               ? Colors[theme].primary
                               : Colors[theme].border,
                         },
@@ -517,9 +517,10 @@ export default function BillingScreen() {
                           styles.badgeText,
                           {
                             color:
-                              ((plan.highlight && !signedIn?.is_premium) || signedIn?.sub_tier === plan.id)
+                              (plan.highlight && !signedIn?.is_premium) ||
+                              signedIn?.sub_tier === plan.id
                                 ? Colors[theme].background
-                               : Colors[theme].text,
+                                : Colors[theme].text,
                           },
                         ]}
                       >
@@ -530,11 +531,15 @@ export default function BillingScreen() {
                     </View>
                   ) : null}
 
-                  <Text style={[styles.planName, { color: Colors[theme].text }]}>
+                  <Text
+                    style={[styles.planName, { color: Colors[theme].text }]}
+                  >
                     {plan.name}
                   </Text>
 
-                  <Text style={[styles.price, { color: Colors[theme].primary }]}>
+                  <Text
+                    style={[styles.price, { color: Colors[theme].primary }]}
+                  >
                     {plan.price}
                     <Text
                       style={{
