@@ -2,7 +2,7 @@
   "expo": {
     "name": "Snoopa",
     "slug": "snoopa",
-    "version": "2.0.3",
+    "version": "2.1.0",
     "runtimeVersion": {
       "policy": "appVersion"
     },
@@ -64,6 +64,17 @@
           "sounds": [
             "./assets/sounds/dog_bark_single.wav"
           ]
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "compileSdkVersion": 36,
+            "targetSdkVersion": 36,
+            "enableMinifyInReleaseBuilds": true,
+            "enableShrinkResourcesInReleaseBuilds": true,
+          }
         }
       ],
       "expo-updates",
