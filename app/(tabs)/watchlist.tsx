@@ -399,11 +399,15 @@ export default function WatchlistScreen() {
   };
 
   const watchlistData = useQuery(api.watchlist.get_watchlists) || [];
-  const is_locked = watchlistData.length >= 2 && signedIn?.is_premium !== true;
+  const watchlist_usage = useQuery(api.watchlist.get_watchlist_usage);
+  const is_locked =
+    watchlist_usage !== undefined &&
+    watchlist_usage.limit !== null &&
+    watchlist_usage.active >= watchlist_usage.limit;
   const snoop_balance = useQuery(api.snoops.get_snoop_balance) ?? 0;
   const snoop_grants = useQuery(api.snoops.get_snoop_grants) ?? [];
   const snoop_total =
-    (snoop_grants as any[]).reduce((sum, g) => sum + g.snoops, 0) || 30;
+    (snoop_grants as any[]).reduce((sum, g) => sum + g.snoops, 0) || 50;
   const snoops_used = snoop_total - snoop_balance;
 
   const activeSnoops = watchlistData.filter((i) => i.status === "active");
@@ -751,8 +755,8 @@ export default function WatchlistScreen() {
       <PremiumFeatureModal
         visible={showPremiumModal}
         onClose={() => setShowPremiumModal(false)}
-        featureName="Unlimited Watchlists"
-        featureDescription="Free accounts are limited to tracking up to 2 watchlists concurrently. Upgrade to Pro to track unlimited topics and monitor all your custom intelligence streams! 🔒"
+        featureName="Watchlist Limit Reached"
+        featureDescription="You've hit the active watchlist limit on your plan. Upgrade to track more topics and monitor all your custom intelligence streams! 🔒"
       />
 
       {selectedSnoop && (

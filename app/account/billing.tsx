@@ -20,50 +20,7 @@ import {
 } from "react-native";
 import Purchases from "react-native-purchases";
 
-const PLANS = [
-  {
-    id: "pro",
-    name: "Snoopa Pro",
-    price: "$3.99",
-    features: [
-      "250 snoops per month",
-      "Up to 7 active watch;ists",
-      "Set source url",
-      "Customize watchlist conditions",
-      "Prioritized customer support",
-    ],
-    highlight: false,
-    badge: "",
-  },
-  {
-    id: "supa",
-    name: "Supa Snoopa",
-    price: "$7.99",
-    features: [
-      "600 snoops per month",
-      "At least 20 active watchlists",
-      "Set source url",
-      "Customize watchlist conditions",
-      "Prioritized customer support",
-    ],
-    highlight: true,
-    badge: "MOST POPULAR",
-  },
-  {
-    id: "max",
-    name: "Snoopa Max",
-    price: "$14.99",
-    features: [
-      "At least 1,500 snoops",
-      "Unlimited active watchlists",
-      "Set source url",
-      "Customize watchlist conditions",
-      "Prioritized customer support",
-    ],
-    highlight: false,
-    badge: "BEST VALUE",
-  },
-];
+import { PLANS } from "@/constants/Plans";
 
 const TIER_LEVELS: Record<string, number> = {
   free: 0,

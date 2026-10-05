@@ -1,6 +1,11 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
+import {
+  assert_can_activate_watchlist,
+  count_active_watchlists,
+  get_watchlist_limit,
+} from "./plans";
 
 export const get_active_countries = internalQuery({
   args: {},
@@ -13,6 +18,23 @@ export const get_active_countries = internalQuery({
 });
 
 // --- Queries ---
+
+/**
+ * Returns how many active watchlists the user has and their plan limit.
+ * `limit` is null when unlimited.
+ */
+export const get_watchlist_usage = query({
+  args: {},
+  handler: async (ctx) => {
+    const user_id = await getAuthUserId(ctx);
+    if (!user_id) return { active: 0, limit: 2 as number | null };
+
+    const user = await ctx.db.get(user_id);
+    const limit = get_watchlist_limit(user);
+    const active = await count_active_watchlists(ctx, user_id);
+    return { active, limit: limit === Infinity ? null : limit };
+  },
+});
 
 /**
  * Get all watchlist items for the current user.
@@ -133,18 +155,8 @@ export const add_watchlist_item = mutation({
     const user_id = await getAuthUserId(ctx);
     if (!user_id) throw new Error("Not authenticated");
 
-    // Watchlist limit check for free users (max 2 watchlists)
-    const user_record = await ctx.db.get(user_id);
-    const is_premium = user_record?.is_premium === true;
-    if (!is_premium) {
-      const existing = await ctx.db
-        .query("watchlist")
-        .withIndex("by_user", (q) => q.eq("user_id", user_id))
-        .collect();
-      if (existing.length >= 2) {
-        throw new Error("FREE_LIMIT_REACHED: Maximum 2 watchlists allowed on free tier.");
-      }
-    }
+    // Active watchlist limit by tier
+    await assert_can_activate_watchlist(ctx, user_id);
 
     const id = await ctx.db.insert("watchlist", {
       user_id,
@@ -229,6 +241,9 @@ export const toggle_watchlist_status = mutation({
     }
 
     const newStatus = item.status === "active" ? "completed" : "active";
+    if (newStatus === "active") {
+      await assert_can_activate_watchlist(ctx, user_id);
+    }
 
     await ctx.db.patch(args.watchlist_id, {
       status: newStatus,
@@ -290,6 +305,10 @@ export const reactivate_watchlist = mutation({
     const item = await ctx.db.get(args.watchlist_id);
     if (!item || item.user_id !== user_id) {
       throw new Error("Watchlist item not found or unauthorized");
+    }
+
+    if (item.status !== "active") {
+      await assert_can_activate_watchlist(ctx, user_id);
     }
 
     await ctx.db.patch(args.watchlist_id, {

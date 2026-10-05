@@ -397,10 +397,10 @@ export function computeUserSnoopStats(user: any, userSnoops: any[]) {
   ];
 
   const tier = user?.sub_tier || user?.plan || "free";
-  let defaultTotal = 30;
-  if (tier === "pro") defaultTotal = 1000;
-  else if (tier === "supa") defaultTotal = 4000;
-  else if (tier === "max") defaultTotal = 12000;
+  let defaultTotal = 50;
+  if (tier === "pro") defaultTotal = 250;
+  else if (tier === "supa") defaultTotal = 600;
+  else if (tier === "max") defaultTotal = 1500;
 
   if (activeGrants.length === 0) {
     return {

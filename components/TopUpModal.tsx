@@ -1,4 +1,5 @@
 import Colors from "@/constants/Colors";
+import { PACKS } from "@/constants/Plans";
 import { useCustomAlert } from "@/context/CustomAlertContext";
 import { useHapitcs } from "@/context/HapticsContext";
 import { useTheme } from "@/context/ThemeContext";
@@ -28,30 +29,6 @@ interface TopUpModalProps {
   visible: boolean;
   onClose: () => void;
 }
-
-const PACKS = [
-  {
-    id: "boost_pack",
-    name: "Boost Pack",
-    price: "$2.99",
-    description: "100 Snoops",
-    icon: require("@/assets/icons/tracked.png"),
-  },
-  {
-    id: "fuel_pack",
-    name: "Fuel Pack",
-    price: "$5.99",
-    description: "300 Snoops",
-    icon: require("@/assets/icons/tracked.png"),
-  },
-  {
-    id: "surge_pack",
-    name: "Surge Pack",
-    price: "$12.99",
-    description: "850 Snoops",
-    icon: require("@/assets/icons/tracked.png"),
-  },
-];
 
 export default function TopUpModal({ visible, onClose }: TopUpModalProps) {
   const { theme } = useTheme();
@@ -127,7 +104,7 @@ export default function TopUpModal({ visible, onClose }: TopUpModalProps) {
   // ---------------------------------------------------------------------------
   // IAP Purchase
   // ---------------------------------------------------------------------------
-  const handlePurchase = async (packId: string) => {
+  const handlePurchase = async (packId: (typeof PACKS)[number]["id"]) => {
     haptics.impact("success");
     if (Platform.OS === "web") {
       showCustomAlert("Purchases are not supported on web.", "danger");
@@ -135,17 +112,10 @@ export default function TopUpModal({ visible, onClose }: TopUpModalProps) {
     }
 
     let rcProductId = "";
-    let amount = 0;
-    if (packId === "boost_pack") {
-      rcProductId = "snoopa_boost_200_consumable";
-      amount = 200;
-    } else if (packId === "fuel_pack") {
-      rcProductId = "snoopa_fuel_500_consumable";
-      amount = 500;
-    } else if (packId === "surge_pack") {
-      rcProductId = "snoopa_surge_1200_consumable";
-      amount = 1200;
-    }
+    if (packId === "boost_pack") rcProductId = "snoopa_boost_200_consumable";
+    else if (packId === "fuel_pack") rcProductId = "snoopa_fuel_500_consumable";
+    else if (packId === "surge_pack") rcProductId = "snoopa_surge_1200_consumable";
+    const amount = PACKS.find((p) => p.id === packId)?.snoops ?? 0;
 
     const product = products.find((p) => p.identifier === rcProductId);
     if (!product) {
@@ -159,7 +129,7 @@ export default function TopUpModal({ visible, onClose }: TopUpModalProps) {
     try {
       setIsPurchasing(packId);
       await Purchases.purchaseStoreProduct(product);
-      await addTopUp({ amount });
+      await addTopUp({ pack_id: packId });
       showCustomAlert(`Successfully purchased ${amount} Snoops!`, "success");
       bottomSheetRef.current?.dismiss();
       onClose();

@@ -9,16 +9,12 @@ import {
   query,
 } from "./_generated/server";
 
+import { FREE_LIFETIME_SNOOPS, PACK_SNOOPS, TIER_SNOOPS } from "./plans";
+
 const TIER_LABELS: Record<string, string> = {
   pro: "Snoopa Pro",
   supa: "Supa Snoopa",
   max: "Snoopa Max",
-};
-
-const TIER_SNOOPS: Record<string, number> = {
-  pro: 1000,
-  supa: 4000,
-  max: 12000,
 };
 
 // ---------------------------------------------------------------------------
@@ -345,19 +341,28 @@ export const get_snoop_grants = query({
 
 export const add_top_up = mutation({
   args: {
-    amount: v.number(),
+    pack_id: v.union(
+      v.literal("boost_pack"),
+      v.literal("fuel_pack"),
+      v.literal("surge_pack"),
+    ),
   },
   handler: async (ctx, args) => {
     const user_id = await getAuthUserId(ctx);
     if (!user_id) throw new ConvexError("Not authenticated");
 
+    // The server decides the amount — the client never sends it.
+    const amount = PACK_SNOOPS[args.pack_id];
+
     await ctx.db.insert("snoops", {
       user_id,
-      snoops: args.amount,
-      remaining: args.amount,
+      snoops: amount,
+      remaining: amount,
       type: "top_up",
       // No expiration_date for top-ups — they never expire
     });
+
+    return { amount };
   },
 });
 
@@ -513,20 +518,17 @@ export const sync_user_subscription = mutation({
       args.is_premium &&
       (current_tier !== args.tier || !current_is_premium || is_new_sub_cycle)
     ) {
-      let snoop_amount = 0;
-      if (args.tier === "pro") snoop_amount = 1000;
-      else if (args.tier === "supa") snoop_amount = 4000;
-      else if (args.tier === "max") snoop_amount = 12000;
+      const snoop_amount = TIER_SNOOPS[args.tier] ?? 0;
 
       if (snoop_amount > 0) {
-        // Deplete previous monthly or free snoop grants
+        // Deplete previous monthly grants (the free lifetime grant is kept)
         const active_grants = await ctx.db
           .query("snoops")
           .withIndex("by_user", (q) => q.eq("user_id", user_id))
           .collect();
 
         for (const grant of active_grants) {
-          if (grant.type === "free" || grant.type === "monthly") {
+          if (grant.type === "monthly") {
             await ctx.db.patch(grant._id, { remaining: 0 });
           }
         }
@@ -573,83 +575,22 @@ export const sync_user_subscription = mutation({
     }
 
     if (!args.is_premium && args.tier === "free") {
-      // Free user: check if they have a free snoop grant for this month
-      const start_timestamp = start_of_month_timestamp();
+      // Free users get a one-time lifetime grant — never re-issued, even after a downgrade.
       const existing_free = await ctx.db
         .query("snoops")
         .withIndex("by_user", (q: any) => q.eq("user_id", user_id))
-        .filter((q: any) =>
-          q.and(
-            q.eq(q.field("type"), "free"),
-            q.gte(q.field("expiration_date"), start_timestamp),
-          ),
-        )
+        .filter((q: any) => q.eq(q.field("type"), "free"))
         .first();
 
       if (!existing_free) {
-        // Provision 10 free snoops expiring at the end of the month
         await ctx.db.insert("snoops", {
           user_id,
-          snoops: 10,
-          remaining: 10,
+          snoops: FREE_LIFETIME_SNOOPS,
+          remaining: FREE_LIFETIME_SNOOPS,
           type: "free",
-          expiration_date: end_of_month_timestamp(),
         });
       }
     }
-  },
-});
-
-/**
- * Creates a 10-snoop "free" grant expiring at the end of the current calendar
- * month for every user that does not already have a free/monthly grant
- * active for this month.
- */
-export const seed_free_snoops = internalMutation({
-  args: {},
-  handler: async (ctx) => {
-    const now = Date.now();
-
-    // Compute end-of-month timestamp (UTC)
-    const end_of_month = end_of_month_timestamp();
-
-    // Start-of-month for checking existing grants
-    const start_of_month = start_of_month_timestamp();
-
-    const users = await ctx.db.query("users").collect();
-    let created = 0;
-    let skipped = 0;
-
-    for (const user of users) {
-      // Check if the user already has a free or monthly grant for this month
-      const existing_grants = await ctx.db
-        .query("snoops")
-        .withIndex("by_user", (q) => q.eq("user_id", user._id))
-        .collect();
-
-      const has_current_grant = existing_grants.some(
-        (g) =>
-          (g.type === "free" || g.type === "monthly") &&
-          g.expiration_date !== undefined &&
-          g.expiration_date >= start_of_month,
-      );
-
-      if (has_current_grant) {
-        skipped++;
-        continue;
-      }
-
-      await ctx.db.insert("snoops", {
-        user_id: user._id,
-        snoops: 10,
-        remaining: 10,
-        type: "free",
-        expiration_date: end_of_month,
-      });
-      created++;
-    }
-
-    return `Created free snoop grants for ${created} users, skipped ${skipped} (already had a grant this month).`;
   },
 });
 
@@ -698,7 +639,7 @@ export const refill_premium_snoops = internalMutation({
       }
 
       const tier = user.sub_tier ?? "pro";
-      const snoop_amount = TIER_SNOOPS[tier] ?? 1000;
+      const snoop_amount = TIER_SNOOPS[tier] ?? TIER_SNOOPS.pro;
 
       // Deplete the previous monthly grant so we don't stack up old allowances
       const old_grants = await ctx.db

@@ -13,6 +13,10 @@ import {
 } from "./_generated/server";
 import { cleanUrl, getCurrentDateTime, hashString } from "./utils";
 
+function _watchlist_limit_error(limit: number): string {
+  return `FREE_LIMIT_REACHED: You have reached the limit of ${limit} active watchlists on your plan. Upgrade to track more! \u{1F512}`;
+}
+
 /**
  * Get all messages mapping to a watchlist (or its legacy session).
  */
@@ -1595,17 +1599,9 @@ export const generate_watchlist_preview = action({
     const user_id = await getAuthUserId(ctx);
     if (!user_id) throw new Error("Not authenticated");
 
-    const user_record = await ctx.runQuery(internal.users.get_user_internal, {
-      user_id,
-    });
-    const is_premium = user_record?.is_premium === true;
-    if (!is_premium) {
-      const existing = await ctx.runQuery(api.watchlist.get_watchlists);
-      if (existing.length >= 2) {
-        throw new Error(
-          "FREE_LIMIT_REACHED: You have reached the maximum limit of 2 watchlists on a free account. Upgrade to Pro for unlimited watchlists! 🔒",
-        );
-      }
+    const usage = await ctx.runQuery(api.watchlist.get_watchlist_usage);
+    if (usage.limit !== null && usage.active >= usage.limit) {
+      throw new Error(_watchlist_limit_error(usage.limit));
     }
 
     try {
@@ -1646,17 +1642,9 @@ export const confirm_and_create_watchlist = action({
     const user_id = await getAuthUserId(ctx);
     if (!user_id) throw new Error("Not authenticated");
 
-    const user_record = await ctx.runQuery(internal.users.get_user_internal, {
-      user_id,
-    });
-    const is_premium = user_record?.is_premium === true;
-    if (!is_premium) {
-      const existing = await ctx.runQuery(api.watchlist.get_watchlists);
-      if (existing.length >= 2) {
-        throw new Error(
-          "FREE_LIMIT_REACHED: You have reached the maximum limit of 2 watchlists on a free account. Upgrade to Pro for unlimited watchlists! 🔒",
-        );
-      }
+    const usage = await ctx.runQuery(api.watchlist.get_watchlist_usage);
+    if (usage.limit !== null && usage.active >= usage.limit) {
+      throw new Error(_watchlist_limit_error(usage.limit));
     }
 
     // 1. Create watchlist record
@@ -1716,17 +1704,9 @@ export const initialize_watchlist = action({
     const user_id = await getAuthUserId(ctx);
     if (!user_id) throw new Error("Not authenticated");
 
-    const user_record = await ctx.runQuery(internal.users.get_user_internal, {
-      user_id,
-    });
-    const is_premium = user_record?.is_premium === true;
-    if (!is_premium) {
-      const existing = await ctx.runQuery(api.watchlist.get_watchlists);
-      if (existing.length >= 2) {
-        throw new Error(
-          "FREE_LIMIT_REACHED: You have reached the maximum limit of 2 watchlists on a free account. Upgrade to Pro for unlimited watchlists! 🔒",
-        );
-      }
+    const usage = await ctx.runQuery(api.watchlist.get_watchlist_usage);
+    if (usage.limit !== null && usage.active >= usage.limit) {
+      throw new Error(_watchlist_limit_error(usage.limit));
     }
 
     try {

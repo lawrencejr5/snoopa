@@ -118,7 +118,7 @@ export default function TermsPage() {
               Every query, chat message, or background tracking action consumes one or more Snoops.
             </li>
             <li>
-              Free users receive a limited monthly allowance of Snoops (e.g., 30 per month). Unused free Snoops expire at the end of the calendar month and do not roll over.
+              Free users receive a one-time allowance of 50 Snoops. These do not renew or reset, and do not expire.
             </li>
             <li>
               Premium subscribers (Snoopa Pro, Supa Snoopa, Snoopa Max) receive a larger monthly allowance of Snoops. These reset periodically according to your active subscription cycle.

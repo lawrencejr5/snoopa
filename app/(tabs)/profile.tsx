@@ -51,7 +51,7 @@ export default function ProfileScreen() {
   const snoop_balance = useQuery(api.snoops.get_snoop_balance) ?? 0;
   const snoop_grants = useQuery(api.snoops.get_snoop_grants) ?? [];
   const snoop_total =
-    (snoop_grants as any[]).reduce((sum, g) => sum + g.snoops, 0) || 30;
+    (snoop_grants as any[]).reduce((sum, g) => sum + g.snoops, 0) || 50;
   const snoops_used = snoop_total - snoop_balance;
   const snoop_pct = snoop_total > 0 ? snoops_used / snoop_total : 0;
   const is_low = snoop_balance <= snoop_total * 0.3;

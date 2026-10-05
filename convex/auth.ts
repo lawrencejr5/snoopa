@@ -6,7 +6,7 @@ import {
   retrieveAccount,
 } from "@convex-dev/auth/server";
 import { MutationCtx } from "./_generated/server";
-import { end_of_month_timestamp, start_of_month_timestamp } from "./snoops";
+import { FREE_LIFETIME_SNOOPS } from "./plans";
 
 const decode_base64 = (str: string): string => {
   if (typeof atob === "function") {
@@ -188,25 +188,19 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
         user?.plan === "free";
 
       if (is_free_user) {
-        const start_timestamp = start_of_month_timestamp();
+        // One-time lifetime grant: skip if the user has EVER had a free grant
         const existing_free_grant = await ctx.db
           .query("snoops")
           .withIndex("by_user", (q) => q.eq("user_id", args.userId))
-          .filter((q) =>
-            q.and(
-              q.eq(q.field("type"), "free"),
-              q.gte(q.field("expiration_date"), start_timestamp),
-            ),
-          )
+          .filter((q) => q.eq(q.field("type"), "free"))
           .first();
 
         if (!existing_free_grant) {
           await ctx.db.insert("snoops", {
             user_id: args.userId,
-            snoops: 10,
-            remaining: 10,
+            snoops: FREE_LIFETIME_SNOOPS,
+            remaining: FREE_LIFETIME_SNOOPS,
             type: "free",
-            expiration_date: end_of_month_timestamp(),
           });
         }
       }

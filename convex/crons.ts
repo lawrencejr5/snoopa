@@ -35,13 +35,6 @@ if (process.env.RUN_CRONS === "true") {
     { tier: 4 },
   );
 
-  // Monthly refill of free snoops for all free users (at midnight on the 1st of every month)
-  crons.cron(
-    "refill-free-snoops",
-    "0 0 1 * *",
-    internal.snoops.seed_free_snoops,
-  );
-
   // Monthly refill of premium snoops for all active premium users (at midnight on the 1st)
   crons.cron(
     "refill-premium-snoops",

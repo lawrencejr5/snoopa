@@ -524,7 +524,7 @@ export default function SnoopDetailsScreen() {
     } catch (error: any) {
       console.error("Failed to create watchlist from chat:", error);
       const msg = error?.message?.includes("FREE_LIMIT_REACHED")
-        ? "You have reached the maximum limit of 2 watchlists on a free account. Upgrade to Pro for unlimited watchlists! 🔒"
+        ? "You've reached the active watchlist limit on your plan. Upgrade to track more! 🔒"
         : "Failed to create watchlist. Please try again.";
       showCustomAlert(msg, "danger");
     } finally {

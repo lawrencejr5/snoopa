@@ -814,14 +814,18 @@ export default function HomeScreen() {
   const snoop_balance = useQuery(api.snoops.get_snoop_balance) ?? 0;
   const snoop_grants = useQuery(api.snoops.get_snoop_grants) ?? [];
   const snoop_total =
-    snoop_grants.reduce((sum: number, g: any) => sum + g.snoops, 0) || 10;
+    snoop_grants.reduce((sum: number, g: any) => sum + g.snoops, 0) || 50;
   const snoops_used = Math.max(0, snoop_total - snoop_balance);
   const snoop_pct = snoop_total > 0 ? snoops_used / snoop_total : 0;
   const is_low_on_snoops =
     snoop_balance === 0 ||
     snoop_grants.length === 0 ||
     (snoop_total > 0 && snoop_pct >= 0.8);
-  const is_locked = watchlistData.length >= 2 && signedIn?.is_premium !== true;
+  const watchlist_usage = useQuery(api.watchlist.get_watchlist_usage);
+  const is_locked =
+    watchlist_usage !== undefined &&
+    watchlist_usage.limit !== null &&
+    watchlist_usage.active >= watchlist_usage.limit;
 
   const activeSnoops = watchlistData
     .filter((i: any) => i.status === "active")
@@ -1424,8 +1428,8 @@ export default function HomeScreen() {
       <PremiumFeatureModal
         visible={showPremiumModal}
         onClose={() => setShowPremiumModal(false)}
-        featureName="Unlimited Watchlists"
-        featureDescription="Free accounts are limited to tracking up to 2 watchlists concurrently. Upgrade to Pro to track unlimited topics and more features 🔒"
+        featureName="Watchlist Limit Reached"
+        featureDescription="You've hit the active watchlist limit on your plan. Upgrade to track more topics and unlock more features 🔒"
       />
 
       <TrackTopicModal
