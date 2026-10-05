@@ -202,6 +202,17 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
             remaining: FREE_LIFETIME_SNOOPS,
             type: "free",
           });
+
+          await ctx.db.insert("notifications", {
+            user_id: args.userId,
+            type: "reward",
+            title: "🎁 Gift from the Founder!",
+            message:
+              "You've been gifted 50 lifetime Snoops to monitor intelligence streams across the web. Happy snooping! 🐾",
+            seen: false,
+            read: false,
+            reward_claimed: false,
+          });
         }
       }
     },

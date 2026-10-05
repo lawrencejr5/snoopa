@@ -322,8 +322,8 @@ export const seed_free_users = internalMutation({
 });
 
 /**
- * One-off: wipes all old monthly (expiring) "free" snoop grants and gives
- * every user a fresh 50-snoop lifetime grant. Safe to re-run.
+ * One-off: wipes all old monthly (expiring) "free" snoop grants. Safe to re-run.
+ * Lifetime free snoops will be granted when users open the app.
  * Run: npx convex run migrations:migrate_free_lifetime_snoops
  */
 export const migrate_free_lifetime_snoops = internalMutation({
@@ -331,7 +331,6 @@ export const migrate_free_lifetime_snoops = internalMutation({
   handler: async (ctx) => {
     const users = await ctx.db.query("users").collect();
     let deleted = 0;
-    let granted = 0;
 
     for (const user of users) {
       const grants = await ctx.db
@@ -339,29 +338,15 @@ export const migrate_free_lifetime_snoops = internalMutation({
         .withIndex("by_user", (q) => q.eq("user_id", user._id))
         .collect();
 
-      let has_lifetime = false;
       for (const grant of grants) {
-        if (grant.type !== "free") continue;
-        if (grant.expiration_date === undefined) {
-          has_lifetime = true;
-        } else {
+        if (grant.type === "free" && grant.expiration_date !== undefined) {
           await ctx.db.delete(grant._id);
           deleted++;
         }
       }
-
-      if (!has_lifetime) {
-        await ctx.db.insert("snoops", {
-          user_id: user._id,
-          snoops: FREE_LIFETIME_SNOOPS,
-          remaining: FREE_LIFETIME_SNOOPS,
-          type: "free",
-        });
-        granted++;
-      }
     }
 
-    return `Deleted ${deleted} old free grants, granted ${granted} lifetime grants.`;
+    return `Deleted ${deleted} old expiring free snoop grants. Users will receive their 50 lifetime snoops when opening the app.`;
   },
 });
 

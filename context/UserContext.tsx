@@ -28,6 +28,17 @@ const UserProvider: FC<{ children: ReactNode }> = ({ children }) => {
   const syncSubscription = useMutation(api.snoops.sync_user_subscription);
   const updateAppLoadMetadata = useMutation(api.users.update_app_load_metadata);
   const saveReferralSource = useMutation(api.users.save_referral_source);
+  const checkAndGrantFreeSnoops = useMutation(
+    api.snoops.check_and_grant_free_lifetime_snoops,
+  );
+
+  useEffect(() => {
+    if (!signedIn?._id) return;
+    if (signedIn.is_premium) return; // Free lifetime snoops are only for free tier users
+    checkAndGrantFreeSnoops().catch((err) => {
+      console.error("Error checking free snoop grant:", err);
+    });
+  }, [signedIn?._id, signedIn?.is_premium]);
 
   useEffect(() => {
     if (!signedIn?._id) return;

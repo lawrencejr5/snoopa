@@ -90,11 +90,16 @@ export default function RewardModal({ reward, onDismiss }: RewardModalProps) {
     onDismiss();
   };
 
-  // Extract tier from the notification title or message if needed
-  const snoop_count =
-    Object.entries(TIER_SNOOP_COUNTS).find(([key]) =>
-      reward.title.toLowerCase().includes(key),
-    )?.[1] ?? null;
+  const isFounderGift =
+    reward.title.toLowerCase().includes("founder") ||
+    reward.message.toLowerCase().includes("founder") ||
+    reward.message.includes("50 lifetime");
+
+  const snoop_count = isFounderGift
+    ? "50"
+    : Object.entries(TIER_SNOOP_COUNTS).find(([key]) =>
+        reward.title.toLowerCase().includes(key),
+      )?.[1] ?? null;
 
   return (
     <Modal transparent animationType="none" statusBarTranslucent>
@@ -124,7 +129,7 @@ export default function RewardModal({ reward, onDismiss }: RewardModalProps) {
           {/* Badge */}
           <View style={[styles.badge, { backgroundColor: C.success + "22" }]}>
             <Text style={[styles.badge_text, { color: C.success }]}>
-              PREMIUM GIFT
+              {isFounderGift ? "FOUNDER'S GIFT" : "PREMIUM GIFT"}
             </Text>
           </View>
 
@@ -151,14 +156,16 @@ export default function RewardModal({ reward, onDismiss }: RewardModalProps) {
                 style={[styles.snoop_pill_label, { color: C.text_secondary }]}
               >
                 {" "}
-                snoops added this month
+                {isFounderGift
+                  ? "lifetime snoops granted"
+                  : "snoops added this month"}
               </Text>
             </View>
           )}
 
-          {/* Explore benefits button */}
+          {/* Main Action button */}
           <Pressable
-            onPress={handle_explore}
+            onPress={isFounderGift ? handle_dismiss : handle_explore}
             style={({ pressed }) => [
               styles.claim_button,
               {
@@ -168,16 +175,18 @@ export default function RewardModal({ reward, onDismiss }: RewardModalProps) {
             ]}
           >
             <Text style={[styles.claim_button_text, { color: C.background }]}>
-              Explore benefits
+              {isFounderGift ? "Start Snooping 🐾" : "Explore benefits"}
             </Text>
           </Pressable>
 
-          {/* Got it link */}
-          <Pressable onPress={handle_dismiss} style={styles.later_button}>
-            <Text style={[styles.later_text, { color: C.text_secondary }]}>
-              Got it!
-            </Text>
-          </Pressable>
+          {/* Dismiss link for premium rewards */}
+          {!isFounderGift && (
+            <Pressable onPress={handle_dismiss} style={styles.later_button}>
+              <Text style={[styles.later_text, { color: C.text_secondary }]}>
+                Got it!
+              </Text>
+            </Pressable>
+          )}
         </Animated.View>
       </View>
     </Modal>

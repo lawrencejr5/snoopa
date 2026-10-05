@@ -589,8 +589,74 @@ export const sync_user_subscription = mutation({
           remaining: FREE_LIFETIME_SNOOPS,
           type: "free",
         });
+
+        await ctx.db.insert("notifications", {
+          user_id,
+          type: "reward",
+          title: "🎁 Gift from the Founder!",
+          message:
+            "You've been gifted 50 lifetime Snoops to monitor intelligence streams across the web. Happy snooping! 🐾",
+          seen: false,
+          read: false,
+          reward_claimed: false,
+        });
       }
     }
+  },
+});
+
+/**
+ * Checks if the current user has been given their one-time free lifetime snoops (50).
+ * If not, grants them 50 snoops and creates a Founder's Gift reward notification so a popup displays.
+ */
+export const check_and_grant_free_lifetime_snoops = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const user_id = await getAuthUserId(ctx);
+    if (!user_id) return { granted: false };
+
+    const user = await ctx.db.get(user_id);
+    if (!user) return { granted: false };
+
+    // Free lifetime snoops are ONLY for free users (not premium users)
+    const is_free_user =
+      !user.is_premium ||
+      user.sub_tier === "free" ||
+      user.plan === "free";
+
+    if (!is_free_user) {
+      return { granted: false };
+    }
+
+    const existing_free = await ctx.db
+      .query("snoops")
+      .withIndex("by_user", (q: any) => q.eq("user_id", user_id))
+      .filter((q: any) => q.eq(q.field("type"), "free"))
+      .first();
+
+    if (existing_free) {
+      return { granted: false };
+    }
+
+    await ctx.db.insert("snoops", {
+      user_id,
+      snoops: FREE_LIFETIME_SNOOPS,
+      remaining: FREE_LIFETIME_SNOOPS,
+      type: "free",
+    });
+
+    await ctx.db.insert("notifications", {
+      user_id,
+      type: "reward",
+      title: "🎁 Gift from the Founder!",
+      message:
+        "You've been gifted 50 lifetime Snoops to monitor intelligence streams across the web. Happy snooping! 🐾",
+      seen: false,
+      read: false,
+      reward_claimed: false,
+    });
+
+    return { granted: true };
   },
 });
 
