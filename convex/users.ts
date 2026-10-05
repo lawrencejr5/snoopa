@@ -227,8 +227,8 @@ export const deleteUser = mutation({
       await ctx.db.delete(wl._id);
     }
 
-    // 2. Delete user-level data (sessions and general notifications)
-    const [sessions, userNotifications] = await Promise.all([
+    // 2. Delete user-level data (sessions, notifications, snoops, ad_views)
+    const [sessions, userNotifications, snoops, adViews] = await Promise.all([
       ctx.db
         .query("sessions")
         .withIndex("by_user", (q) => q.eq("user_id", user_id))
@@ -237,11 +237,21 @@ export const deleteUser = mutation({
         .query("notifications")
         .withIndex("by_user", (q) => q.eq("user_id", user_id))
         .collect(),
+      ctx.db
+        .query("snoops")
+        .withIndex("by_user", (q) => q.eq("user_id", user_id))
+        .collect(),
+      ctx.db
+        .query("ad_views")
+        .withIndex("by_user", (q) => q.eq("user_id", user_id))
+        .collect(),
     ]);
 
     await Promise.all([
       ...sessions.map((s) => ctx.db.delete(s._id)),
       ...userNotifications.map((n) => ctx.db.delete(n._id)),
+      ...snoops.map((sn) => ctx.db.delete(sn._id)),
+      ...adViews.map((av) => ctx.db.delete(av._id)),
     ]);
 
     // 2.5 Delete auth accounts

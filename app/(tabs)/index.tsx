@@ -1166,124 +1166,122 @@ export default function HomeScreen() {
             </View>
           </Animated.View>
         )}
-        {activeSnoops.length > 0 && (
-          <Animated.View style={[styles.section, style3]}>
-            <View style={styles.sectionHeader}>
-              <View
-                style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
-              >
-                <Text
-                  style={[
-                    styles.sectionLabel,
-                    { color: Colors[theme].text_secondary },
-                  ]}
-                >
-                  RECENT BRIEFING(S)
-                </Text>
-              </View>
-              <Pressable onPress={() => router.push("/notifications" as any)}>
-                <Text
-                  style={{
-                    color: Colors[theme].primary,
-                    fontFamily: "FontBold",
-                    fontSize: 11,
-                  }}
-                >
-                  SEE ALL
-                </Text>
-              </Pressable>
-            </View>
-
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              onScroll={(e) => {
-                const x = e.nativeEvent.contentOffset.x;
-                const snapWidth = width - 40 + 12; // Card width + gap
-                const index = Math.round(x / snapWidth);
-                if (index !== activeBriefIndex) setActiveBriefIndex(index);
-              }}
-              scrollEventThrottle={16}
-              snapToInterval={width - 40 + 12} // width - 40 (card) + 12 (gap)
-              decelerationRate="fast"
-              snapToAlignment="start"
-              style={{ marginHorizontal: -20 }}
-              contentContainerStyle={{ paddingHorizontal: 20 }}
+        <Animated.View style={[styles.section, style3]}>
+          <View style={styles.sectionHeader}>
+            <View
+              style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
             >
-              {latestBriefings.length > 0 ? (
-                latestBriefings.map((item, index) => (
-                  <View
-                    key={item._id}
-                    style={{
-                      marginRight:
-                        index === latestBriefings.length - 1 ? 0 : 12,
-                    }}
-                  >
-                    <BriefingCardSwipe item={item} width={width} />
-                  </View>
-                ))
-              ) : (
-                <View
-                  style={[
-                    styles.briefingCardSwipe,
-                    {
-                      width: width - 40,
-                      backgroundColor: Colors[theme].surface,
-                      borderColor: Colors[theme].border,
-                      justifyContent: "center",
-                      alignItems: "center",
-                      gap: 12,
-                    },
-                  ]}
-                >
-                  <Octicons
-                    name="info"
-                    size={20}
-                    color={Colors[theme].text_secondary}
-                  />
-                  <Text
-                    style={{
-                      color: Colors[theme].text_secondary,
-                      fontFamily: "FontMedium",
-                      fontSize: 11,
-                      textTransform: "uppercase",
-                      letterSpacing: 1,
-                    }}
-                  >
-                    No briefings for you yet
-                  </Text>
-                </View>
-              )}
-            </ScrollView>
-
-            {/* Pagination Dots */}
-            {latestBriefings.length > 1 && (
-              <View
+              <Text
+                style={[
+                  styles.sectionLabel,
+                  { color: Colors[theme].text_secondary },
+                ]}
+              >
+                RECENT BRIEFING(S)
+              </Text>
+            </View>
+            <Pressable onPress={() => router.push("/notifications" as any)}>
+              <Text
                 style={{
-                  flexDirection: "row",
-                  justifyContent: "center",
-                  gap: 6,
-                  marginTop: 14,
+                  color: Colors[theme].primary,
+                  fontFamily: "FontBold",
+                  fontSize: 11,
                 }}
               >
-                {latestBriefings.map((_, i) => (
-                  <View
-                    key={i}
-                    style={{
-                      width: activeBriefIndex === i ? 16 : 6,
-                      height: 6,
-                      borderRadius: 3,
-                      backgroundColor:
-                        activeBriefIndex === i
-                          ? Colors[theme].primary
-                          : Colors[theme].text_secondary + "40",
-                    }}
-                  />
-                ))}
+                SEE ALL
+              </Text>
+            </Pressable>
+          </View>
+
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            onScroll={(e) => {
+              const x = e.nativeEvent.contentOffset.x;
+              const snapWidth = width - 40 + 12; // Card width + gap
+              const index = Math.round(x / snapWidth);
+              if (index !== activeBriefIndex) setActiveBriefIndex(index);
+            }}
+            scrollEventThrottle={16}
+            snapToInterval={width - 40 + 12} // width - 40 (card) + 12 (gap)
+            decelerationRate="fast"
+            snapToAlignment="start"
+            style={{ marginHorizontal: -20 }}
+            contentContainerStyle={{ paddingHorizontal: 20 }}
+          >
+            {latestBriefings.length > 0 ? (
+              latestBriefings.map((item, index) => (
+                <View
+                  key={item._id}
+                  style={{
+                    marginRight:
+                      index === latestBriefings.length - 1 ? 0 : 12,
+                  }}
+                >
+                  <BriefingCardSwipe item={item} width={width} />
+                </View>
+              ))
+            ) : (
+              <View
+                style={[
+                  styles.briefingCardSwipe,
+                  {
+                    width: width - 40,
+                    backgroundColor: Colors[theme].surface,
+                    borderColor: Colors[theme].border,
+                    justifyContent: "center",
+                    alignItems: "center",
+                    gap: 12,
+                  },
+                ]}
+              >
+                <Octicons
+                  name="info"
+                  size={20}
+                  color={Colors[theme].text_secondary}
+                />
+                <Text
+                  style={{
+                    color: Colors[theme].text_secondary,
+                    fontFamily: "FontMedium",
+                    fontSize: 11,
+                    textTransform: "uppercase",
+                    letterSpacing: 1,
+                  }}
+                >
+                  No briefings for you yet
+                </Text>
               </View>
             )}
-          </Animated.View>
-        )}
+          </ScrollView>
+
+          {/* Pagination Dots */}
+          {latestBriefings.length > 1 && (
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "center",
+                gap: 6,
+                marginTop: 14,
+              }}
+            >
+              {latestBriefings.map((_, i) => (
+                <View
+                  key={i}
+                  style={{
+                    width: activeBriefIndex === i ? 16 : 6,
+                    height: 6,
+                    borderRadius: 3,
+                    backgroundColor:
+                      activeBriefIndex === i
+                        ? Colors[theme].primary
+                        : Colors[theme].text_secondary + "40",
+                  }}
+                />
+              ))}
+            </View>
+          )}
+        </Animated.View>
 
         {/* Active Snoops List */}
         <Animated.View style={[styles.section, style4]}>

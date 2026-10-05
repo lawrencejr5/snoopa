@@ -9,6 +9,7 @@ import { useMutation } from "convex/react";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Image,
   Keyboard,
   Modal,
@@ -288,7 +289,9 @@ export default function ProfileScreen() {
                 style={[
                   styles.modalButton,
                   { backgroundColor: Colors[theme].surface },
+                  isDeleting && { opacity: 0.5 },
                 ]}
+                disabled={isDeleting}
                 onPress={() => {
                   Keyboard.dismiss();
                   setModalVisible(false);
@@ -304,12 +307,18 @@ export default function ProfileScreen() {
                 style={[
                   styles.modalButton,
                   { backgroundColor: Colors[theme].danger },
+                  isDeleting && { opacity: 0.5 },
                 ]}
+                disabled={isDeleting}
                 onPress={handleDelete}
               >
-                <Text style={{ color: "white", fontFamily: "FontBold" }}>
-                  {isDeleting ? "Deleting..." : "Delete"}
-                </Text>
+                {isDeleting ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={{ color: "white", fontFamily: "FontBold" }}>
+                    Delete
+                  </Text>
+                )}
               </Pressable>
             </View>
           </View>
