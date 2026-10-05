@@ -13,19 +13,19 @@ import { useLoadingContext } from "@/context/LoadingContext";
 import { useTheme } from "@/context/ThemeContext";
 import { useUser } from "@/context/UserContext";
 import { api } from "@/convex/_generated/api";
+import { getLastFocusedTab, setLastFocusedTab } from "@/utils/navigationState";
 import { Octicons } from "@expo/vector-icons";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import { useFocusEffect, useNavigation, useRouter } from "expo-router";
-import { getLastFocusedTab, setLastFocusedTab } from "@/utils/navigationState";
 import { useCallback, useEffect, useState } from "react";
 import {
   Image,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
-  Platform,
 } from "react-native";
 import Animated, {
   Easing,
@@ -310,7 +310,8 @@ function InactiveSnoopCard({
 export default function WatchlistScreen() {
   const { theme } = useTheme();
   const router = useRouter();
-  const isIOS26OrAbove = Platform.OS === "ios" && parseInt(String(Platform.Version), 10) >= 26;
+  const isIOS26OrAbove =
+    Platform.OS === "ios" && parseInt(String(Platform.Version), 10) >= 26;
 
   const { isLoading } = useConvexAuth();
   const { appLoading } = useLoadingContext();
@@ -432,22 +433,40 @@ export default function WatchlistScreen() {
 
       const lastTab = getLastFocusedTab();
       if (lastTab !== "watchlist") {
-        s1.value = 0; s2.value = 0; s3.value = 0; s4.value = 0;
+        s1.value = 0;
+        s2.value = 0;
+        s3.value = 0;
+        s4.value = 0;
         s1.value = withTiming(1, { duration: DURATION });
-        s2.value = withDelay(80,  withTiming(1, { duration: DURATION }));
+        s2.value = withDelay(80, withTiming(1, { duration: DURATION }));
         s3.value = withDelay(160, withTiming(1, { duration: DURATION }));
         s4.value = withDelay(240, withTiming(1, { duration: DURATION }));
       } else {
-        s1.value = 1; s2.value = 1; s3.value = 1; s4.value = 1;
+        s1.value = 1;
+        s2.value = 1;
+        s3.value = 1;
+        s4.value = 1;
       }
       setLastFocusedTab("watchlist");
     }, [isLoaded]),
   );
 
-  const style1 = useAnimatedStyle(() => ({ opacity: s1.value, transform: [{ translateY: (1 - s1.value) * SLIDE }] }));
-  const style2 = useAnimatedStyle(() => ({ opacity: s2.value, transform: [{ translateY: (1 - s2.value) * SLIDE }] }));
-  const style3 = useAnimatedStyle(() => ({ opacity: s3.value, transform: [{ translateY: (1 - s3.value) * SLIDE }] }));
-  const style4 = useAnimatedStyle(() => ({ opacity: s4.value, transform: [{ translateY: (1 - s4.value) * SLIDE }] }));
+  const style1 = useAnimatedStyle(() => ({
+    opacity: s1.value,
+    transform: [{ translateY: (1 - s1.value) * SLIDE }],
+  }));
+  const style2 = useAnimatedStyle(() => ({
+    opacity: s2.value,
+    transform: [{ translateY: (1 - s2.value) * SLIDE }],
+  }));
+  const style3 = useAnimatedStyle(() => ({
+    opacity: s3.value,
+    transform: [{ translateY: (1 - s3.value) * SLIDE }],
+  }));
+  const style4 = useAnimatedStyle(() => ({
+    opacity: s4.value,
+    transform: [{ translateY: (1 - s4.value) * SLIDE }],
+  }));
 
   if (isLoading || !signedIn || appLoading || !watchlistData)
     return <Loading />;
@@ -490,12 +509,15 @@ export default function WatchlistScreen() {
         {watchlistData.length === 0 ? (
           /* Empty State */
           <Animated.View
-            style={[{
-              flex: 1,
-              justifyContent: "center",
-              alignItems: "center",
-              paddingHorizontal: 20,
-            }, style2]}
+            style={[
+              {
+                flex: 1,
+                justifyContent: "center",
+                alignItems: "center",
+                paddingHorizontal: 20,
+              },
+              style2,
+            ]}
           >
             <View
               style={[
@@ -523,7 +545,7 @@ export default function WatchlistScreen() {
                   letterSpacing: -0.5,
                 }}
               >
-                No Snoops Yet
+                No Watchlists Yet
               </Text>
               <Text
                 style={{
@@ -562,9 +584,7 @@ export default function WatchlistScreen() {
         ) : (
           <>
             {/* Stats Section */}
-            <Animated.View
-              style={[styles.statsContainer, style2]}
-            >
+            <Animated.View style={[styles.statsContainer, style2]}>
               <View
                 style={[
                   styles.statCard,
@@ -668,9 +688,7 @@ export default function WatchlistScreen() {
 
             {/* Active Snoops */}
             {activeSnoops.length > 0 && (
-              <Animated.View
-                style={[styles.section, style3]}
-              >
+              <Animated.View style={[styles.section, style3]}>
                 <Text
                   style={[styles.sectionTitle, { color: Colors[theme].text }]}
                 >
@@ -690,9 +708,7 @@ export default function WatchlistScreen() {
 
             {/* Closed/Confirmed Snoops */}
             {closedSnoops.length > 0 && (
-              <Animated.View
-                style={[styles.section, style4]}
-              >
+              <Animated.View style={[styles.section, style4]}>
                 <Text
                   style={[styles.sectionTitle, { color: Colors[theme].text }]}
                 >

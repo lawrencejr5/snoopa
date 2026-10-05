@@ -22,13 +22,13 @@ import { useUser } from "@/context/UserContext";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { getLastFocusedTab, setLastFocusedTab } from "@/utils/navigationState";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Octicons } from "@expo/vector-icons";
 import {
   BottomSheetBackdrop,
   BottomSheetModal,
   BottomSheetView,
 } from "@gorhom/bottom-sheet";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import {
   useFocusEffect,
@@ -1083,7 +1083,9 @@ export default function HomeScreen() {
                     flex: 1,
                   }}
                 >
-                  💡 Snoopa uses snoops to query live web intel, run background checks, and send instant alerts when watchlist conditions trigger.
+                  💡 Snoopa uses snoops to query live web intel, run background
+                  checks, and send instant alerts when watchlist conditions
+                  trigger.
                 </Text>
                 <Pressable
                   onPress={() => setShowSnoopTooltip(false)}
@@ -1214,8 +1216,7 @@ export default function HomeScreen() {
                 <View
                   key={item._id}
                   style={{
-                    marginRight:
-                      index === latestBriefings.length - 1 ? 0 : 12,
+                    marginRight: index === latestBriefings.length - 1 ? 0 : 12,
                   }}
                 >
                   <BriefingCardSwipe item={item} width={width} />
@@ -1345,7 +1346,7 @@ export default function HomeScreen() {
                   letterSpacing: -0.5,
                 }}
               >
-                No snoops yet
+                No watchlists yet
               </Text>
               <Text
                 style={{
