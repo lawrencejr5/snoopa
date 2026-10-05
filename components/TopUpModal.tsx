@@ -73,10 +73,14 @@ export default function TopUpModal({ visible, onClose }: TopUpModalProps) {
   // ---------------------------------------------------------------------------
   // Sheet visibility
   // ---------------------------------------------------------------------------
+  const isPresentedRef = useRef(false);
+
   useEffect(() => {
     if (visible) {
+      isPresentedRef.current = true;
       bottomSheetRef.current?.present();
-    } else {
+    } else if (isPresentedRef.current) {
+      isPresentedRef.current = false;
       bottomSheetRef.current?.dismiss();
     }
   }, [visible]);
@@ -84,6 +88,7 @@ export default function TopUpModal({ visible, onClose }: TopUpModalProps) {
   const handleSheetChanges = useCallback(
     (index: number) => {
       if (index === -1) {
+        isPresentedRef.current = false;
         onClose();
       }
     },
@@ -96,6 +101,7 @@ export default function TopUpModal({ visible, onClose }: TopUpModalProps) {
         {...props}
         disappearsOnIndex={-1}
         appearsOnIndex={0}
+        pressBehavior="close"
       />
     ),
     [],

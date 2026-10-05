@@ -54,10 +54,14 @@ export default function PaywallModal({ visible, onClose }: PaywallModalProps) {
     }
   }, [visible]);
 
+  const isPresentedRef = useRef(false);
+
   useEffect(() => {
     if (visible) {
+      isPresentedRef.current = true;
       bottomSheetRef.current?.present();
-    } else {
+    } else if (isPresentedRef.current) {
+      isPresentedRef.current = false;
       bottomSheetRef.current?.dismiss();
     }
   }, [visible]);
@@ -65,6 +69,7 @@ export default function PaywallModal({ visible, onClose }: PaywallModalProps) {
   const handleSheetChanges = useCallback(
     (index: number) => {
       if (index === -1) {
+        isPresentedRef.current = false;
         onClose();
       }
     },
@@ -77,6 +82,7 @@ export default function PaywallModal({ visible, onClose }: PaywallModalProps) {
         {...props}
         disappearsOnIndex={-1}
         appearsOnIndex={0}
+        pressBehavior="close"
       />
     ),
     [],

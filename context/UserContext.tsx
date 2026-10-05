@@ -5,6 +5,7 @@ import React, {
   ReactNode,
   useContext,
   useEffect,
+  useState,
 } from "react";
 import { AppState, AppStateStatus, Platform } from "react-native";
 import Purchases from "react-native-purchases";
@@ -18,6 +19,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 type UserData = Doc<"users"> & { profile_url?: string | null };
 interface UserContextType {
   signedIn: UserData | undefined;
+  isPaywallOpen: boolean;
+  setIsPaywallOpen: (open: boolean) => void;
 }
 
 const UserContext = createContext<UserContextType | null>(null);
@@ -25,6 +28,7 @@ const UserContext = createContext<UserContextType | null>(null);
 const UserProvider: FC<{ children: ReactNode }> = ({ children }) => {
   const currentUser = useQuery(api.users.get_current_user);
   const signedIn = currentUser as UserData;
+  const [isPaywallOpen, setIsPaywallOpen] = useState(false);
   const syncSubscription = useMutation(api.snoops.sync_user_subscription);
   const updateAppLoadMetadata = useMutation(api.users.update_app_load_metadata);
   const saveReferralSource = useMutation(api.users.save_referral_source);
@@ -213,7 +217,9 @@ const UserProvider: FC<{ children: ReactNode }> = ({ children }) => {
   }, [signedIn?._id, currentUser === undefined]);
 
   return (
-    <UserContext.Provider value={{ signedIn }}>{children}</UserContext.Provider>
+    <UserContext.Provider value={{ signedIn, isPaywallOpen, setIsPaywallOpen }}>
+      {children}
+    </UserContext.Provider>
   );
 };
 

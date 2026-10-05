@@ -617,17 +617,24 @@ export default function HomeScreen() {
     [],
   );
   const [showTopUp, setShowTopUp] = useState(false);
+  const { setIsPaywallOpen } = useUser();
   const [showPremiumModal, setShowPremiumModal] = useState(false);
   const [showPaywallModal, setShowPaywallModal] = useState(false);
   const [showSnoopTooltip, setShowSnoopTooltip] = useState(false);
+  const hasCheckedJustSignedIn = useRef(false);
 
   useEffect(() => {
-    if (!signedIn?._id) return;
+    setIsPaywallOpen(showPaywallModal);
+  }, [showPaywallModal, setIsPaywallOpen]);
+
+  useEffect(() => {
+    if (!signedIn?._id || hasCheckedJustSignedIn.current) return;
 
     const checkJustSignedIn = async () => {
       try {
         const justSignedIn = await AsyncStorage.getItem("just_signed_in");
         if (justSignedIn === "true") {
+          hasCheckedJustSignedIn.current = true;
           await AsyncStorage.removeItem("just_signed_in");
           const isFreeUser =
             !signedIn.is_premium || signedIn.sub_tier === "free";

@@ -23,7 +23,7 @@ import {
   usePushNotification,
 } from "@/context/PushNotification";
 import DeviceThemeProvider from "@/context/ThemeContext";
-import UserProvider from "@/context/UserContext";
+import UserProvider, { useUser } from "@/context/UserContext";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
@@ -95,6 +95,7 @@ const WithinContext = ({ loaded }: { loaded: boolean }) => {
   const router = useRouter();
   const segments = useSegments();
   const { isAuthenticated, isLoading } = useConvexAuth();
+  const { isPaywallOpen } = useUser();
   const [showSplash, setShowSplash] = useState<boolean>(true);
   const [isFirstLaunch, setIsFirstLaunch] = useState<boolean | null>(null);
   const [show_reward_modal, set_show_reward_modal] = useState(false);
@@ -147,17 +148,18 @@ const WithinContext = ({ loaded }: { loaded: boolean }) => {
 
   const dismissed_rewards_ref = useRef<string[]>([]);
 
-  // Show the reward modal as soon as a pending reward is detected
+  // Show the reward modal as soon as a pending reward is detected and paywall is closed
   useEffect(() => {
     if (
       pending_reward &&
       isAuthenticated &&
       !showSplash &&
+      !isPaywallOpen &&
       !dismissed_rewards_ref.current.includes(pending_reward._id)
     ) {
       set_show_reward_modal(true);
     }
-  }, [pending_reward, isAuthenticated, showSplash]);
+  }, [pending_reward, isAuthenticated, showSplash, isPaywallOpen]);
 
   // Re-check when the app returns to foreground
   useEffect(() => {
@@ -169,6 +171,7 @@ const WithinContext = ({ loaded }: { loaded: boolean }) => {
           next_state === "active" &&
           pending_reward &&
           isAuthenticated &&
+          !isPaywallOpen &&
           !dismissed_rewards_ref.current.includes(pending_reward._id)
         ) {
           set_show_reward_modal(true);
@@ -177,7 +180,7 @@ const WithinContext = ({ loaded }: { loaded: boolean }) => {
       },
     );
     return () => subscription.remove();
-  }, [pending_reward, isAuthenticated]);
+  }, [pending_reward, isAuthenticated, isPaywallOpen]);
 
   const { notificationResponse } = usePushNotification();
   const last_handled_notification_id_ref = useRef<string | null>(null);

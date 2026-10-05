@@ -107,6 +107,8 @@ export function ReferralOptionIcon({
   return <Text style={{ fontSize: 18 }}>{item.icon}</Text>;
 }
 
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
 interface ReferralModalProps {
   visible: boolean;
   onClose?: () => void;
@@ -119,8 +121,25 @@ export default function ReferralModal({ visible }: ReferralModalProps) {
   const saveReferralSource = useMutation(api.users.save_referral_source);
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [hasAnsweredLocal, setHasAnsweredLocal] = useState<boolean>(true);
 
-  if (!visible || !signedIn || signedIn.referral_source) {
+  React.useEffect(() => {
+    async function checkLocal() {
+      try {
+        const pending = await AsyncStorage.getItem("pending_referral_source");
+        if (pending || signedIn?.referral_source) {
+          setHasAnsweredLocal(true);
+        } else {
+          setHasAnsweredLocal(false);
+        }
+      } catch {
+        setHasAnsweredLocal(false);
+      }
+    }
+    checkLocal();
+  }, [signedIn?.referral_source]);
+
+  if (!visible || !signedIn || signedIn.referral_source || hasAnsweredLocal) {
     return null;
   }
 
