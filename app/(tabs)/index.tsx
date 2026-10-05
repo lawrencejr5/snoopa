@@ -752,7 +752,9 @@ export default function HomeScreen() {
 
   // Data queries
   const watchlistData = useQuery(api.watchlist.get_watchlists) || [];
-  const trendingQueryResult = useQuery(api.watchlist.get_trending_topics, {});
+  const trendingQueryResult = useQuery(api.watchlist.get_trending_topics, {
+    country_code: "USER",
+  });
   const trendingTopics = (
     Array.isArray(trendingQueryResult)
       ? trendingQueryResult

@@ -350,16 +350,21 @@ export const get_trending_topics = query({
     let countryName = "Worldwide";
     let requestedCountryName: string | undefined = undefined;
 
-    if (args.country_code && args.country_code !== "WORLD") {
+    const requestedCode =
+      args.country_code === "USER" || args.country_code === "AUTO"
+        ? undefined
+        : args.country_code;
+
+    if (requestedCode && requestedCode !== "WORLD") {
       const countryRecord = await ctx.db
         .query("active_countries")
-        .withIndex("by_code", (q) => q.eq("code", args.country_code as string))
+        .withIndex("by_code", (q) => q.eq("code", requestedCode as string))
         .first();
       if (countryRecord && countryRecord.status === "active") {
         countryCode = countryRecord.code;
         requestedCountryName = countryRecord.name;
       }
-    } else if (!args.country_code && user_id) {
+    } else if (!requestedCode && user_id) {
       const user = await ctx.db.get(user_id);
       if (user?.country) {
         const countryRecord = await ctx.db
@@ -415,20 +420,27 @@ export const get_trending_topics = query({
     const displayCode = isFallback ? "WORLD" : countryCode;
     const displayName = isFallback ? "Worldwide" : countryName;
 
+    const topics = results.map((r) => ({
+      topic: r.topic,
+      category: r.category,
+      summary: r.summary,
+      suggested_condition: r.suggested_condition,
+      keywords: r.keywords,
+      tracker_count: 0, // kept for UI compatibility; real trackers come from watchlist
+      refreshed_at: r.refreshed_at,
+    }));
+
+    // If no country_code argument was explicitly provided, return Array for backward compatibility with older app versions
+    if (!args.country_code) {
+      return topics;
+    }
+
     return {
       country_code: displayCode,
       country_name: displayName,
       flag_emoji: getFlagEmoji(displayCode),
       is_fallback: isFallback,
-      topics: results.map((r) => ({
-        topic: r.topic,
-        category: r.category,
-        summary: r.summary,
-        suggested_condition: r.suggested_condition,
-        keywords: r.keywords,
-        tracker_count: 0, // kept for UI compatibility; real trackers come from watchlist
-        refreshed_at: r.refreshed_at,
-      })),
+      topics,
     };
   },
 });
