@@ -5,6 +5,7 @@ import React, {
   ReactNode,
   useContext,
   useEffect,
+  useRef,
   useState,
 } from "react";
 import { AppState, AppStateStatus, Platform } from "react-native";
@@ -12,6 +13,7 @@ import Purchases from "react-native-purchases";
 
 import { api } from "@/convex/_generated/api";
 import { Doc } from "@/convex/_generated/dataModel";
+import { posthog } from "@/utils/posthog";
 import { useMutation, useQuery } from "convex/react";
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -29,12 +31,47 @@ const UserProvider: FC<{ children: ReactNode }> = ({ children }) => {
   const currentUser = useQuery(api.users.get_current_user);
   const signedIn = currentUser as UserData;
   const [isPaywallOpen, setIsPaywallOpen] = useState(false);
+  const identifiedUserId = useRef<string | undefined>(undefined);
   const syncSubscription = useMutation(api.snoops.sync_user_subscription);
   const updateAppLoadMetadata = useMutation(api.users.update_app_load_metadata);
   const saveReferralSource = useMutation(api.users.save_referral_source);
   const checkAndGrantFreeSnoops = useMutation(
     api.snoops.check_and_grant_free_lifetime_snoops,
   );
+
+  useEffect(() => {
+    const userId = signedIn?._id;
+
+    if (!userId) {
+      if (identifiedUserId.current) {
+        posthog?.reset();
+        identifiedUserId.current = undefined;
+      }
+      return;
+    }
+
+    if (identifiedUserId.current && identifiedUserId.current !== userId) {
+      posthog?.reset();
+    }
+
+    posthog?.identify(userId, {
+      $set: {
+        email: signedIn.email,
+        name: signedIn.fullname,
+        ...(signedIn.plan ? { plan: signedIn.plan } : {}),
+        ...(signedIn.sub_tier
+          ? { subscription_tier: signedIn.sub_tier }
+          : {}),
+      },
+    });
+    identifiedUserId.current = userId;
+  }, [
+    signedIn?._id,
+    signedIn?.email,
+    signedIn?.fullname,
+    signedIn?.plan,
+    signedIn?.sub_tier,
+  ]);
 
   useEffect(() => {
     if (!signedIn?._id) return;

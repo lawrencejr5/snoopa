@@ -1,9 +1,14 @@
 "use node";
 
-import OpenAI from "openai";
 import { internal } from "./_generated/api";
 import { internalAction } from "./_generated/server";
 import { generateContentWithGemini } from "./openrouter";
+import {
+  aiObservabilityOptions,
+  createAIClient,
+  createAIObservabilityContext,
+  flushAIObservability,
+} from "./ai-observability";
 
 // ---------------------------------------------------------------------------
 // Main action — scrape + AI extraction
@@ -39,8 +44,12 @@ export const refresh_trending_topics = internalAction({
       ...active_countries,
       { code: "WORLD", gl: "WORLD", hl: "en-US" },
     ];
+    const refreshRunId = crypto.randomUUID();
 
     for (const country of countriesToProcess) {
+      const observability = createAIObservabilityContext(
+        `trending:${refreshRunId}:${country.code}`,
+      );
       console.log(`[Trending] Processing country: ${country.code}`);
       
       const NEWS_URL =
@@ -101,7 +110,7 @@ Extract exactly 10 trackable trending topics from this content.`;
       // Try DeepSeek first
       if (deepseek_key) {
         try {
-          const openai = new OpenAI({
+          const openai: any = createAIClient({
             baseURL: "https://api.deepseek.com",
             apiKey: deepseek_key,
           });
@@ -112,7 +121,9 @@ Extract exactly 10 trackable trending topics from this content.`;
               { role: "user", content: user_prompt },
             ],
             response_format: { type: "json_object" },
+            ...aiObservabilityOptions(observability, "deepseek"),
           });
+          await flushAIObservability();
           const text = response.choices[0].message.content?.trim() ?? "";
           const parsed = JSON.parse(text);
           topics_json = Array.isArray(parsed)
@@ -131,6 +142,7 @@ Extract exactly 10 trackable trending topics from this content.`;
             user_prompt,
             system_prompt,
             "google/gemini-2.5-flash-lite",
+            observability,
           );
           text = text.trim();
           text = text

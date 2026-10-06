@@ -6,6 +6,7 @@ import { api } from "@/convex/_generated/api";
 import { useAction, useMutation, useQuery } from "convex/react";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
+import { usePostHog } from "posthog-react-native";
 import { useState } from "react";
 import {
   ActivityIndicator,
@@ -23,6 +24,7 @@ import {
 export default function FeedbackScreen() {
   const { theme } = useTheme();
   const router = useRouter();
+  const posthog = usePostHog();
   const user = useQuery(api.users.get_current_user);
   const userFeedbacks = useQuery(
     api.feedback.get_user_feedbacks,
@@ -99,6 +101,9 @@ export default function FeedbackScreen() {
         images: storageIds.length > 0 ? storageIds : undefined,
       });
 
+      posthog?.capture("feedback_submitted", {
+        attachment_count: storageIds.length,
+      });
       showCustomAlert(
         "Thank you for your report. We'll look into it.",
         "success",

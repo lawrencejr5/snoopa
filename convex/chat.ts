@@ -1,7 +1,13 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { callOpenRouter, generateContentWithGemini, OpenRouterMessage } from "./openrouter";
+import {
+  aiObservabilityOptions,
+  createAIClient,
+  createAIObservabilityContext,
+  flushAIObservability,
+  type AIObservabilityContext,
+} from "./ai-observability";
 import { v } from "convex/values";
-import OpenAI from "openai";
 import { api, internal } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
 import {
@@ -310,6 +316,9 @@ type Intent =
 async function _detectIntent(
   content: string,
   history?: string,
+  observability: AIObservabilityContext = createAIObservabilityContext(
+    `chat-intent-${crypto.randomUUID()}`,
+  ),
 ): Promise<Intent> {
   const api_key = process.env.OPENROUTER_API_KEY;
   if (!api_key) return "CHAT";
@@ -330,12 +339,22 @@ async function _detectIntent(
 
     let text: string;
     try {
-      text = await generateContentWithGemini(userPrompt, systemInstruction, "google/gemini-2.5-flash-lite");
+      text = await generateContentWithGemini(
+        userPrompt,
+        systemInstruction,
+        "google/gemini-2.5-flash-lite",
+        observability,
+      );
     } catch (e) {
       console.warn(
         "Primary model failed, falling back to gemini-3.1-flash-lite",
       );
-      text = await generateContentWithGemini(userPrompt, systemInstruction, "google/gemini-3.1-flash-lite");
+      text = await generateContentWithGemini(
+        userPrompt,
+        systemInstruction,
+        "google/gemini-3.1-flash-lite",
+        observability,
+      );
     }
     text = text.trim().toUpperCase();
     console.log(`🔍 Intent: "${content.substring(0, 50)}" → ${text}`);
@@ -578,7 +597,7 @@ function _initAIClients() {
       `${!openrouter_api_key ? "OPENROUTER_API_KEY" : "DEEPSEEK_API_KEY"} is not set in environment variables`,
     );
   }
-  const openai = new OpenAI({
+  const openai: any = createAIClient({
     baseURL: "https://api.deepseek.com",
     apiKey: deepseek_api_key,
   });
@@ -670,10 +689,11 @@ function _buildOpenAIMessages(
 /** Runs DeepSeek with a Gemini 2.5 Flash fallback. Returns the response text. */
 async function _runAI(
   openaiMessages: { role: "system" | "user" | "assistant"; content: string }[],
-  openai: OpenAI,
+  openai: any,
   messages: any[],
   userPrompt: string,
   instructions: string,
+  observability: AIObservabilityContext,
 ): Promise<string> {
   // Primary: DeepSeek
   try {
@@ -681,9 +701,11 @@ async function _runAI(
       openai.chat.completions.create({
         model: "deepseek-v4-flash",
         messages: openaiMessages,
+        ...aiObservabilityOptions(observability, "deepseek"),
       }),
       timeout(20_000),
     ]);
+    await flushAIObservability();
     const text = result.choices[0].message.content ?? "";
     console.log(
       `✅ Success (deepseek-chat) - Input: ${result.usage?.prompt_tokens}, Output: ${result.usage?.completion_tokens}`,
@@ -699,7 +721,11 @@ async function _runAI(
   // Fallback: Gemini 3.1 Flash Lite via OpenRouter
   try {
     const text = (await Promise.race([
-      callOpenRouter(openaiMessages, "google/gemini-3.1-flash-lite"),
+      callOpenRouter(
+        openaiMessages,
+        "google/gemini-3.1-flash-lite",
+        observability,
+      ),
       timeout(20_000),
     ])) as string;
     console.log(`✅ Success (gemini-3.1-flash-lite via OpenRouter, fallback)`);
@@ -1099,6 +1125,11 @@ export const send_message = action({
     if (!args.session_id && !args.watchlist_id)
       throw new Error("Attempted to chat without an active context.");
 
+    const observability = createAIObservabilityContext(
+      `conversation:${args.watchlist_id ?? args.session_id}`,
+      user_id,
+    );
+
     // -------------------------------------------------------------------------
     // Snoop balance gate — deduct 1 snoop before doing any AI work.
     // -------------------------------------------------------------------------
@@ -1158,6 +1189,7 @@ export const send_message = action({
         mappedHistory
           .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
           .join("\n"),
+        observability,
       ));
     console.log(`🔍 Intent${args.intent ? " (pre-detected)" : ""}: ${intent}`);
 
@@ -1226,6 +1258,7 @@ export const send_message = action({
         messages,
         userPrompt,
         instructions,
+        observability,
       );
     } catch {
       const error_message = "Sorry, I'm having trouble responding to you";
@@ -1345,6 +1378,9 @@ async function _parseWatchlistPrompt(
   ctx: any,
   prompt: string,
   instructions: string,
+  observability: AIObservabilityContext = createAIObservabilityContext(
+    `watchlist-preview-${crypto.randomUUID()}`,
+  ),
 ): Promise<{
   title: string;
   keywords: string[];
@@ -1368,9 +1404,11 @@ async function _parseWatchlistPrompt(
           { role: "system", content: instructions },
           { role: "user", content: prompt },
         ],
+        ...aiObservabilityOptions(observability, "deepseek"),
       }),
       timeout(20_000),
     ]);
+    await flushAIObservability();
     response_text = result.choices[0].message.content ?? "";
     console.log(`✅ Success (deepseek-chat)`);
   } catch (error: any) {
@@ -1385,7 +1423,11 @@ async function _parseWatchlistPrompt(
         { role: "user", content: `[ignoring loop detection] ${prompt}` },
       ];
       response_text = (await Promise.race([
-        callOpenRouter(messages, "google/gemini-3.1-flash-lite"),
+        callOpenRouter(
+          messages,
+          "google/gemini-3.1-flash-lite",
+          observability,
+        ),
         timeout(20_000),
       ])) as string;
       console.log(`✅ Success (gemini-3.1-flash-lite via OpenRouter, fallback)`);
@@ -1606,7 +1648,15 @@ export const generate_watchlist_preview = action({
 
     try {
       const { instructions } = await _buildWatchlistPrompt(ctx);
-      const parsed = await _parseWatchlistPrompt(ctx, args.prompt, instructions);
+      const parsed = await _parseWatchlistPrompt(
+        ctx,
+        args.prompt,
+        instructions,
+        createAIObservabilityContext(
+          `watchlist-preview:${user_id}:${crypto.randomUUID()}`,
+          user_id,
+        ),
+      );
       return parsed;
     } catch (err: any) {
       console.error("Error generating watchlist preview:", err);
@@ -1711,7 +1761,15 @@ export const initialize_watchlist = action({
 
     try {
       const { instructions } = await _buildWatchlistPrompt(ctx);
-      const parsed = await _parseWatchlistPrompt(ctx, args.prompt, instructions);
+      const parsed = await _parseWatchlistPrompt(
+        ctx,
+        args.prompt,
+        instructions,
+        createAIObservabilityContext(
+          `watchlist-preview:${user_id}:${crypto.randomUUID()}`,
+          user_id,
+        ),
+      );
 
       const wl_id = await ctx.runMutation(api.watchlist.add_watchlist_item, {
         title: parsed.title,

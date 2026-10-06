@@ -1,5 +1,4 @@
-import { mutation, internalMutation } from "./_generated/server";
-import { FREE_LIFETIME_SNOOPS } from "./plans";
+import { internalMutation, mutation } from "./_generated/server";
 
 /**
  * Seed active_countries table with Nigeria and the US.

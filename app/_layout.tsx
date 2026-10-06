@@ -16,6 +16,7 @@ import { StatusBar } from "expo-status-bar";
 
 import RewardModal from "@/components/RewardModal";
 import { CustomAlertProvider } from "@/context/CustomAlertContext";
+import AnalyticsProvider from "@/context/AnalyticsProvider";
 import HapticsProvider from "@/context/HapticsContext";
 import LoadingProvider from "@/context/LoadingContext";
 import {
@@ -67,27 +68,29 @@ export default function RootLayout() {
   }, [error]);
 
   return (
-    <ConvexAuthProvider client={convex} storage={AsyncStorage}>
-      <GestureHandlerRootView style={{ flex: 1 }}>
-        <KeyboardProvider>
-          <DeviceThemeProvider>
-            <HapticsProvider>
-              <LoadingProvider>
-                <CustomAlertProvider>
-                  <PushNotificationProvider>
-                    <UserProvider>
-                      <BottomSheetModalProvider>
-                        <WithinContext loaded={loaded} />
-                      </BottomSheetModalProvider>
-                    </UserProvider>
-                  </PushNotificationProvider>
-                </CustomAlertProvider>
-              </LoadingProvider>
-            </HapticsProvider>
-          </DeviceThemeProvider>
-        </KeyboardProvider>
-      </GestureHandlerRootView>
-    </ConvexAuthProvider>
+    <AnalyticsProvider>
+      <ConvexAuthProvider client={convex} storage={AsyncStorage}>
+        <GestureHandlerRootView style={{ flex: 1 }}>
+          <KeyboardProvider>
+            <DeviceThemeProvider>
+              <HapticsProvider>
+                <LoadingProvider>
+                  <CustomAlertProvider>
+                    <PushNotificationProvider>
+                      <UserProvider>
+                        <BottomSheetModalProvider>
+                          <WithinContext loaded={loaded} />
+                        </BottomSheetModalProvider>
+                      </UserProvider>
+                    </PushNotificationProvider>
+                  </CustomAlertProvider>
+                </LoadingProvider>
+              </HapticsProvider>
+            </DeviceThemeProvider>
+          </KeyboardProvider>
+        </GestureHandlerRootView>
+      </ConvexAuthProvider>
+    </AnalyticsProvider>
   );
 }
 

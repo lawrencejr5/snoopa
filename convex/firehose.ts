@@ -1,6 +1,12 @@
 import { generateContentWithGemini } from "./openrouter";
+import {
+  aiObservabilityOptions,
+  createAIClient,
+  createAIObservabilityContext,
+  flushAIObservability,
+  type AIObservabilityContext,
+} from "./ai-observability";
 import { v } from "convex/values";
-import OpenAI from "openai";
 import { internal } from "./_generated/api";
 import { action, internalAction, internalQuery } from "./_generated/server";
 import { sendExpoPush } from "./notifications";
@@ -50,6 +56,7 @@ async function verifyHeadlineWithGemini(
   headline: string,
   snippet: string,
   condition: string,
+  observability: AIObservabilityContext,
 ): Promise<boolean> {
   const prompt = `You are a strict fact-checker. Given a news headline and snippet, determine whether it satisfies the following condition.
         Condition: "${condition}"
@@ -59,14 +66,24 @@ async function verifyHeadlineWithGemini(
         Reply with ONLY "true" if the condition is satisfied, or "false" if it is not. No explanation.`;
 
   try {
-    const text = await generateContentWithGemini(prompt, undefined, "google/gemini-2.5-flash-lite");
+    const text = await generateContentWithGemini(
+      prompt,
+      undefined,
+      "google/gemini-2.5-flash-lite",
+      observability,
+    );
     return text.trim().toLowerCase() === "true";
   } catch (err) {
     console.warn(
       "Primary verification model failed, falling back to gemini-3.1-flash-lite",
     );
     try {
-      const text = await generateContentWithGemini(prompt, undefined, "google/gemini-3.1-flash-lite");
+      const text = await generateContentWithGemini(
+        prompt,
+        undefined,
+        "google/gemini-3.1-flash-lite",
+        observability,
+      );
       return text.trim().toLowerCase() === "true";
     } catch (fallbackErr) {
       console.error("OpenRouter Gemini verification error:", fallbackErr);
@@ -78,6 +95,7 @@ async function verifyHeadlineWithGemini(
 async function verifySourceWithGemini(
   content: string,
   condition: string,
+  observability: AIObservabilityContext,
 ): Promise<boolean> {
   const prompt = `You are a strict fact-checker. Given the content of a web page, determine whether it satisfies the following condition.
         Condition: "${condition}"
@@ -86,14 +104,24 @@ async function verifySourceWithGemini(
         Reply with ONLY "true" if the condition is satisfied, or "false" if it is not. No explanation.`;
 
   try {
-    const text = await generateContentWithGemini(prompt, undefined, "google/gemini-2.5-flash-lite");
+    const text = await generateContentWithGemini(
+      prompt,
+      undefined,
+      "google/gemini-2.5-flash-lite",
+      observability,
+    );
     return text.trim().toLowerCase() === "true";
   } catch (err) {
     console.warn(
       "Primary source verification model failed, falling back to gemini-3.1-flash-lite",
     );
     try {
-      const text = await generateContentWithGemini(prompt, undefined, "google/gemini-3.1-flash-lite");
+      const text = await generateContentWithGemini(
+        prompt,
+        undefined,
+        "google/gemini-3.1-flash-lite",
+        observability,
+      );
       return text.trim().toLowerCase() === "true";
     } catch (fallbackErr) {
       console.error("OpenRouter Gemini source verification error:", fallbackErr);
@@ -122,8 +150,11 @@ async function generateBrief(
   headlines: VerifiedHeadline[],
   deepseekKey: string,
   recentBriefs: string[] = [],
+  observability: AIObservabilityContext = createAIObservabilityContext(
+    `watchlist-brief-${crypto.randomUUID()}`,
+  ),
 ): Promise<string> {
-  const openai = new OpenAI({
+  const openai: any = createAIClient({
     baseURL: "https://api.deepseek.com",
     apiKey: deepseekKey,
   });
@@ -162,14 +193,21 @@ async function generateBrief(
         { role: "system", content: systemInstructions },
         { role: "user", content: userPrompt },
       ],
+      ...aiObservabilityOptions(observability, "deepseek"),
     });
+    await flushAIObservability();
     return response.choices[0].message.content?.trim() ?? headlines[0].title;
   } catch (err) {
     console.warn(
       "DeepSeek primary model failed, falling back to gemini-2.5-flash-lite",
     );
     try {
-      const text = await generateContentWithGemini(userPrompt, systemInstructions, "google/gemini-2.5-flash-lite");
+      const text = await generateContentWithGemini(
+        userPrompt,
+        systemInstructions,
+        "google/gemini-2.5-flash-lite",
+        observability,
+      );
       return text.trim();
     } catch (fallbackErr) {
       console.error("Gemini brief generation error:", fallbackErr);
@@ -325,6 +363,7 @@ async function _processMonitoredSources(
       const satisfied = await verifySourceWithGemini(
         snapshot,
         item.condition,
+        createAIObservabilityContext(`watchlist:${item._id}`, item.user_id),
       );
       sourceUpdates.push({ source, newHash, newSnapshot: snapshot, satisfied });
     }),
@@ -470,6 +509,7 @@ async function _runGeneralSearch(
         headline.title,
         headline.content ?? "",
         item.condition,
+        createAIObservabilityContext(`watchlist:${item._id}`, item.user_id),
       );
 
       toMarkProcessed.push({ urlHash: headline.hash, watchlist_id: item._id });
@@ -533,6 +573,7 @@ async function _dispatchAlerts(
       headlines,
       deepseekKey,
       recent_briefs,
+      createAIObservabilityContext(`watchlist:${item._id}`, item.user_id),
     );
 
     // If everything in the new headlines is already known — skip dispatch

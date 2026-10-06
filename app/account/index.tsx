@@ -10,6 +10,7 @@ import { registerForPushNotificationsAsync } from "@/utils/reg_push_notification
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useConvexAuth, useMutation } from "convex/react";
 import { useRouter } from "expo-router";
+import { usePostHog } from "posthog-react-native";
 import * as WebBrowser from "expo-web-browser";
 import { useState } from "react";
 import {
@@ -28,6 +29,7 @@ export default function AccountScreen() {
   const router = useRouter();
 
   const { signedIn } = useUser();
+  const posthog = usePostHog();
 
   const { isLoading } = useConvexAuth();
   const { appLoading } = useLoadingContext();
@@ -100,6 +102,7 @@ export default function AccountScreen() {
         console.warn("Could not remove token from server", e);
       }
 
+      posthog?.capture("user_signed_out");
       await signOut();
     } catch (err) {
       console.log(err);

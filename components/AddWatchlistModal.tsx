@@ -3,6 +3,7 @@ import { useCustomAlert } from "@/context/CustomAlertContext";
 import { useTheme } from "@/context/ThemeContext";
 import { useUser } from "@/context/UserContext";
 import { api } from "@/convex/_generated/api";
+import { posthogLogger } from "@/utils/posthog-logger";
 import {
   BottomSheetBackdrop,
   BottomSheetModal,
@@ -11,6 +12,7 @@ import {
 } from "@gorhom/bottom-sheet";
 import { useAction } from "convex/react";
 import { useRouter } from "expo-router";
+import { usePostHog } from "posthog-react-native";
 import LottieView from "lottie-react-native";
 import React, {
   useCallback,
@@ -115,6 +117,7 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
   const { theme } = useTheme();
   const router = useRouter();
   const { signedIn } = useUser();
+  const posthog = usePostHog();
   const { showCustomAlert } = useCustomAlert();
   const bottomSheetRef = useRef<BottomSheetModal>(null);
   const inputRef = useRef<any>(null);
@@ -275,6 +278,10 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
     setValidationError(null);
     setErrorText(null);
     setPhase("generating");
+    posthog?.capture("watchlist_preview_requested");
+    posthogLogger.info("watchlist_preview_requested", {
+      source: "add_watchlist_modal",
+    });
 
     try {
       const result = await generateWatchlistPreview({
@@ -292,11 +299,17 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
           time_range: result.time_range,
           final_snoop_text: result.final_snoop_text,
         });
+        posthogLogger.info("watchlist_preview_generated", {
+          source: "add_watchlist_modal",
+        });
         setPhase("completed");
       } else {
         throw new Error("Failed to generate watchlist preview");
       }
     } catch (error: any) {
+      posthogLogger.warn("watchlist_preview_generation_failed", {
+        source: "add_watchlist_modal",
+      });
       console.error("Failed to generate watchlist preview:", error);
       const msg = error?.message?.includes("FREE_LIMIT_REACHED")
         ? "You have reached the maximum limit of 2 watchlists on a free account. Upgrade to Pro for unlimited watchlists! 🔒"
@@ -334,6 +347,15 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
 
       if (result?.watchlist_id) {
         const targetId = result.watchlist_id;
+        posthog?.capture("watchlist_created", {
+          search_type: watchlistPreview.search_type ?? "general",
+          time_range: watchlistPreview.time_range ?? "any_time",
+        });
+        posthogLogger.info("watchlist_created", {
+          source: "add_watchlist_modal",
+          search_type: watchlistPreview.search_type ?? "general",
+          time_range: watchlistPreview.time_range ?? "any_time",
+        });
         handleClose();
         showCustomAlert("New watchlist created", "success");
         router.push({
@@ -344,6 +366,9 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
         throw new Error("Failed to confirm watchlist creation");
       }
     } catch (error: any) {
+      posthogLogger.warn("watchlist_creation_failed", {
+        source: "add_watchlist_modal",
+      });
       console.error("Failed to save watchlist:", error);
       const msg = error?.message?.includes("FREE_LIMIT_REACHED")
         ? "You have reached the maximum limit of 2 watchlists on a free account. Upgrade to Pro for unlimited watchlists! 🔒"

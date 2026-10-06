@@ -7,6 +7,7 @@ import { api } from "@/convex/_generated/api";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useMutation } from "convex/react";
 import { useRouter } from "expo-router";
+import { usePostHog } from "posthog-react-native";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -30,6 +31,7 @@ export default function ProfileScreen() {
 
   const { signOut } = useAuthActions();
   const { signedIn } = useUser();
+  const posthog = usePostHog();
 
   const [fullname, setFullname] = useState("");
   const [username, setUsername] = useState("");
@@ -56,6 +58,9 @@ export default function ProfileScreen() {
         username,
         memory,
       });
+      posthog?.capture("profile_updated", {
+        updated_fields: ["fullname", "username", "memory"],
+      });
       showCustomAlert("Profile updated successfully", "success");
     } catch (error) {
       showCustomAlert("Failed to update profile", "danger");
@@ -69,6 +74,7 @@ export default function ProfileScreen() {
     try {
       setIsDeleting(true);
       await deleteUser();
+      posthog?.capture("account_deleted");
       await signOut();
       setModalVisible(false);
       router.replace("/");

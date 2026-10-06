@@ -6,6 +6,7 @@ import { api } from "@/convex/_generated/api";
 import { Feather, Octicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useMutation } from "convex/react";
+import { usePostHog } from "posthog-react-native";
 import { useRouter } from "expo-router";
 import React, { useRef, useState } from "react";
 import {
@@ -68,6 +69,7 @@ const OnboardingScreen = () => {
   const { theme } = useTheme();
   const router = useRouter();
   const { signedIn } = useUser();
+  const posthog = usePostHog();
   const saveReferralSource = useMutation(api.users.save_referral_source);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [selectedReferral, setSelectedReferral] = useState<string | null>(null);
@@ -107,6 +109,9 @@ const OnboardingScreen = () => {
           await saveReferralSource({ source: selectedReferral });
         }
         await AsyncStorage.setItem("hasSeenOnboarding", "true");
+        posthog?.capture("onboarding_completed", {
+          referral_source: selectedReferral,
+        });
         router.replace("/welcome");
       } catch (err) {
         console.error("Error saving onboarding completion:", err);

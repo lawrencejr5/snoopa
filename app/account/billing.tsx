@@ -7,6 +7,7 @@ import { useHapitcs } from "@/context/HapticsContext";
 import { useTheme } from "@/context/ThemeContext";
 import { useUser } from "@/context/UserContext";
 import { useRouter } from "expo-router";
+import { usePostHog } from "posthog-react-native";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -35,6 +36,7 @@ export default function BillingScreen() {
   const haptics = useHapitcs();
   const { showCustomAlert } = useCustomAlert();
   const { signedIn } = useUser();
+  const posthog = usePostHog();
 
   const getPlanBtnText = (planId: string) => {
     const currentTier = signedIn?.sub_tier || "free";
@@ -136,6 +138,9 @@ export default function BillingScreen() {
         const sub_end_date = entitlement.expirationDate
           ? new Date(entitlement.expirationDate).getTime()
           : undefined;
+        posthog?.capture("subscription_purchase_completed", {
+          plan_id: planId,
+        });
         showCustomAlert(
           `Successfully upgraded to Snoopa ${planId.toUpperCase()}!`,
           "success",

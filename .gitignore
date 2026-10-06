@@ -46,3 +46,5 @@ firebase-private-key.json
 
 #convex
 convex/_generated
+.env.local
+.env

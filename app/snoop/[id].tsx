@@ -22,6 +22,7 @@ import {
 } from "@gorhom/bottom-sheet";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
+import { usePostHog } from "posthog-react-native";
 import * as WebBrowser from "expo-web-browser";
 import React, {
   useCallback,
@@ -419,6 +420,7 @@ export default function SnoopDetailsScreen() {
   const { showCustomAlert } = useCustomAlert();
   const { id } = useLocalSearchParams();
   const { signedIn } = useUser();
+  const posthog = usePostHog();
   const scrollRef = useRef<ScrollView>(null);
 
   const [input, setInput] = useState("");
@@ -826,6 +828,9 @@ export default function SnoopDetailsScreen() {
               ? "EDIT_CONDITION"
               : undefined,
       });
+      posthog?.capture("watchlist_chat_message_sent", {
+        command_mode: current_mode ?? "chat",
+      });
       if (current_mode) {
         setCommandMode(null);
       }
@@ -846,6 +851,9 @@ export default function SnoopDetailsScreen() {
       await submitFeedback({
         chat_id: chatId as Id<"chats">,
         feedback: feedbackType,
+      });
+      posthog?.capture("watchlist_chat_feedback_submitted", {
+        feedback_type: feedbackType,
       });
       showCustomAlert("Feedback submitted", "success");
     } catch (err) {
@@ -870,6 +878,7 @@ export default function SnoopDetailsScreen() {
     setIsProcessing(true);
     try {
       await deleteWatchlist({ watchlist_id: id as Id<"watchlist"> });
+      posthog?.capture("watchlist_deleted");
       showCustomAlert("Watchlist deleted successfully", "success");
       router.back();
     } catch (e) {
@@ -893,6 +902,9 @@ export default function SnoopDetailsScreen() {
         content,
         intent: is_paused ? "RESUME" : "PAUSE",
       });
+      posthog?.capture("watchlist_tracking_toggled", {
+        action: is_paused ? "resumed" : "paused",
+      });
     } catch (e) {
       console.error("Pause/resume via chat failed:", e);
     } finally {
@@ -908,6 +920,7 @@ export default function SnoopDetailsScreen() {
         watchlist_id: id as Id<"watchlist">,
         title: newTitle,
       });
+      posthog?.capture("watchlist_renamed");
       setShowRename(false);
     } catch (e) {
       console.error("Rename failed:", e);
