@@ -363,167 +363,102 @@ export default function NotificationsView() {
         </div>
       )}
 
-      {/* Top Row: Metric KPI Card + Broadcast System Alert Card */}
+      {/* Top Header Row: Minimal KPI Card + Broadcast Button */}
       <div
         style={{
           display: "flex",
-          alignItems: "stretch",
+          alignItems: "center",
           justifyContent: "space-between",
           flexWrap: "wrap",
-          gap: 20,
-          marginBottom: 24,
+          gap: 16,
+          marginBottom: 20,
         }}
       >
-        {/* Metric KPI Card: Single card showing this month's deliveries with all-time total */}
-        <div style={{ flex: 1, minWidth: 300, maxWidth: 440 }}>
-          <div className="card" style={{ height: "100%" }}>
-            <div className="metric-header">
-              <span className="metric-title">Notifications Delivered</span>
-              <div className="metric-icon-wrap">
-                <Bell
-                  style={{ width: 18, height: 18, color: "var(--accent-milk)" }}
-                />
-              </div>
-            </div>
+        {/* Minimal KPI Card */}
+        <div
+          className="card"
+          style={{
+            padding: "12px 18px",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 14,
+          }}
+        >
+          <div
+            className="metric-icon-wrap"
+            style={{ width: 34, height: 34, flexShrink: 0 }}
+          >
+            <Bell style={{ width: 16, height: 16, color: "var(--accent-milk)" }} />
+          </div>
 
-            <div
-              style={{
-                display: "flex",
-                alignItems: "baseline",
-                gap: 8,
-                marginBottom: 4,
-              }}
-            >
-              <div
-                className="metric-value"
-                style={{ marginBottom: 0, fontSize: 34 }}
+          <div>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+              <span
+                style={{
+                  fontSize: 22,
+                  fontWeight: 700,
+                  fontFamily: "var(--font-header)",
+                  color: "var(--text-primary)",
+                  lineHeight: 1,
+                }}
               >
                 {stats.thisMonth.toLocaleString()}
-              </div>
+              </span>
               <span
                 style={{
-                  fontSize: 13,
+                  fontSize: 12,
+                  fontWeight: 600,
                   color: "var(--text-secondary)",
-                  fontWeight: 500,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.04em",
                 }}
               >
-                delivered this month ({currentMonthName})
+                Delivered this month ({currentMonthName})
               </span>
             </div>
-
-            <div
-              className="metric-sub"
-              style={{ color: "var(--text-muted)", marginBottom: 14 }}
-            >
-              Monthly dispatch volume across proactive intel alerts and system
-              updates
-            </div>
-
             <div
               style={{
+                fontSize: 12,
+                color: "var(--text-muted)",
+                marginTop: 3,
                 display: "flex",
                 alignItems: "center",
-                justifyContent: "space-between",
-                paddingTop: 12,
-                borderTop: "1px solid var(--border-color)",
+                gap: 5,
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-                <CheckCircle2
-                  style={{ width: 15, height: 15, color: "var(--accent-green)" }}
-                />
-                <span
-                  style={{
-                    fontSize: 13,
-                    color: "var(--text-secondary)",
-                    fontWeight: 500,
-                  }}
-                >
-                  Total Delivered All-Time
-                </span>
-              </div>
-              <span
-                style={{
-                  fontSize: 16,
-                  fontWeight: 700,
-                  fontFamily: "var(--font-header)",
-                  color: "var(--text-primary)",
-                }}
-              >
+              <CheckCircle2
+                style={{ width: 12, height: 12, color: "var(--accent-green)" }}
+              />
+              <span>Total all-time:</span>
+              <strong style={{ color: "var(--text-secondary)", fontWeight: 600 }}>
                 {stats.allTime.toLocaleString()}
-              </span>
+              </strong>
             </div>
           </div>
         </div>
 
-        {/* Action Card: Broadcast System Notification */}
-        <div style={{ flex: 1, minWidth: 300, maxWidth: 440 }}>
-          <div
-            className="card"
-            style={{
-              height: "100%",
-              display: "flex",
-              flexDirection: "column",
-              justifyContent: "space-between",
-            }}
-          >
-            <div>
-              <div className="metric-header">
-                <span className="metric-title">System Broadcast</span>
-                <div
-                  className="metric-icon-wrap"
-                  style={{
-                    backgroundColor: "rgba(168, 85, 247, 0.15)",
-                    color: "var(--accent-purple, #a855f7)",
-                  }}
-                >
-                  <ShieldAlert style={{ width: 18, height: 18 }} />
-                </div>
-              </div>
-
-              <div
-                style={{
-                  fontSize: 18,
-                  fontWeight: 700,
-                  fontFamily: "var(--font-header)",
-                  color: "var(--text-primary)",
-                  marginBottom: 6,
-                }}
-              >
-                Broadcast to All Users
-              </div>
-              <div
-                className="metric-sub"
-                style={{ color: "var(--text-secondary)", marginBottom: 16 }}
-              >
-                Save and dispatch a system notification. Instantly visible to all users on the mobile app feed.
-              </div>
-            </div>
-
-            <button
-              className="btn-primary"
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 8,
-                padding: "10px 16px",
-                fontSize: 13,
-                fontWeight: 600,
-                width: "100%",
-                cursor: "pointer",
-              }}
-              onClick={() => {
-                setSubmitError(null);
-                setBroadcastSuccess(null);
-                setShowCreateModal(true);
-              }}
-            >
-              <ShieldAlert style={{ width: 16, height: 16 }} />
-              <span>Broadcast System Notification</span>
-            </button>
-          </div>
-        </div>
+        {/* System Broadcast Single Button */}
+        <button
+          className="btn-primary"
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "9px 16px",
+            fontSize: 13,
+            fontWeight: 600,
+            cursor: "pointer",
+            whiteSpace: "nowrap",
+          }}
+          onClick={() => {
+            setSubmitError(null);
+            setBroadcastSuccess(null);
+            setShowCreateModal(true);
+          }}
+        >
+          <ShieldAlert style={{ width: 16, height: 16 }} />
+          <span>Broadcast System Notification</span>
+        </button>
       </div>
 
       {/* Main Table Card */}
@@ -541,17 +476,16 @@ export default function NotificationsView() {
         >
           {/* Search Bar */}
           <div
-            className="search-bar"
+            className="search-input-wrap"
             style={{ flex: 1, minWidth: 260, maxWidth: 420 }}
           >
-            <Search className="search-icon" style={{ width: 16, height: 16 }} />
+            <Search className="search-icon" />
             <input
               type="text"
               placeholder="Search notifications, messages, customers, or watchlists..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="input-field"
-              style={{ width: "100%", paddingLeft: 38 }}
             />
           </div>
 
