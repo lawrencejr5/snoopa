@@ -25,7 +25,8 @@
       "userInterfaceStyle": "dark",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "UIUserInterfaceStyle": "Dark"
+        "UIUserInterfaceStyle": "Dark",
+        "NSUserTrackingUsageDescription": "This identifier helps us deliver relevant rewarded ads so you can continue earning free snoops."
       }
     },
     "android": {
@@ -85,7 +86,6 @@
           "iosAppId": "ca-app-pub-7078901325871517~9953396692"
         }
       ],
-      "expo-tracking-transparency",
       "expo-localization"
     ],
     "experiments": {

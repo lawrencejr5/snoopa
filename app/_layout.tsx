@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { AppState, AppStateStatus, Platform } from "react-native";
 import Purchases from "react-native-purchases";
 import "react-native-reanimated";
+import { requestTrackingPermissionsAsync } from "expo-tracking-transparency";
 import CustomSplash from "./splashscreen";
 
 import { api } from "@/convex/_generated/api";
@@ -130,6 +131,19 @@ const WithinContext = ({ loaded }: { loaded: boolean }) => {
     }, 2000);
     return () => clearTimeout(timer);
   }, []);
+
+  useEffect(() => {
+    if (!showSplash) {
+      (async () => {
+        try {
+          const { status } = await requestTrackingPermissionsAsync();
+          console.log("App Tracking Transparency permission status:", status);
+        } catch (e) {
+          console.warn("Error requesting App Tracking Transparency permissions:", e);
+        }
+      })();
+    }
+  }, [showSplash]);
 
   useEffect(() => {
     if (!loaded || isLoading || isFirstLaunch === null) return;
