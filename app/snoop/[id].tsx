@@ -22,8 +22,8 @@ import {
 } from "@gorhom/bottom-sheet";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
-import { usePostHog } from "posthog-react-native";
 import * as WebBrowser from "expo-web-browser";
+import { usePostHog } from "posthog-react-native";
 import React, {
   useCallback,
   useEffect,
@@ -539,15 +539,21 @@ export default function SnoopDetailsScreen() {
     string | null | undefined
   >(undefined);
   const initialUnseenCaptured = useRef(false);
+  const initialUnseenIdRef = useRef<string | null | undefined>(undefined);
   const itemYPositions = useRef<Record<number, number>>({});
   const hasScrolledInitial = useRef(false);
+  const hasMarkedSeen = useRef(false);
+  const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Reset tracking state when switching watchlist ID
   useEffect(() => {
     initialUnseenCaptured.current = false;
+    initialUnseenIdRef.current = undefined;
     hasScrolledInitial.current = false;
+    hasMarkedSeen.current = false;
     itemYPositions.current = {};
     setInitialUnseenId(undefined);
+    if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
   }, [id]);
 
   useFocusEffect(
@@ -581,7 +587,7 @@ export default function SnoopDetailsScreen() {
           content: log.action,
           timestamp: log.timestamp,
           logType: log.type as "success" | "error",
-          seen: log.seen ?? false,
+          seen: log.seen === false ? false : true,
         });
       }
     }
@@ -623,7 +629,7 @@ export default function SnoopDetailsScreen() {
             content: displayContent,
             timestamp: msg._creationTime,
             gateType: is_premium_gate ? "upgrade" : "top_up",
-            seen: msg.seen ?? false,
+            seen: msg.seen === false ? false : true,
           });
           continue;
         }
@@ -634,7 +640,7 @@ export default function SnoopDetailsScreen() {
           content: cleanContent,
           timestamp: msg._creationTime,
           feedback: (msg as any).feedback,
-          seen: msg.role === "user" ? true : (msg.seen ?? false),
+          seen: msg.role === "user" ? true : msg.seen === false ? false : true,
         });
       }
     }
@@ -644,59 +650,114 @@ export default function SnoopDetailsScreen() {
     return entries;
   }, [logs, chatMessages]);
 
-  // Capture the first unseen message ID on initial timeline load
+  // Capture the first unseen message ID once BOTH queries have loaded
   useEffect(() => {
-    if (timeline.length > 0 && !initialUnseenCaptured.current) {
-      initialUnseenCaptured.current = true;
-      const firstUnseen = timeline.find((item) => !item.seen);
-      setInitialUnseenId(firstUnseen ? firstUnseen.id : null);
-    }
-  }, [timeline]);
+    if (logs === undefined || chatMessages === undefined) return;
+    if (initialUnseenCaptured.current) return;
 
-  // Mark logs & chats as seen in DB after capturing the initial unseen marker
+    initialUnseenCaptured.current = true;
+    const firstUnseen = timeline.find((item) => item.seen === false);
+    const targetId = firstUnseen ? firstUnseen.id : null;
+    initialUnseenIdRef.current = targetId;
+    setInitialUnseenId(targetId);
+  }, [logs, chatMessages, timeline]);
+
+  const firstUnseenIndex = useMemo(() => {
+    if (!initialUnseenId) return -1;
+    return timeline.findIndex((item) => item.id === initialUnseenId);
+  }, [initialUnseenId, timeline]);
+
+  // Mark logs & chats as seen in DB after user views them
   useEffect(() => {
-    if (initialUnseenCaptured.current && id && isScreenFocused) {
-      markLogsSeen({ watchlist_id: id as Id<"watchlist"> }).catch(() => {});
-      markChatsSeen({ watchlist_id: id as Id<"watchlist"> }).catch(() => {});
+    if (
+      initialUnseenCaptured.current &&
+      initialUnseenId !== undefined &&
+      id &&
+      isScreenFocused &&
+      !hasMarkedSeen.current
+    ) {
+      const timer = setTimeout(() => {
+        hasMarkedSeen.current = true;
+        markLogsSeen({ watchlist_id: id as Id<"watchlist"> }).catch(() => {});
+        markChatsSeen({ watchlist_id: id as Id<"watchlist"> }).catch(() => {});
+      }, 1000);
+      return () => clearTimeout(timer);
     }
   }, [initialUnseenId, id, isScreenFocused]);
 
-  const scrollToInitialPosition = useCallback(() => {
-    if (hasScrolledInitial.current || initialUnseenId === undefined) return;
+  const scrollToUnread = useCallback(
+    (targetY: number) => {
+      const scrollY = Math.max(0, targetY - 8);
+      // Immediately position the first unread message at the top of the viewport
+      scrollRef.current?.scrollTo({
+        y: scrollY,
+        animated: false,
+      });
 
-    if (initialUnseenId === null) {
-      // All messages seen -> scroll to bottom
-      hasScrolledInitial.current = true;
-      setTimeout(() => {
-        scrollRef.current?.scrollToEnd({ animated: false });
-      }, 100);
-    } else {
-      const unseenIndex = timeline.findIndex(
-        (item) => item.id === initialUnseenId,
-      );
-      if (unseenIndex !== -1) {
+      // Follow up in case of minor layout adjustment as text/elements settle
+      if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+      scrollTimeoutRef.current = setTimeout(() => {
         hasScrolledInitial.current = true;
-        // Scroll to last seen message (unseenIndex - 1) or first unseen message (0)
-        const targetIndex = Math.max(0, unseenIndex - 1);
-        setTimeout(() => {
-          const targetY =
-            itemYPositions.current[targetIndex] ??
-            itemYPositions.current[unseenIndex] ??
-            0;
-          scrollRef.current?.scrollTo({
-            y: Math.max(0, targetY - 10),
-            animated: false,
-          });
-        }, 100);
-      }
+        const latestY =
+          firstUnseenIndex !== -1
+            ? itemYPositions.current[firstUnseenIndex]
+            : undefined;
+        const finalY = latestY ?? targetY;
+        scrollRef.current?.scrollTo({
+          y: Math.max(0, finalY - 8),
+          animated: false,
+        });
+      }, 60);
+    },
+    [firstUnseenIndex],
+  );
+
+  // If firstUnseenIndex was already measured when initialUnseenId resolved, scroll immediately
+  useEffect(() => {
+    if (
+      firstUnseenIndex !== -1 &&
+      !hasScrolledInitial.current &&
+      itemYPositions.current[firstUnseenIndex] !== undefined
+    ) {
+      scrollToUnread(itemYPositions.current[firstUnseenIndex]);
     }
-  }, [initialUnseenId, timeline]);
+  }, [firstUnseenIndex, scrollToUnread]);
+
+  // When all messages are read (initialUnseenId === null), scroll to end once content is ready
+  const handleContentSizeChange = useCallback(
+    (_w: number, contentHeight: number) => {
+      if (initialUnseenIdRef.current === null && !hasScrolledInitial.current) {
+        if (contentHeight > 0) {
+          if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+          scrollTimeoutRef.current = setTimeout(() => {
+            if (
+              !hasScrolledInitial.current &&
+              initialUnseenIdRef.current === null
+            ) {
+              hasScrolledInitial.current = true;
+              scrollRef.current?.scrollToEnd({ animated: false });
+            }
+          }, 80);
+        }
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
-    if (initialUnseenId !== undefined && !hasScrolledInitial.current) {
-      scrollToInitialPosition();
+    if (initialUnseenId === null && !hasScrolledInitial.current) {
+      if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+      scrollTimeoutRef.current = setTimeout(() => {
+        if (
+          !hasScrolledInitial.current &&
+          initialUnseenIdRef.current === null
+        ) {
+          hasScrolledInitial.current = true;
+          scrollRef.current?.scrollToEnd({ animated: false });
+        }
+      }, 120);
     }
-  }, [initialUnseenId, scrollToInitialPosition]);
+  }, [initialUnseenId]);
 
   const prevMessagesLength = useRef(0);
   const prevLogsLength = useRef(0);
@@ -929,7 +990,9 @@ export default function SnoopDetailsScreen() {
     }
   };
 
-  if (snoop === undefined) return <Loading />;
+  if (snoop === undefined || logs === undefined || chatMessages === undefined) {
+    return <Loading />;
+  }
 
   if (snoop === null) {
     return (
@@ -1332,13 +1395,10 @@ export default function SnoopDetailsScreen() {
           style={{ flex: 1 }}
           contentContainerStyle={{ padding: 16, paddingBottom: 8 }}
           showsVerticalScrollIndicator={false}
+          onContentSizeChange={handleContentSizeChange}
         >
           {/* Timeline entries */}
           {timeline.map((entry, index) => {
-            const firstUnseenIndex =
-              initialUnseenId !== null && initialUnseenId !== undefined
-                ? timeline.findIndex((e) => e.id === initialUnseenId)
-                : -1;
             const isFirstUnseen =
               firstUnseenIndex !== -1 && index === firstUnseenIndex;
 
@@ -1362,9 +1422,13 @@ export default function SnoopDetailsScreen() {
               <View
                 key={entry.id}
                 onLayout={(e) => {
-                  itemYPositions.current[index] = e.nativeEvent.layout.y;
-                  if (!hasScrolledInitial.current) {
-                    scrollToInitialPosition();
+                  const y = e.nativeEvent.layout.y;
+                  itemYPositions.current[index] = y;
+                  if (
+                    index === firstUnseenIndex &&
+                    !hasScrolledInitial.current
+                  ) {
+                    scrollToUnread(y);
                   }
                 }}
               >
@@ -1389,10 +1453,10 @@ export default function SnoopDetailsScreen() {
                       {isFirstUnseen && (
                         <Text
                           style={{
-                            fontFamily: "FontMedium",
+                            fontFamily: "FontBold",
                             fontSize: 12,
                             color: Colors[theme].text_secondary,
-                            marginLeft: 2,
+                            marginLeft: 4,
                           }}
                         >
                           (unread)
