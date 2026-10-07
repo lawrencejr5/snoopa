@@ -282,3 +282,21 @@ export const send_snoop_alert_push = internalAction({
     await sendExpoPush(push_tokens, title, message);
   },
 });
+
+/**
+ * Action to broadcast an Expo push notification to multiple device tokens.
+ * Triggered asynchronously when an admin saves a system notification.
+ */
+export const broadcast_system_push = internalAction({
+  args: {
+    push_tokens: v.array(v.string()),
+    title: v.string(),
+    message: v.string(),
+  },
+  handler: async (_ctx, args) => {
+    if (args.push_tokens.length === 0) return;
+    await sendExpoPush(args.push_tokens, args.title, args.message, {
+      type: "system",
+    });
+  },
+});

@@ -76,26 +76,39 @@ export default function NotificationDetailScreen() {
 
   // Compute dynamic visuals once notification is loaded
   const is_snoops = notification?.type === "snoops";
+  const is_system = notification?.type === "system";
   const is_exhausted =
     is_snoops &&
     (notification?.title.toLowerCase().includes("out") ||
       notification?.message.toLowerCase().includes("run out"));
 
-  const header_title = is_snoops ? "Snoops Info" : "Premium Gift";
+  const header_title = is_snoops
+    ? "Snoops Info"
+    : is_system
+      ? "System Alert"
+      : "Premium Gift";
 
   const badge_text = is_snoops
     ? is_exhausted
       ? "SNOOPS EXHAUSTED"
       : "SNOOPS LOW"
-    : "EXCLUSIVE REWARD";
+    : is_system
+      ? "SYSTEM ANNOUNCEMENT"
+      : "EXCLUSIVE REWARD";
 
   const badge_color = is_snoops
     ? is_exhausted
       ? C.danger
       : C.warning
-    : C.success;
+    : is_system
+      ? C.warning
+      : C.success;
 
-  const button_text = is_snoops ? "Upgrade or Top Up" : "Explore benefits";
+  const button_text = is_snoops
+    ? "Upgrade or Top Up"
+    : is_system
+      ? "Understood"
+      : "Explore benefits";
 
   return (
     <Container>
@@ -209,9 +222,9 @@ export default function NotificationDetailScreen() {
                 </Pressable>
               </View>
             ) : (
-              /* Explore Benefits Button */
+              /* Action Button */
               <Pressable
-                onPress={handle_explore}
+                onPress={is_system ? handle_back : handle_explore}
                 style={({ pressed }) => [
                   styles.btn,
                   {

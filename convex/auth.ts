@@ -213,6 +213,34 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
             read: false,
             reward_claimed: false,
           });
+
+          // Seed active system announcements from the past 30 days for this new user
+          const thirty_days_ago = Date.now() - 30 * 24 * 60 * 60 * 1000;
+          const active_system = await ctx.db
+            .query("notifications")
+            .filter((q) =>
+              q.and(
+                q.eq(q.field("type"), "system"),
+                q.gte(q.field("_creationTime"), thirty_days_ago),
+              ),
+            )
+            .collect();
+
+          const seen_announcements = new Set<string>();
+          for (const sn of active_system) {
+            const key = `${sn.title}:::${sn.message}`;
+            if (!seen_announcements.has(key)) {
+              seen_announcements.add(key);
+              await ctx.db.insert("notifications", {
+                user_id: args.userId,
+                type: "system",
+                title: sn.title,
+                message: sn.message,
+                seen: false,
+                read: false,
+              });
+            }
+          }
         }
       }
     },

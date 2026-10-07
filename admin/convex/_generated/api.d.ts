@@ -22,6 +22,7 @@ import type * as migrations from "../migrations.js";
 import type * as monitored_sources from "../monitored_sources.js";
 import type * as notifications from "../notifications.js";
 import type * as openrouter from "../openrouter.js";
+import type * as plans from "../plans.js";
 import type * as session from "../session.js";
 import type * as snoops from "../snoops.js";
 import type * as tavily from "../tavily.js";
@@ -52,6 +53,7 @@ declare const fullApi: ApiFromModules<{
   monitored_sources: typeof monitored_sources;
   notifications: typeof notifications;
   openrouter: typeof openrouter;
+  plans: typeof plans;
   session: typeof session;
   snoops: typeof snoops;
   tavily: typeof tavily;

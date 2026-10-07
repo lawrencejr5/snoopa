@@ -956,4 +956,62 @@ export const getAdminNotifications = query({
   },
 });
 
+/**
+ * Create a system-wide notification.
+ * Dispatches a notification of type 'system' to all registered users on the platform,
+ * making it visible across all user feeds on the app, and optionally sending push alerts.
+ */
+export const create_system_notification = mutation({
+  args: {
+    title: v.string(),
+    message: v.string(),
+    send_push: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    const title = args.title.trim();
+    const message = args.message.trim();
+
+    if (!title) {
+      throw new Error("Notification title cannot be empty.");
+    }
+    if (!message) {
+      throw new Error("Notification message cannot be empty.");
+    }
+
+    const users = await ctx.db.query("users").collect();
+    if (users.length === 0) {
+      return { success: true, count: 0 };
+    }
+
+    const push_tokens: string[] = [];
+
+    for (const user of users) {
+      await ctx.db.insert("notifications", {
+        user_id: user._id,
+        type: "system",
+        title,
+        message,
+        seen: false,
+        read: false,
+      });
+
+      if (user.pushTokens && Array.isArray(user.pushTokens)) {
+        push_tokens.push(...user.pushTokens);
+      }
+    }
+
+    // Deliver Expo push notifications if requested and tokens exist
+    if (args.send_push !== false && push_tokens.length > 0) {
+      const unique_tokens = Array.from(new Set(push_tokens));
+      await ctx.scheduler.runAfter(0, internal.notifications.broadcast_system_push, {
+        push_tokens: unique_tokens,
+        title,
+        message,
+      });
+    }
+
+    return { success: true, count: users.length };
+  },
+});
+
 

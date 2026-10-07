@@ -1,7 +1,7 @@
 "use client";
 
 import { api } from "@convex/_generated/api";
-import { useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import {
   ArrowDown,
   ArrowUp,
@@ -61,6 +61,9 @@ export default function NotificationsView() {
   const router = useRouter();
   const notifications = useQuery(api.admin.getAdminNotifications) as
     AdminNotificationItem[] | undefined;
+  const createSystemNotification = useMutation(
+    api.admin.create_system_notification,
+  );
 
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
@@ -73,20 +76,59 @@ export default function NotificationsView() {
     useState<AdminNotificationItem | null>(null);
   const [copiedId, setCopiedId] = useState(false);
 
-  // Close modal with Escape key
+  // Broadcast system notification modal state
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newTitle, setNewTitle] = useState("");
+  const [newMessage, setNewMessage] = useState("");
+  const [sendPush, setSendPush] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [broadcastSuccess, setBroadcastSuccess] = useState<string | null>(null);
+
+  // Close modals with Escape key
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        setSelectedNotification(null);
+        if (showCreateModal && !isSubmitting) {
+          setShowCreateModal(false);
+        } else if (selectedNotification) {
+          setSelectedNotification(null);
+        }
       }
     };
-    if (selectedNotification) {
-      window.addEventListener("keydown", handleKeyDown);
-    }
+    window.addEventListener("keydown", handleKeyDown);
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [selectedNotification]);
+  }, [showCreateModal, isSubmitting, selectedNotification]);
+
+  const handleBroadcastSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTitle.trim() || !newMessage.trim()) return;
+
+    setIsSubmitting(true);
+    setSubmitError(null);
+
+    try {
+      const res = await createSystemNotification({
+        title: newTitle.trim(),
+        message: newMessage.trim(),
+        send_push: sendPush,
+      });
+
+      setShowCreateModal(false);
+      setNewTitle("");
+      setNewMessage("");
+      setBroadcastSuccess(
+        `System notification saved and broadcasted to ${res.count} user${res.count === 1 ? "" : "s"}!`,
+      );
+      setTimeout(() => setBroadcastSuccess(null), 6000);
+    } catch (err: any) {
+      setSubmitError(err.message || "Failed to broadcast system notification.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const filteredAndSorted = useMemo(() => {
     if (!notifications) return [];
@@ -287,64 +329,77 @@ export default function NotificationsView() {
 
   return (
     <div>
-      {/* Metric KPI Card: Single card showing this month's deliveries with all-time total */}
-      <div style={{ marginBottom: 24, maxWidth: 440 }}>
-        <div className="card">
-          <div className="metric-header">
-            <span className="metric-title">Notifications Delivered</span>
-            <div className="metric-icon-wrap">
-              <Bell
-                style={{ width: 18, height: 18, color: "var(--accent-milk)" }}
-              />
-            </div>
+      {/* Success Notification Alert Banner */}
+      {broadcastSuccess && (
+        <div
+          style={{
+            backgroundColor: "rgba(106, 170, 102, 0.15)",
+            border: "1px solid rgba(106, 170, 102, 0.4)",
+            borderRadius: "var(--radius-md)",
+            padding: "14px 18px",
+            marginBottom: 20,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            color: "var(--accent-green)",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <CheckCircle2 style={{ width: 18, height: 18 }} />
+            <span style={{ fontSize: 14, fontWeight: 500 }}>{broadcastSuccess}</span>
           </div>
-
-          <div
+          <button
+            onClick={() => setBroadcastSuccess(null)}
             style={{
-              display: "flex",
-              alignItems: "baseline",
-              gap: 8,
-              marginBottom: 4,
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              color: "var(--accent-green)",
+              padding: 2,
             }}
           >
-            <div
-              className="metric-value"
-              style={{ marginBottom: 0, fontSize: 34 }}
-            >
-              {stats.thisMonth.toLocaleString()}
+            <X style={{ width: 14, height: 14 }} />
+          </button>
+        </div>
+      )}
+
+      {/* Top Row: Metric KPI Card + Broadcast System Alert Card */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "stretch",
+          justifyContent: "space-between",
+          flexWrap: "wrap",
+          gap: 20,
+          marginBottom: 24,
+        }}
+      >
+        {/* Metric KPI Card: Single card showing this month's deliveries with all-time total */}
+        <div style={{ flex: 1, minWidth: 300, maxWidth: 440 }}>
+          <div className="card" style={{ height: "100%" }}>
+            <div className="metric-header">
+              <span className="metric-title">Notifications Delivered</span>
+              <div className="metric-icon-wrap">
+                <Bell
+                  style={{ width: 18, height: 18, color: "var(--accent-milk)" }}
+                />
+              </div>
             </div>
-            <span
+
+            <div
               style={{
-                fontSize: 13,
-                color: "var(--text-secondary)",
-                fontWeight: 500,
+                display: "flex",
+                alignItems: "baseline",
+                gap: 8,
+                marginBottom: 4,
               }}
             >
-              delivered this month ({currentMonthName})
-            </span>
-          </div>
-
-          <div
-            className="metric-sub"
-            style={{ color: "var(--text-muted)", marginBottom: 14 }}
-          >
-            Monthly dispatch volume across proactive intel alerts and system
-            updates
-          </div>
-
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              paddingTop: 12,
-              borderTop: "1px solid var(--border-color)",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-              <CheckCircle2
-                style={{ width: 15, height: 15, color: "var(--accent-green)" }}
-              />
+              <div
+                className="metric-value"
+                style={{ marginBottom: 0, fontSize: 34 }}
+              >
+                {stats.thisMonth.toLocaleString()}
+              </div>
               <span
                 style={{
                   fontSize: 13,
@@ -352,19 +407,121 @@ export default function NotificationsView() {
                   fontWeight: 500,
                 }}
               >
-                Total Delivered All-Time
+                delivered this month ({currentMonthName})
               </span>
             </div>
-            <span
+
+            <div
+              className="metric-sub"
+              style={{ color: "var(--text-muted)", marginBottom: 14 }}
+            >
+              Monthly dispatch volume across proactive intel alerts and system
+              updates
+            </div>
+
+            <div
               style={{
-                fontSize: 16,
-                fontWeight: 700,
-                fontFamily: "var(--font-header)",
-                color: "var(--text-primary)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                paddingTop: 12,
+                borderTop: "1px solid var(--border-color)",
               }}
             >
-              {stats.allTime.toLocaleString()}
-            </span>
+              <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                <CheckCircle2
+                  style={{ width: 15, height: 15, color: "var(--accent-green)" }}
+                />
+                <span
+                  style={{
+                    fontSize: 13,
+                    color: "var(--text-secondary)",
+                    fontWeight: 500,
+                  }}
+                >
+                  Total Delivered All-Time
+                </span>
+              </div>
+              <span
+                style={{
+                  fontSize: 16,
+                  fontWeight: 700,
+                  fontFamily: "var(--font-header)",
+                  color: "var(--text-primary)",
+                }}
+              >
+                {stats.allTime.toLocaleString()}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Action Card: Broadcast System Notification */}
+        <div style={{ flex: 1, minWidth: 300, maxWidth: 440 }}>
+          <div
+            className="card"
+            style={{
+              height: "100%",
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "space-between",
+            }}
+          >
+            <div>
+              <div className="metric-header">
+                <span className="metric-title">System Broadcast</span>
+                <div
+                  className="metric-icon-wrap"
+                  style={{
+                    backgroundColor: "rgba(168, 85, 247, 0.15)",
+                    color: "var(--accent-purple, #a855f7)",
+                  }}
+                >
+                  <ShieldAlert style={{ width: 18, height: 18 }} />
+                </div>
+              </div>
+
+              <div
+                style={{
+                  fontSize: 18,
+                  fontWeight: 700,
+                  fontFamily: "var(--font-header)",
+                  color: "var(--text-primary)",
+                  marginBottom: 6,
+                }}
+              >
+                Broadcast to All Users
+              </div>
+              <div
+                className="metric-sub"
+                style={{ color: "var(--text-secondary)", marginBottom: 16 }}
+              >
+                Save and dispatch a system notification. Instantly visible to all users on the mobile app feed.
+              </div>
+            </div>
+
+            <button
+              className="btn-primary"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 8,
+                padding: "10px 16px",
+                fontSize: 13,
+                fontWeight: 600,
+                width: "100%",
+                cursor: "pointer",
+              }}
+              onClick={() => {
+                setSubmitError(null);
+                setBroadcastSuccess(null);
+                setShowCreateModal(true);
+              }}
+            >
+              <ShieldAlert style={{ width: 16, height: 16 }} />
+              <span>Broadcast System Notification</span>
+            </button>
           </div>
         </div>
       </div>
@@ -1242,6 +1399,268 @@ export default function NotificationsView() {
                 Close
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* CREATE SYSTEM NOTIFICATION MODAL */}
+      {showCreateModal && (
+        <div
+          className="modal-center-overlay"
+          onClick={() => !isSubmitting && setShowCreateModal(false)}
+        >
+          <div
+            className="modal-center-box"
+            style={{
+              maxWidth: 540,
+              maxHeight: "90vh",
+              overflowY: "auto",
+              padding: 26,
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                paddingBottom: 16,
+                marginBottom: 20,
+                borderBottom: "1px solid var(--border-color)",
+                gap: 12,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div
+                  className="metric-icon-wrap"
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: "var(--radius-md)",
+                    backgroundColor: "rgba(168, 85, 247, 0.15)",
+                    color: "var(--accent-purple, #a855f7)",
+                  }}
+                >
+                  <ShieldAlert style={{ width: 20, height: 20 }} />
+                </div>
+                <div>
+                  <h3
+                    className="font-header"
+                    style={{
+                      fontSize: 18,
+                      fontWeight: 700,
+                      color: "var(--text-primary)",
+                      margin: 0,
+                    }}
+                  >
+                    Broadcast System Notification
+                  </h3>
+                  <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+                    Saves a system alert delivered to all users on the mobile app
+                  </span>
+                </div>
+              </div>
+
+              <button
+                className="btn-icon"
+                disabled={isSubmitting}
+                onClick={() => setShowCreateModal(false)}
+                title="Close"
+              >
+                <X style={{ width: 16, height: 16 }} />
+              </button>
+            </div>
+
+            {/* Error / Alert banner */}
+            {submitError && (
+              <div
+                style={{
+                  backgroundColor: "rgba(239, 68, 68, 0.12)",
+                  border: "1px solid rgba(239, 68, 68, 0.3)",
+                  borderRadius: "var(--radius-md)",
+                  padding: "10px 14px",
+                  marginBottom: 16,
+                  color: "var(--accent-danger, #ef4444)",
+                  fontSize: 13,
+                }}
+              >
+                {submitError}
+              </div>
+            )}
+
+            {/* Form */}
+            <form onSubmit={handleBroadcastSubmit}>
+              {/* Title input */}
+              <div style={{ marginBottom: 18 }}>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: "var(--text-secondary)",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.05em",
+                    marginBottom: 6,
+                  }}
+                >
+                  Notification Title *
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Scheduled Maintenance, v2.1 Update Available..."
+                  value={newTitle}
+                  onChange={(e) => setNewTitle(e.target.value)}
+                  className="input-field-normal"
+                  required
+                  disabled={isSubmitting}
+                  maxLength={100}
+                />
+              </div>
+
+              {/* Message textarea */}
+              <div style={{ marginBottom: 18 }}>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: "var(--text-secondary)",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.05em",
+                    marginBottom: 6,
+                  }}
+                >
+                  Announcement Message *
+                </label>
+                <textarea
+                  rows={4}
+                  placeholder="Write the full message that all users will read in their notifications feed..."
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                  className="input-field-normal"
+                  style={{ resize: "vertical", minHeight: 90 }}
+                  required
+                  disabled={isSubmitting}
+                />
+              </div>
+
+              {/* Push Notification Toggle */}
+              <div
+                style={{
+                  backgroundColor: "var(--bg-input)",
+                  border: "1px solid var(--border-color)",
+                  borderRadius: "var(--radius-md)",
+                  padding: "12px 14px",
+                  marginBottom: 20,
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: 12,
+                  cursor: "pointer",
+                }}
+                onClick={() => setSendPush((prev) => !prev)}
+              >
+                <input
+                  type="checkbox"
+                  checked={sendPush}
+                  onChange={(e) => setSendPush(e.target.checked)}
+                  style={{ marginTop: 3, cursor: "pointer" }}
+                />
+                <div>
+                  <div
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 600,
+                      color: "var(--text-primary)",
+                    }}
+                  >
+                    Send Push Notification via Expo
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 12,
+                      color: "var(--text-secondary)",
+                      marginTop: 2,
+                    }}
+                  >
+                    Trigger immediate push notifications with the dog bark alert
+                    sound to all registered mobile devices.
+                  </div>
+                </div>
+              </div>
+
+              {/* Scope Notice */}
+              <div
+                style={{
+                  backgroundColor: "var(--bg-card)",
+                  border: "1px solid var(--border-color)",
+                  borderRadius: "var(--radius-md)",
+                  padding: "10px 14px",
+                  marginBottom: 22,
+                  fontSize: 12,
+                  color: "var(--text-muted)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                }}
+              >
+                <Info
+                  style={{
+                    width: 15,
+                    height: 15,
+                    flexShrink: 0,
+                    color: "var(--accent-warning)",
+                  }}
+                />
+                <span>
+                  This notification will be saved with type{" "}
+                  <strong>system</strong> and will appear in every user's
+                  in-app feed.
+                </span>
+              </div>
+
+              {/* Actions Footer */}
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "flex-end",
+                  alignItems: "center",
+                  gap: 10,
+                  paddingTop: 16,
+                  borderTop: "1px solid var(--border-color)",
+                }}
+              >
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  disabled={isSubmitting}
+                  onClick={() => setShowCreateModal(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn-primary"
+                  disabled={
+                    isSubmitting || !newTitle.trim() || !newMessage.trim()
+                  }
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                  }}
+                >
+                  {isSubmitting ? (
+                    <span>Broadcasting...</span>
+                  ) : (
+                    <>
+                      <ShieldAlert style={{ width: 15, height: 15 }} />
+                      <span>Broadcast to All Users</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

@@ -54,8 +54,12 @@ export default function NotificationsScreen() {
       markRead({ notification_id: item._id });
     }
 
-    // For reward or snoops notifications, navigate to the full details page
-    if (item.type === "reward" || item.type === "snoops") {
+    // For reward, snoops, or system notifications, navigate to the full details page
+    if (
+      item.type === "reward" ||
+      item.type === "snoops" ||
+      item.type === "system"
+    ) {
       router.push({
         pathname: "/notifications/[id]",
         params: { id: item._id },
