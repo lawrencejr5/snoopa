@@ -6,7 +6,7 @@ import {
   createAIObservabilityContext,
   flushAIObservability,
   type AIObservabilityContext,
-} from "./ai-observability";
+} from "./ai_observability";
 import { v } from "convex/values";
 import { api, internal } from "./_generated/api";
 import { Id } from "./_generated/dataModel";

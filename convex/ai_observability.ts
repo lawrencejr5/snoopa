@@ -1,7 +1,4 @@
-"use node";
-
 import { OpenAI } from "@posthog/ai/openai";
-import { PostHog } from "posthog-node";
 import VendorOpenAI from "openai";
 
 const projectToken = process.env.POSTHOG_PROJECT_TOKEN;
@@ -19,15 +16,61 @@ if (process.env.NODE_ENV === "development" && !host) {
   );
 }
 
+/**
+ * Lightweight, fetch-based PostHog client compatible with both Convex V8 isolate runtime
+ * and Node runtimes without relying on Node built-ins (node:os, node:fs, node:zlib).
+ */
+class ConvexPostHog {
+  private projectToken: string;
+  private host: string;
+  private queue: any[] = [];
+
+  constructor(projectToken: string, host: string) {
+    this.projectToken = projectToken;
+    this.host = host.replace(/\/$/, "");
+  }
+
+  capture(event: { distinctId?: string; event: string; properties?: any }) {
+    const payload = {
+      api_key: this.projectToken,
+      event: event.event,
+      distinct_id:
+        event.distinctId || event.properties?.distinct_id || "snoopa-ai",
+      properties: {
+        ...event.properties,
+        $lib: "posthog-convex",
+      },
+      timestamp: new Date().toISOString(),
+    };
+    this.queue.push(payload);
+  }
+
+  async flush() {
+    if (this.queue.length === 0) return;
+    const batch = [...this.queue];
+    this.queue = [];
+
+    try {
+      await fetch(`${this.host}/batch/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          api_key: this.projectToken,
+          batch,
+        }),
+      });
+    } catch (err) {
+      console.warn("[PostHog] Failed to flush events:", err);
+    }
+  }
+
+  async shutdown() {
+    await this.flush();
+  }
+}
+
 const posthog =
-  projectToken && host
-    ? new PostHog(projectToken, {
-        host,
-        privacyMode: false,
-        flushAt: 1,
-        flushInterval: 0,
-      })
-    : undefined;
+  projectToken && host ? new ConvexPostHog(projectToken, host) : undefined;
 
 export type AIObservabilityContext = {
   sessionId: string;

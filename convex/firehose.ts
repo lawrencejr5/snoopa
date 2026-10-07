@@ -5,7 +5,7 @@ import {
   createAIObservabilityContext,
   flushAIObservability,
   type AIObservabilityContext,
-} from "./ai-observability";
+} from "./ai_observability";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { action, internalAction, internalQuery } from "./_generated/server";

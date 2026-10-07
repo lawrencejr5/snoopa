@@ -1,5 +1,3 @@
-"use node";
-
 import { action } from "./_generated/server";
 import { v } from "convex/values";
 import {
@@ -8,7 +6,7 @@ import {
   createAIObservabilityContext,
   flushAIObservability,
   type AIObservabilityContext,
-} from "./ai-observability";
+} from "./ai_observability";
 
 export interface OpenRouterMessage {
   role: "system" | "user" | "assistant";

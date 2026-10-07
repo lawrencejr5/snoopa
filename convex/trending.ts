@@ -8,7 +8,7 @@ import {
   createAIClient,
   createAIObservabilityContext,
   flushAIObservability,
-} from "./ai-observability";
+} from "./ai_observability";
 
 // ---------------------------------------------------------------------------
 // Main action — scrape + AI extraction

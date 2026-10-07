@@ -42,10 +42,16 @@ export default function AnalyticsView() {
     { name: "Max", count: stats.tierCounts.max, fill: "#fd5a5a" },
   ];
 
-  const storeData = stats.storeSplit || [
-    { name: "Apple (iOS)", value: 1, color: "#6aaa66" },
-    { name: "Google (Android)", value: 1, color: "#F4D03F" },
-  ];
+  const storeData = (
+    stats.storeSplit || [
+      { name: "Apple (iOS)", value: 0, color: "#6aaa66" },
+      { name: "Google (Android)", value: 0, color: "#F4D03F" },
+    ]
+  ).filter(
+    (item: { name: string; value: number; color: string }) =>
+      item.name.toLowerCase().includes("ios") ||
+      item.name.toLowerCase().includes("android"),
+  );
 
   const rawCountries = stats.countryDistribution || [];
 

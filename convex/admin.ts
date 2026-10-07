@@ -218,7 +218,6 @@ export const getAdminStats = query({
     const storeSplit = [
       { name: "Apple (iOS)", value: iosCount, color: "#6aaa66" },
       { name: "Google (Android)", value: androidCount, color: "#F4D03F" },
-      ...(otherOsCount > 0 ? [{ name: "Web / Other", value: otherOsCount, color: "#e2e2bb" }] : []),
     ];
 
     const regionNames = new Intl.DisplayNames(["en"], { type: "region" });
