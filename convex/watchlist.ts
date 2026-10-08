@@ -367,13 +367,26 @@ export const get_trending_topics = query({
     } else if (!requestedCode && user_id) {
       const user = await ctx.db.get(user_id);
       if (user?.country) {
+        // user.country could be a name like "Nigeria" or a code like "NG"
         const countryRecord = await ctx.db
           .query("active_countries")
           .withIndex("by_name", (q) => q.eq("name", user.country as string))
           .first();
-        if (countryRecord && countryRecord.status === "active") {
-          countryCode = countryRecord.code;
-          requestedCountryName = countryRecord.name;
+
+        const byCode = !countryRecord
+          ? await ctx.db
+              .query("active_countries")
+              .withIndex("by_code", (q) => q.eq("code", user.country as string))
+              .first()
+          : null;
+
+        const resolved = countryRecord || byCode;
+        if (resolved && resolved.status === "active") {
+          countryCode = resolved.code;
+          requestedCountryName = resolved.name;
+        } else if (!resolved) {
+          // Fallback info if country isn't in active_countries yet
+          requestedCountryName = user.country;
         }
       }
     }
@@ -400,8 +413,6 @@ export const get_trending_topics = query({
       if (countryCode !== "WORLD" || requestedCountryName) {
         isFallback = true;
       }
-      countryCode = "WORLD";
-      countryName = "Worldwide";
     } else {
       countryName = requestedCountryName || "Worldwide";
     }
@@ -438,7 +449,9 @@ export const get_trending_topics = query({
     return {
       country_code: displayCode,
       country_name: displayName,
-      flag_emoji: getFlagEmoji(displayCode),
+      user_country_code: countryCode !== "WORLD" ? countryCode : undefined,
+      user_country_name: requestedCountryName,
+      flag_emoji: getFlagEmoji(countryCode !== "WORLD" ? countryCode : displayCode),
       is_fallback: isFallback,
       topics,
     };

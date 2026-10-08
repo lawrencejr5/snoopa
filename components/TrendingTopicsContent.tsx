@@ -1,5 +1,6 @@
 import Colors from "@/constants/Colors";
 import { useTheme } from "@/context/ThemeContext";
+import { useUser } from "@/context/UserContext";
 import { api } from "@/convex/_generated/api";
 import { useQuery } from "convex/react";
 import React, { useState } from "react";
@@ -23,6 +24,7 @@ export default function TrendingTopicsContent({
   onClose,
 }: TrendingTopicsContentProps) {
   const { theme } = useTheme();
+  const { signedIn } = useUser();
   const [expandedTopics, setExpandedTopics] = useState<Record<string, boolean>>(
     {},
   );
@@ -35,7 +37,9 @@ export default function TrendingTopicsContent({
   };
 
   // Query user country topics (defaults to user's country if set)
-  const userTrendingResult = useQuery(api.watchlist.get_trending_topics, {});
+  const userTrendingResult = useQuery(api.watchlist.get_trending_topics, {
+    country_code: "USER",
+  });
   // Query worldwide topics strictly
   const worldTrendingResult = useQuery(api.watchlist.get_trending_topics, {
     country_code: "WORLD",
@@ -44,21 +48,26 @@ export default function TrendingTopicsContent({
   const isLoading =
     userTrendingResult === undefined && worldTrendingResult === undefined;
 
-  const hasCountryTopics =
-    !Array.isArray(userTrendingResult) &&
-    userTrendingResult?.is_fallback === false &&
-    userTrendingResult?.country_code !== "WORLD" &&
-    (userTrendingResult?.topics?.length ?? 0) > 0;
-
   const userCountryName =
-    !Array.isArray(userTrendingResult) && userTrendingResult?.country_name
-      ? userTrendingResult.country_name
-      : "Country";
+    (!Array.isArray(userTrendingResult) &&
+      (userTrendingResult?.user_country_name ||
+        (userTrendingResult?.country_name !== "Worldwide"
+          ? userTrendingResult?.country_name
+          : undefined))) ||
+    signedIn?.country ||
+    "Country";
 
   const userFlagEmoji =
     !Array.isArray(userTrendingResult) && userTrendingResult?.flag_emoji
       ? userTrendingResult.flag_emoji
-      : "🌐";
+      : "🇳🇬";
+
+  const hasCountryTopics =
+    Boolean(signedIn?.country) ||
+    (!Array.isArray(userTrendingResult) &&
+      (Boolean(userTrendingResult?.user_country_name) ||
+        (userTrendingResult?.country_code !== "WORLD" &&
+          userTrendingResult?.country_code !== undefined)));
 
   const [selectedTab, setSelectedTab] = useState<"country" | "worldwide">(
     hasCountryTopics ? "country" : "worldwide",
@@ -74,7 +83,7 @@ export default function TrendingTopicsContent({
   }, [hasCountryTopics]);
 
   const activeTopics =
-    selectedTab === "country" && hasCountryTopics
+    selectedTab === "country"
       ? !Array.isArray(userTrendingResult)
         ? userTrendingResult?.topics || []
         : []
@@ -368,7 +377,7 @@ export default function TrendingTopicsContent({
                       style={({ pressed }) => [
                         styles.trackBtn,
                         {
-                          backgroundColor: "transparent",
+                          backgroundColor: Colors[theme].milk,
                           borderColor: Colors[theme].border,
                           opacity: pressed ? 0.7 : 1,
                         },
@@ -377,7 +386,7 @@ export default function TrendingTopicsContent({
                       <Text
                         style={[
                           styles.trackBtnText,
-                          { color: Colors[theme].text },
+                          { color: Colors[theme].background },
                         ]}
                       >
                         Track
