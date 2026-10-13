@@ -321,31 +321,61 @@ export const seed_free_users = internalMutation({
 });
 
 /**
- * One-off: wipes all old monthly (expiring) "free" snoop grants. Safe to re-run.
- * Lifetime free snoops will be granted when users open the app.
+ * One-off: wipes snoop grants where snoops count is 30. Safe to re-run.
  * Run: npx convex run migrations:migrate_free_lifetime_snoops
  */
 export const migrate_free_lifetime_snoops = internalMutation({
   args: {},
   handler: async (ctx) => {
-    const users = await ctx.db.query("users").collect();
+    const all_snoops = await ctx.db.query("snoops").collect();
     let deleted = 0;
 
-    for (const user of users) {
-      const grants = await ctx.db
-        .query("snoops")
-        .withIndex("by_user", (q) => q.eq("user_id", user._id))
-        .collect();
-
-      for (const grant of grants) {
-        if (grant.type === "free" && grant.expiration_date !== undefined) {
-          await ctx.db.delete(grant._id);
-          deleted++;
-        }
+    for (const grant of all_snoops) {
+      if (grant.snoops === 30) {
+        await ctx.db.delete(grant._id);
+        deleted++;
       }
     }
 
-    return `Deleted ${deleted} old expiring free snoop grants. Users will receive their 50 lifetime snoops when opening the app.`;
+    return `Deleted ${deleted} snoops where snoops count was 30.`;
+  },
+});
+
+/**
+ * Deletes all monthly snoops that are not for the current month.
+ * Run: npx convex run migrations:delete_expired_monthly_snoops
+ */
+export const delete_expired_monthly_snoops = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const now = new Date();
+    const start_of_current_month = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0, 0),
+    ).getTime();
+    const end_of_current_month = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0, 23, 59, 59, 999),
+    ).getTime();
+
+    const monthly_snoops = await ctx.db
+      .query("snoops")
+      .filter((q) => q.eq(q.field("type"), "monthly"))
+      .collect();
+
+    let deleted = 0;
+
+    for (const grant of monthly_snoops) {
+      const grant_date = grant.expiration_date ?? grant._creationTime;
+      const is_current_month =
+        grant_date >= start_of_current_month &&
+        grant_date <= end_of_current_month;
+
+      if (!is_current_month) {
+        await ctx.db.delete(grant._id);
+        deleted++;
+      }
+    }
+
+    return `Deleted ${deleted} monthly snoops that were not for the current month.`;
   },
 });
 
@@ -420,7 +450,3 @@ export const deleteBatch = mutation({
     return docs.length;
   },
 });
-
-// ---------------------------------------------------------------------------
-// Monthly premium snoop refill
-// ---------------------------------------------------------------------------
