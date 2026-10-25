@@ -32,12 +32,39 @@ export const storePushToken = mutation({
     const user = await ctx.db.get(user_id);
     if (!user) return;
 
-    const currentTokens = user.pushTokens || [];
-    if (!currentTokens.includes(args.token)) {
+    const current_tokens = user.pushTokens || [];
+    if (!current_tokens.includes(args.token)) {
       await ctx.db.patch(user_id, {
-        pushTokens: [...currentTokens, args.token],
+        pushTokens: [...current_tokens, args.token],
       });
     }
+  },
+});
+
+export const set_notifications_enabled = mutation({
+  args: {
+    enabled: v.boolean(),
+    token: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const user_id = await getAuthUserId(ctx);
+    if (!user_id) return;
+
+    const user = await ctx.db.get(user_id);
+    if (!user) return;
+
+    const patch: { notifications_enabled: boolean; pushTokens?: string[] } = {
+      notifications_enabled: args.enabled,
+    };
+
+    if (args.enabled && args.token) {
+      const current_tokens = user.pushTokens || [];
+      if (!current_tokens.includes(args.token)) {
+        patch.pushTokens = [...current_tokens, args.token];
+      }
+    }
+
+    await ctx.db.patch(user_id, patch);
   },
 });
 
@@ -50,9 +77,9 @@ export const removePushToken = mutation({
     const user = await ctx.db.get(user_id);
     if (!user || !user.pushTokens) return;
 
-    const newTokens = user.pushTokens.filter((t) => t !== args.token);
+    const new_tokens = user.pushTokens.filter((t) => t !== args.token);
     await ctx.db.patch(user_id, {
-      pushTokens: newTokens,
+      pushTokens: new_tokens,
     });
   },
 });
@@ -65,7 +92,12 @@ export const getAllUsersWithTokens = internalQuery({
       .filter((q) => q.neq(q.field("pushTokens"), undefined))
       .collect();
 
-    return users.filter((u) => u.pushTokens && u.pushTokens.length > 0);
+    return users.filter(
+      (u) =>
+        u.notifications_enabled !== false &&
+        u.pushTokens &&
+        u.pushTokens.length > 0,
+    );
   },
 });
 
@@ -73,7 +105,8 @@ export const get_push_tokens = internalQuery({
   args: { user_id: v.id("users") },
   handler: async (ctx, args) => {
     const user = await ctx.db.get(args.user_id);
-    return user?.pushTokens ?? [];
+    if (!user || user.notifications_enabled === false) return [];
+    return user.pushTokens ?? [];
   },
 });
 

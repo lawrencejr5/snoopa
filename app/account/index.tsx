@@ -7,12 +7,14 @@ import { useTheme } from "@/context/ThemeContext";
 import { useUser } from "@/context/UserContext";
 import { api } from "@/convex/_generated/api";
 import { registerForPushNotificationsAsync } from "@/utils/reg_push_notifications";
+import NotificationPermissionBanner from "@/components/NotificationPermissionBanner";
+import { usePushNotification } from "@/context/PushNotification";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useConvexAuth, useMutation } from "convex/react";
 import { useRouter } from "expo-router";
 import { usePostHog } from "posthog-react-native";
 import * as WebBrowser from "expo-web-browser";
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -20,6 +22,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   View,
 } from "react-native";
@@ -39,6 +42,14 @@ export default function AccountScreen() {
   const { signOut } = useAuthActions();
 
   const [themeModalVisible, setThemeModalVisible] = useState(false);
+
+  const {
+    isPushEnabled,
+    permissionStatus,
+    toggleNotifications,
+    openDeviceSettings,
+    expoPushToken,
+  } = usePushNotification();
 
   const menuItems = [
     {
@@ -94,12 +105,12 @@ export default function AccountScreen() {
   const handleSignout = async () => {
     setSigningOut(true);
     try {
-      // Removing push token
-      try {
-        const token = await registerForPushNotificationsAsync();
-        if (token) await remove_push_token({ token });
-      } catch (e) {
-        console.warn("Could not remove token from server", e);
+      if (expoPushToken) {
+        try {
+          await remove_push_token({ token: expoPushToken });
+        } catch (e) {
+          console.warn("Could not remove token from server", e);
+        }
       }
 
       posthog?.capture("user_signed_out");
@@ -223,49 +234,130 @@ export default function AccountScreen() {
         {/* Settings List */}
         <View style={styles.menuContainer}>
           {menuItems.map((item, index) => (
-            <Pressable
-              key={index}
-              style={[
-                styles.menuItem,
-                { borderBottomColor: Colors[theme].border },
-              ]}
-              onPress={() => handlePress(item)}
-            >
-              <View
-                style={{ flexDirection: "row", alignItems: "center", gap: 15 }}
-              >
-                <Image
-                  source={item.icon}
-                  style={{
-                    width: 22,
-                    height: 22,
-                    tintColor: Colors[theme].text,
-                  }}
-                />
-                <Text style={[styles.menuText, { color: Colors[theme].text }]}>
-                  {item.label}
-                </Text>
-              </View>
-              <Image
-                source={
-                  item.route.startsWith("http")
-                    ? require("@/assets/icons/arrow-up.png")
-                    : require("@/assets/icons/chevron-right.png")
-                }
+            <Fragment key={index}>
+              <Pressable
                 style={[
-                  {
-                    width: 14,
-                    height: 14,
-                    tintColor: Colors[theme].text_secondary,
-                  },
-                  item.route.startsWith("http") && {
-                    width: 18,
-                    height: 18,
-                    transform: [{ rotate: "45deg" }],
-                  },
+                  styles.menuItem,
+                  { borderBottomColor: Colors[theme].border },
                 ]}
-              />
-            </Pressable>
+                onPress={() => handlePress(item)}
+              >
+                <View
+                  style={{ flexDirection: "row", alignItems: "center", gap: 15 }}
+                >
+                  <Image
+                    source={item.icon}
+                    style={{
+                      width: 22,
+                      height: 22,
+                      tintColor: Colors[theme].text,
+                    }}
+                  />
+                  <Text style={[styles.menuText, { color: Colors[theme].text }]}>
+                    {item.label}
+                  </Text>
+                </View>
+                <Image
+                  source={
+                    item.route.startsWith("http")
+                      ? require("@/assets/icons/arrow-up.png")
+                      : require("@/assets/icons/chevron-right.png")
+                  }
+                  style={[
+                    {
+                      width: 14,
+                      height: 14,
+                      tintColor: Colors[theme].text_secondary,
+                    },
+                    item.route.startsWith("http") && {
+                      width: 18,
+                      height: 18,
+                      transform: [{ rotate: "45deg" }],
+                    },
+                  ]}
+                />
+              </Pressable>
+
+              {/* Push Notifications Toggle right after Report & Feedback */}
+              {item.label === "Report & Feedback" && (
+                <Pressable
+                  style={[
+                    styles.menuItem,
+                    { borderBottomColor: Colors[theme].border },
+                  ]}
+                  onPress={() => {
+                    if (permissionStatus === "denied") {
+                      openDeviceSettings();
+                    }
+                  }}
+                >
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 15,
+                      flex: 1,
+                    }}
+                  >
+                    <Image
+                      source={require("@/assets/icons/bells.png")}
+                      style={{
+                        width: 22,
+                        height: 22,
+                        tintColor: Colors[theme].text,
+                      }}
+                    />
+                    <View style={{ flex: 1, paddingRight: 10 }}>
+                      <Text style={[styles.menuText, { color: Colors[theme].text }]}>
+                        Push Notifications
+                      </Text>
+                      {permissionStatus === "denied" && (
+                        <Text
+                          style={{
+                            fontFamily: "FontRegular",
+                            fontSize: 11,
+                            color: Colors[theme].warning,
+                            marginTop: 2,
+                          }}
+                        >
+                          Disabled in device settings
+                        </Text>
+                      )}
+                    </View>
+                  </View>
+
+                  <Switch
+                    value={permissionStatus === "denied" ? false : isPushEnabled}
+                    onValueChange={(value) => {
+                      if (permissionStatus === "denied") {
+                        openDeviceSettings();
+                        return;
+                      }
+                      toggleNotifications(value).then((success) => {
+                        if (success) {
+                          showCustomAlert(
+                            value
+                              ? "Push notifications enabled."
+                              : "Push notifications disabled.",
+                            value ? "success" : "warning",
+                          );
+                        }
+                      });
+                    }}
+                    trackColor={{
+                      false: Colors[theme].surface,
+                      true: Colors[theme].lightgreen,
+                    }}
+                    thumbColor={
+                      isPushEnabled && permissionStatus !== "denied"
+                        ? Colors[theme].text
+                        : Colors[theme].text_secondary
+                    }
+                    ios_backgroundColor={Colors[theme].surface}
+                  />
+                </Pressable>
+              )}
+            </Fragment>
           ))}
 
           {/* Logout */}
@@ -452,7 +544,7 @@ const styles = StyleSheet.create({
   },
   menuText: {
     fontSize: 16,
-    fontFamily: "GeistMedium",
+    fontFamily: "FontMedium",
   },
   modalOverlay: {
     flex: 1,

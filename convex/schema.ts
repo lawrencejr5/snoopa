@@ -33,6 +33,7 @@ const schema = defineSchema({
     ),
     emailVerificationTime: v.optional(v.number()),
     pushTokens: v.optional(v.array(v.string())),
+    notifications_enabled: v.optional(v.boolean()),
     memory: v.optional(v.string()),
     os: v.optional(
       v.union(v.literal("ios"), v.literal("android"), v.literal("web")),

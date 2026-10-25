@@ -1,6 +1,7 @@
 import AddWatchlistModal from "@/components/AddWatchlistModal";
 import Container from "@/components/Container";
 import Loading from "@/components/Loading";
+import NotificationPermissionBanner from "@/components/NotificationPermissionBanner";
 import PaywallModal from "@/components/PaywallModal";
 import PremiumFeatureModal from "@/components/PremiumFeatureModal";
 import ReferralModal from "@/components/ReferralModal";
@@ -1059,6 +1060,8 @@ export default function HomeScreen() {
                 </Pressable>
               </View>
             </View>
+
+            <NotificationPermissionBanner style={{ marginHorizontal: 0, marginTop: 10, marginBottom: 6 }} />
 
             {showSnoopTooltip && (
               <View

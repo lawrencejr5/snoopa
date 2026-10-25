@@ -1,7 +1,7 @@
 import Constants from "expo-constants";
 import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
-import { Platform } from "react-native";
+import { Linking, Platform } from "react-native";
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -32,12 +32,10 @@ export async function sendPushNotification(expoPushToken: string) {
   });
 }
 
-function handleRegistrationError(errorMessage: string) {
-  console.log(errorMessage);
-  throw new Error(errorMessage);
-}
-
-export async function registerForPushNotificationsAsync() {
+/**
+ * Configure Android notification channels if on Android.
+ */
+async function configureAndroidNotificationChannelAsync() {
   if (Platform.OS === "android") {
     await Notifications.setNotificationChannelAsync("default", {
       name: "default",
@@ -47,39 +45,117 @@ export async function registerForPushNotificationsAsync() {
       sound: "dog_bark_single.wav",
     });
   }
+}
 
-  if (Device.isDevice) {
-    const { status: existingStatus } =
-      await Notifications.getPermissionsAsync();
-    let finalStatus = existingStatus;
-    if (existingStatus !== "granted") {
-      const { status } = await Notifications.requestPermissionsAsync();
-      finalStatus = status;
+/**
+ * Check current notification permissions without showing any system prompt.
+ */
+export async function getNotificationPermissionsAsync(): Promise<{
+  status: Notifications.PermissionStatus;
+  granted: boolean;
+  canAskAgain: boolean;
+}> {
+  if (!Device.isDevice) {
+    return {
+      status: Notifications.PermissionStatus.DENIED,
+      granted: false,
+      canAskAgain: false,
+    };
+  }
+  return await Notifications.getPermissionsAsync();
+}
+
+/**
+ * Get an existing push token ONLY if permissions are already granted.
+ * Does NOT prompt the user.
+ */
+export async function getExistingPushTokenAsync(): Promise<string | null> {
+  if (!Device.isDevice) return null;
+
+  try {
+    const { status } = await Notifications.getPermissionsAsync();
+    if (status !== Notifications.PermissionStatus.GRANTED) {
+      return null;
     }
-    if (finalStatus !== "granted") {
-      handleRegistrationError(
-        "Permission not granted to get push token for push notification!",
-      );
-      return;
-    }
+
+    await configureAndroidNotificationChannelAsync();
+
     const projectId =
       Constants?.expoConfig?.extra?.eas?.projectId ??
       Constants?.easConfig?.projectId;
-    if (!projectId) {
-      handleRegistrationError("Project ID not found");
-    }
-    try {
-      const pushTokenString = (
-        await Notifications.getExpoPushTokenAsync({
-          projectId,
-        })
-      ).data;
-      // console.log(pushTokenString);
-      return pushTokenString;
-    } catch (e: unknown) {
-      handleRegistrationError(`${e}`);
-    }
-  } else {
-    handleRegistrationError("Must use physical device for push notifications");
+    if (!projectId) return null;
+
+    const pushTokenString = (
+      await Notifications.getExpoPushTokenAsync({
+        projectId,
+      })
+    ).data;
+
+    return pushTokenString;
+  } catch (err) {
+    console.warn("Failed to get existing push token:", err);
+    return null;
   }
+}
+
+/**
+ * Request notification permissions and register for push notifications.
+ * If user has already denied on iOS (canAskAgain is false), this will return null.
+ */
+export async function registerForPushNotificationsAsync(
+  requestIfNeeded: boolean = true,
+): Promise<string | null> {
+  await configureAndroidNotificationChannelAsync();
+
+  if (!Device.isDevice) {
+    console.log("Must use physical device for push notifications");
+    return null;
+  }
+
+  const { status: existingStatus, canAskAgain } =
+    await Notifications.getPermissionsAsync();
+  let finalStatus = existingStatus;
+
+  if (existingStatus !== Notifications.PermissionStatus.GRANTED && requestIfNeeded) {
+    // Only call requestPermissionsAsync if not permanently denied
+    if (canAskAgain !== false || Platform.OS === "android") {
+      const { status } = await Notifications.requestPermissionsAsync();
+      finalStatus = status;
+    }
+  }
+
+  if (finalStatus !== Notifications.PermissionStatus.GRANTED) {
+    console.log("Notification permission not granted, status:", finalStatus);
+    return null;
+  }
+
+  const projectId =
+    Constants?.expoConfig?.extra?.eas?.projectId ??
+    Constants?.easConfig?.projectId;
+  if (!projectId) {
+    console.warn("Project ID not found for push notifications");
+    return null;
+  }
+
+  try {
+    const pushTokenString = (
+      await Notifications.getExpoPushTokenAsync({
+        projectId,
+      })
+    ).data;
+    return pushTokenString;
+  } catch (e: unknown) {
+    console.warn("Error getting push token:", e);
+    return null;
+  }
+}
+
+/**
+ * Open device system settings for Snoopa.
+ * Directly opens Notification settings on iOS/Android.
+ */
+export function openDeviceNotificationSettings() {
+  Linking.openSettings().catch((err) => {
+    console.warn("Could not open device settings:", err);
+  });
 }

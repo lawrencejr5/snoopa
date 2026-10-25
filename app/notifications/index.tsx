@@ -1,4 +1,5 @@
 import Container from "@/components/Container";
+import NotificationPermissionBanner from "@/components/NotificationPermissionBanner";
 import Colors from "@/constants/Colors";
 import { useTheme } from "@/context/ThemeContext";
 import { api } from "@/convex/_generated/api";
@@ -102,6 +103,8 @@ export default function NotificationsScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
+        <NotificationPermissionBanner style={{ marginHorizontal: 0, marginTop: 4, marginBottom: 12 }} />
+
         {isLoading && (
           <View style={{ marginTop: 80, alignItems: "center" }}>
             <ActivityIndicator color={Colors[theme].primary} />
