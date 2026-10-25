@@ -399,14 +399,18 @@ export default function WatchlistScreen() {
     }
   };
 
-  const watchlistData = useQuery(api.watchlist.get_watchlists) || [];
-  const watchlist_usage = useQuery(api.watchlist.get_watchlist_usage);
+  const rawWatchlists = useQuery(api.watchlist.get_watchlists);
+  const watchlistData = rawWatchlists ?? [];
+  const rawWatchlistUsage = useQuery(api.watchlist.get_watchlist_usage);
+  const watchlist_usage = rawWatchlistUsage;
   const is_locked =
     watchlist_usage !== undefined &&
     watchlist_usage.limit !== null &&
     watchlist_usage.active >= watchlist_usage.limit;
-  const snoop_balance = useQuery(api.snoops.get_snoop_balance) ?? 0;
-  const snoop_grants = useQuery(api.snoops.get_snoop_grants) ?? [];
+  const rawSnoopBalance = useQuery(api.snoops.get_snoop_balance);
+  const snoop_balance = rawSnoopBalance ?? 0;
+  const rawSnoopGrants = useQuery(api.snoops.get_snoop_grants);
+  const snoop_grants = rawSnoopGrants ?? [];
   const snoop_total =
     (snoop_grants as any[]).reduce((sum, g) => sum + g.snoops, 0) || 50;
   const snoops_used = snoop_total - snoop_balance;
@@ -416,7 +420,13 @@ export default function WatchlistScreen() {
     (i) => i.status === "completed" || i.status === "inactive",
   );
 
-  const isLoaded = !isLoading && !!signedIn && !appLoading && !!watchlistData;
+  const isDataLoading =
+    rawWatchlists === undefined ||
+    rawWatchlistUsage === undefined ||
+    rawSnoopBalance === undefined ||
+    rawSnoopGrants === undefined;
+
+  const isLoaded = !isLoading && !!signedIn && !appLoading && !isDataLoading;
 
   // Staggered section animations (opacity + slide-up)
   const s1 = useSharedValue(0); // header
@@ -468,7 +478,7 @@ export default function WatchlistScreen() {
     transform: [{ translateY: (1 - s4.value) * SLIDE }],
   }));
 
-  if (isLoading || !signedIn || appLoading || !watchlistData)
+  if (isLoading || !signedIn || appLoading || isDataLoading)
     return <Loading />;
 
   return (

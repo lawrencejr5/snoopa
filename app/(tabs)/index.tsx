@@ -573,7 +573,81 @@ export default function HomeScreen() {
     Platform.OS === "ios" && parseInt(String(Platform.Version), 10) >= 26;
   const { signedIn } = useUser();
   const navigation = useNavigation();
-  const isLoaded = !isLoading && !!signedIn && !appLoading;
+
+  // Data queries
+  const rawWatchlists = useQuery(api.watchlist.get_watchlists);
+  const watchlistData = rawWatchlists ?? [];
+  const trendingQueryResult = useQuery(api.watchlist.get_trending_topics, {
+    country_code: "USER",
+  });
+  const trendingTopics = (
+    Array.isArray(trendingQueryResult)
+      ? trendingQueryResult
+      : trendingQueryResult?.topics || []
+  ).slice(0, 10);
+
+  const trendingCountryName =
+    !Array.isArray(trendingQueryResult) && trendingQueryResult?.country_name
+      ? trendingQueryResult.country_name
+      : "Worldwide";
+
+  const trendingFlagEmoji =
+    !Array.isArray(trendingQueryResult) && trendingQueryResult?.flag_emoji
+      ? trendingQueryResult.flag_emoji
+      : "🌐";
+
+  const isTrendingFallback =
+    !Array.isArray(trendingQueryResult) && trendingQueryResult?.is_fallback
+      ? trendingQueryResult.is_fallback
+      : false;
+
+  const displayIsWorldwide =
+    isTrendingFallback ||
+    trendingCountryName === "Worldwide" ||
+    !trendingCountryName;
+  const displayFlagEmoji = displayIsWorldwide ? "🌐" : trendingFlagEmoji;
+  const displayHeaderText = displayIsWorldwide
+    ? "TRENDING WORLDWIDE"
+    : `TRENDING IN ${trendingCountryName.toUpperCase()}`;
+
+  const unreadCount = useQuery(api.notifications.unread_count) ?? 0;
+  const rawSnoopBalance = useQuery(api.snoops.get_snoop_balance);
+  const snoop_balance = rawSnoopBalance ?? 0;
+  const rawSnoopGrants = useQuery(api.snoops.get_snoop_grants);
+  const snoop_grants = rawSnoopGrants ?? [];
+  const snoop_total =
+    snoop_grants.reduce((sum: number, g: any) => sum + g.snoops, 0) || 50;
+  const snoops_used = Math.max(0, snoop_total - snoop_balance);
+  const snoop_pct = snoop_total > 0 ? snoops_used / snoop_total : 0;
+  const is_low_on_snoops =
+    snoop_balance === 0 ||
+    snoop_grants.length === 0 ||
+    (snoop_total > 0 && snoop_pct >= 0.8);
+  const rawWatchlistUsage = useQuery(api.watchlist.get_watchlist_usage);
+  const watchlist_usage = rawWatchlistUsage;
+  const is_locked =
+    watchlist_usage !== undefined &&
+    watchlist_usage.limit !== null &&
+    watchlist_usage.active >= watchlist_usage.limit;
+
+  const activeSnoops = watchlistData
+    .filter((i: any) => i.status === "active")
+    .sort((a: any, b: any) => b.last_checked - a.last_checked); // Latest first
+  const allSnoops = watchlistData;
+
+  const rawNotifications = useQuery(api.notifications.get_notifications);
+  const notifications = rawNotifications ?? [];
+  const latestBriefings = notifications.slice(0, 5); // Show up to 5 briefs in swiper
+
+  const isDataLoading =
+    rawWatchlists === undefined ||
+    rawSnoopBalance === undefined ||
+    rawSnoopGrants === undefined ||
+    rawNotifications === undefined ||
+    rawWatchlistUsage === undefined ||
+    trendingQueryResult === undefined;
+
+  const isLoaded = !isLoading && !!signedIn && !appLoading && !isDataLoading;
 
   // Staggered section animations (opacity + slide-up)
   const s1 = useSharedValue(0); // header
@@ -751,41 +825,6 @@ export default function HomeScreen() {
     }
   };
 
-  // Data queries
-  const watchlistData = useQuery(api.watchlist.get_watchlists) || [];
-  const trendingQueryResult = useQuery(api.watchlist.get_trending_topics, {
-    country_code: "USER",
-  });
-  const trendingTopics = (
-    Array.isArray(trendingQueryResult)
-      ? trendingQueryResult
-      : trendingQueryResult?.topics || []
-  ).slice(0, 10);
-
-  const trendingCountryName =
-    !Array.isArray(trendingQueryResult) && trendingQueryResult?.country_name
-      ? trendingQueryResult.country_name
-      : "Worldwide";
-
-  const trendingFlagEmoji =
-    !Array.isArray(trendingQueryResult) && trendingQueryResult?.flag_emoji
-      ? trendingQueryResult.flag_emoji
-      : "🌐";
-
-  const isTrendingFallback =
-    !Array.isArray(trendingQueryResult) && trendingQueryResult?.is_fallback
-      ? trendingQueryResult.is_fallback
-      : false;
-
-  const displayIsWorldwide =
-    isTrendingFallback ||
-    trendingCountryName === "Worldwide" ||
-    !trendingCountryName;
-  const displayFlagEmoji = displayIsWorldwide ? "🌐" : trendingFlagEmoji;
-  const displayHeaderText = displayIsWorldwide
-    ? "TRENDING WORLDWIDE"
-    : `TRENDING IN ${trendingCountryName.toUpperCase()}`;
-
   const trendingSheetRef = useRef<TrendingTopicsSheetRef>(null);
   const searchParams = useLocalSearchParams<{
     track_topic?: string;
@@ -820,30 +859,6 @@ export default function HomeScreen() {
       setShowTrackModal(true);
     }, 250);
   };
-  const unreadCount = useQuery(api.notifications.unread_count) ?? 0;
-  const snoop_balance = useQuery(api.snoops.get_snoop_balance) ?? 0;
-  const snoop_grants = useQuery(api.snoops.get_snoop_grants) ?? [];
-  const snoop_total =
-    snoop_grants.reduce((sum: number, g: any) => sum + g.snoops, 0) || 50;
-  const snoops_used = Math.max(0, snoop_total - snoop_balance);
-  const snoop_pct = snoop_total > 0 ? snoops_used / snoop_total : 0;
-  const is_low_on_snoops =
-    snoop_balance === 0 ||
-    snoop_grants.length === 0 ||
-    (snoop_total > 0 && snoop_pct >= 0.8);
-  const watchlist_usage = useQuery(api.watchlist.get_watchlist_usage);
-  const is_locked =
-    watchlist_usage !== undefined &&
-    watchlist_usage.limit !== null &&
-    watchlist_usage.active >= watchlist_usage.limit;
-
-  const activeSnoops = watchlistData
-    .filter((i: any) => i.status === "active")
-    .sort((a: any, b: any) => b.last_checked - a.last_checked); // Latest first
-  const allSnoops = watchlistData;
-
-  const notifications = useQuery(api.notifications.get_notifications) || [];
-  const latestBriefings = notifications.slice(0, 5); // Show up to 5 briefs in swiper
 
   const style1 = useAnimatedStyle(() => ({
     opacity: s1.value,
@@ -862,7 +877,7 @@ export default function HomeScreen() {
     transform: [{ translateY: (1 - s4.value) * SLIDE }],
   }));
 
-  if (isLoading || !signedIn || appLoading) return <Loading />;
+  if (isLoading || !signedIn || appLoading || isDataLoading) return <Loading />;
 
   const currentDate = new Date().toLocaleDateString("en-US", {
     weekday: "long",

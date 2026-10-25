@@ -57,13 +57,17 @@ export default function ProfileScreen() {
   } = usePushNotification();
 
   // Snoop balance
-  const snoop_balance = useQuery(api.snoops.get_snoop_balance) ?? 0;
-  const snoop_grants = useQuery(api.snoops.get_snoop_grants) ?? [];
+  const rawSnoopBalance = useQuery(api.snoops.get_snoop_balance);
+  const snoop_balance = rawSnoopBalance ?? 0;
+  const rawSnoopGrants = useQuery(api.snoops.get_snoop_grants);
+  const snoop_grants = rawSnoopGrants ?? [];
   const snoop_total =
     (snoop_grants as any[]).reduce((sum, g) => sum + g.snoops, 0) || 50;
   const snoops_used = snoop_total - snoop_balance;
   const snoop_pct = snoop_total > 0 ? snoops_used / snoop_total : 0;
   const is_low = snoop_balance <= snoop_total * 0.3;
+  const isDataLoading =
+    rawSnoopBalance === undefined || rawSnoopGrants === undefined;
 
   const menuItems = [
     {
@@ -136,7 +140,7 @@ export default function ProfileScreen() {
     }
   };
 
-  const isLoaded = !isLoading && !!signedIn && !appLoading;
+  const isLoaded = !isLoading && !!signedIn && !appLoading && !isDataLoading;
 
   // Staggered section animations (opacity + slide-up)
   const s1 = useSharedValue(0); // header
@@ -188,7 +192,7 @@ export default function ProfileScreen() {
     transform: [{ translateY: (1 - s4.value) * SLIDE }],
   }));
 
-  if (isLoading || !signedIn || appLoading) return <Loading />;
+  if (isLoading || !signedIn || appLoading || isDataLoading) return <Loading />;
 
   return (
     <Container>
@@ -500,7 +504,9 @@ export default function ProfileScreen() {
                   </View>
 
                   <Switch
-                    value={permissionStatus === "denied" ? false : isPushEnabled}
+                    value={
+                      permissionStatus === "denied" ? false : isPushEnabled
+                    }
                     onValueChange={(value) => {
                       if (permissionStatus === "denied") {
                         openDeviceSettings();
@@ -519,7 +525,7 @@ export default function ProfileScreen() {
                     }}
                     trackColor={{
                       false: Colors[theme].surface,
-                      true: Colors[theme].lightgreen,
+                      true: Colors[theme].success,
                     }}
                     thumbColor={
                       isPushEnabled && permissionStatus !== "denied"
