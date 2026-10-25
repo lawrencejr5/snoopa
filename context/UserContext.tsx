@@ -1,4 +1,5 @@
 import * as Localization from "expo-localization";
+import { getCountryCodeFromTimeZone, getCountryName } from "@/utils/country";
 import React, {
   createContext,
   FC,
@@ -32,6 +33,8 @@ const UserProvider: FC<{ children: ReactNode }> = ({ children }) => {
   const signedIn = currentUser as UserData;
   const [isPaywallOpen, setIsPaywallOpen] = useState(false);
   const identifiedUserId = useRef<string | undefined>(undefined);
+  const cachedLocationRef = useRef<{ name: string; code: string } | null>(null);
+  const lastLocationFetchRef = useRef<number>(0);
   const syncSubscription = useMutation(api.snoops.sync_user_subscription);
   const updateAppLoadMetadata = useMutation(api.users.update_app_load_metadata);
   const saveReferralSource = useMutation(api.users.save_referral_source);
@@ -104,62 +107,139 @@ const UserProvider: FC<{ children: ReactNode }> = ({ children }) => {
   useEffect(() => {
     if (!signedIn?._id) return;
 
-    const getCountryName = (code: string): string => {
+    const fetchJsonWithTimeout = async (url: string, timeoutMs = 3500) => {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
       try {
-        const displayNames = new Intl.DisplayNames(["en"], { type: "region" });
-        return displayNames.of(code.toUpperCase()) || code.toUpperCase();
-      } catch {
-        return code.toUpperCase();
+        const res = await fetch(url, { signal: controller.signal });
+        clearTimeout(timeoutId);
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
+        }
+        const data = await res.json();
+        if (
+          data &&
+          (data.error === true ||
+            data.status === "fail" ||
+            data.reason === "RateLimited")
+        ) {
+          throw new Error(data.message || data.reason || "Provider error");
+        }
+        return data;
+      } finally {
+        clearTimeout(timeoutId);
       }
     };
 
     const fetchIpLocation = async (): Promise<
       { name: string; code: string } | undefined
     > => {
+      // 1. Primary: ipwho.is (Provides reliable geolocation + full country name + code)
       try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3500);
-        const res = await fetch("https://ipapi.co/json/", {
-          signal: controller.signal,
-        });
-        clearTimeout(timeoutId);
-        if (res.ok) {
-          const data = await res.json();
-          const code = data.country_code || data.country;
-          const name =
-            data.country_name || (code ? getCountryName(code) : undefined);
-          if (code) return { name, code };
+        const data = await fetchJsonWithTimeout("https://ipwho.is/");
+        const code = (data.country_code || "").trim();
+        const rawName = (data.country || "").trim();
+        const name =
+          (rawName.length > 2 ? rawName : undefined) ||
+          (code ? getCountryName(code) : undefined);
+        if (code && name) {
+          return { name, code: code.toUpperCase() };
         }
       } catch {
-        try {
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 3500);
-          const res = await fetch("https://api.country.is", {
-            signal: controller.signal,
-          });
-          clearTimeout(timeoutId);
-          if (res.ok) {
-            const data = await res.json();
-            const code = data.country;
-            if (code) return { name: getCountryName(code), code };
-          }
-        } catch {
-          // ignore fallback failure
-        }
+        // Fall through to next provider
       }
 
-      // Fallback to device locale region if IP lookup fails
+      // 2. Secondary: api.country.is (Fast & simple, returns 2-letter country code)
+      try {
+        const data = await fetchJsonWithTimeout("https://api.country.is");
+        const code = (data.country || "").trim();
+        if (code) {
+          const name = getCountryName(code);
+          if (name) {
+            return { name, code: code.toUpperCase() };
+          }
+        }
+      } catch {
+        // Fall through to next provider
+      }
+
+      // 3. Tertiary: ipinfo.io (Fast fallback, returns 2-letter country code)
+      try {
+        const data = await fetchJsonWithTimeout("https://ipinfo.io/json");
+        const code = (data.country || "").trim();
+        if (code) {
+          const name = getCountryName(code);
+          if (name) {
+            return { name, code: code.toUpperCase() };
+          }
+        }
+      } catch {
+        // Fall through to next provider
+      }
+
+      // 4. Quaternary: ipapi.co
+      try {
+        const data = await fetchJsonWithTimeout("https://ipapi.co/json/");
+        const code = (data.country_code || data.country || "").trim();
+        const rawName = (data.country_name || "").trim();
+        const name =
+          (rawName.length > 2 ? rawName : undefined) ||
+          (code ? getCountryName(code) : undefined);
+        if (code && name) {
+          return { name, code: code.toUpperCase() };
+        }
+      } catch {
+        // Fall through to device fallback
+      }
+
+      // 5. Fallback 1: Device timezone mapping
+      // Crucial on Android where device language is set to "English (United States)"
+      // but the user is physically located in Nigeria (Africa/Lagos)
+      const tzCode = getCountryCodeFromTimeZone();
+      if (tzCode) {
+        return { name: getCountryName(tzCode), code: tzCode.toUpperCase() };
+      }
+
+      // 6. Fallback 2: Device locale region
       const locales = Localization.getLocales();
       const regionCode =
         locales && locales.length > 0 ? locales[0].regionCode : undefined;
-      return regionCode
-        ? { name: getCountryName(regionCode), code: regionCode }
-        : undefined;
+      if (regionCode) {
+        try {
+          const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
+          // Safety: If device has an African timezone but language is en-US, don't claim US!
+          if (regionCode.toUpperCase() === "US" && tz.startsWith("Africa/")) {
+            return { name: "Nigeria", code: "NG" };
+          }
+        } catch {
+          // ignore
+        }
+        return {
+          name: getCountryName(regionCode),
+          code: regionCode.toUpperCase(),
+        };
+      }
+
+      return undefined;
     };
 
-    const syncMetadata = async () => {
+    const syncMetadata = async (forceRefreshLocation = false) => {
       try {
-        const location = await fetchIpLocation();
+        const now = Date.now();
+        // Avoid hammering IP APIs on every AppState active transition
+        if (
+          !cachedLocationRef.current ||
+          forceRefreshLocation ||
+          now - lastLocationFetchRef.current > 60 * 60 * 1000
+        ) {
+          const location = await fetchIpLocation();
+          if (location) {
+            cachedLocationRef.current = location;
+            lastLocationFetchRef.current = now;
+          }
+        }
+
+        const location = cachedLocationRef.current;
         const os =
           Platform.OS === "ios"
             ? "ios"

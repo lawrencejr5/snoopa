@@ -172,21 +172,44 @@ export const update_app_load_metadata = mutation({
     } = {};
 
     if (args.os !== undefined) updates.os = args.os;
-    if (args.country !== undefined) updates.country = args.country;
-    if (args.countryCode !== undefined && args.country) {
+
+    let country_name = args.country;
+    const country_code = args.countryCode;
+
+    if (country_name && country_name.length === 2) {
+      try {
+        const display_names = new Intl.DisplayNames(["en"], { type: "region" });
+        country_name =
+          display_names.of(country_name.toUpperCase()) || country_name;
+      } catch {
+        // fallback
+      }
+    }
+
+    if (country_name !== undefined) updates.country = country_name;
+
+    if (country_code !== undefined && country_name) {
       // Dynamically register the country in active_countries if not exists
-      const existingCountry = await ctx.db
+      const existing_country = await ctx.db
         .query("active_countries")
-        .withIndex("by_code", (q) => q.eq("code", args.countryCode as string))
+        .withIndex("by_code", (q) => q.eq("code", country_code as string))
         .first();
 
-      if (!existingCountry) {
+      if (!existing_country) {
         await ctx.db.insert("active_countries", {
-          name: args.country,
-          code: args.countryCode,
-          gl: args.countryCode,
-          hl: `en-${args.countryCode}`,
+          name: country_name,
+          code: country_code,
+          gl: country_code,
+          hl: `en-${country_code}`,
           status: "active",
+        });
+      } else if (
+        existing_country.name &&
+        existing_country.name.length === 2 &&
+        country_name.length > 2
+      ) {
+        await ctx.db.patch(existing_country._id, {
+          name: country_name,
         });
       }
     }
