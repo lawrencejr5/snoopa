@@ -1,7 +1,7 @@
 import AddWatchlistModal from "@/components/AddWatchlistModal";
 import Container from "@/components/Container";
 import Loading from "@/components/Loading";
-import NotificationPermissionBanner from "@/components/NotificationPermissionBanner";
+import { usePushNotification } from "@/context/PushNotification";
 import PaywallModal from "@/components/PaywallModal";
 import PremiumFeatureModal from "@/components/PremiumFeatureModal";
 import ReferralModal from "@/components/ReferralModal";
@@ -573,6 +573,16 @@ export default function HomeScreen() {
     Platform.OS === "ios" && parseInt(String(Platform.Version), 10) >= 26;
   const { signedIn } = useUser();
   const navigation = useNavigation();
+  const {
+    isPermissionGranted,
+    permissionStatus,
+    isPushEnabled,
+    refreshPermissions,
+  } = usePushNotification();
+
+  const isNotificationDisabled =
+    signedIn?.notifications_enabled === false ||
+    (permissionStatus !== null && (!isPermissionGranted || !isPushEnabled));
 
   // Data queries
   const rawWatchlists = useQuery(api.watchlist.get_watchlists);
@@ -660,6 +670,7 @@ export default function HomeScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      refreshPermissions();
       if (!isLoaded) return;
 
       const lastTab = getLastFocusedTab();
@@ -963,6 +974,68 @@ export default function HomeScreen() {
         }}
         showsVerticalScrollIndicator={false}
       >
+        {/* Notifications Disabled Card */}
+        {isNotificationDisabled && (
+          <Animated.View style={style2}>
+            <Pressable
+              onPress={() => router.push("/(tabs)/profile" as any)}
+              style={({ pressed }) => [
+                styles.notifBannerCard,
+                {
+                  backgroundColor: Colors[theme].surface,
+                  borderColor: Colors[theme].border,
+                  opacity: pressed ? 0.75 : 1,
+                },
+              ]}
+            >
+              <View style={styles.notifBannerLeft}>
+                <View
+                  style={[
+                    styles.notifBannerIconBox,
+                    { backgroundColor: Colors[theme].warning + "18" },
+                  ]}
+                >
+                  <Image
+                    source={require("@/assets/icons/bells.png")}
+                    style={[
+                      styles.notifBannerIcon,
+                      { tintColor: Colors[theme].warning },
+                    ]}
+                  />
+                </View>
+                <View style={styles.notifBannerTextContainer}>
+                  <Text
+                    style={[
+                      styles.notifBannerTitle,
+                      { color: Colors[theme].text },
+                    ]}
+                    numberOfLines={1}
+                  >
+                    Notifications are turned off
+                  </Text>
+                  <Text
+                    style={[
+                      styles.notifBannerSubtitle,
+                      { color: Colors[theme].text_secondary },
+                    ]}
+                    numberOfLines={1}
+                  >
+                    Tap to enable snoop alerts in Profile
+                  </Text>
+                </View>
+              </View>
+
+              <Image
+                source={require("@/assets/icons/chevron-right.png")}
+                style={[
+                  styles.notifBannerChevron,
+                  { tintColor: Colors[theme].text_secondary },
+                ]}
+              />
+            </Pressable>
+          </Animated.View>
+        )}
+
         {/* Trending Topics */}
         {trendingTopics.length > 0 && (
           <Animated.View style={style2}>
@@ -1075,8 +1148,6 @@ export default function HomeScreen() {
                 </Pressable>
               </View>
             </View>
-
-            <NotificationPermissionBanner style={{ marginHorizontal: 0, marginTop: 10, marginBottom: 6 }} />
 
             {showSnoopTooltip && (
               <View
@@ -1838,5 +1909,51 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 12,
     paddingBottom: 30,
+  },
+  notifBannerCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginBottom: 14,
+  },
+  notifBannerLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    flex: 1,
+    marginRight: 8,
+  },
+  notifBannerIconBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  notifBannerIcon: {
+    width: 16,
+    height: 16,
+  },
+  notifBannerTextContainer: {
+    flex: 1,
+  },
+  notifBannerTitle: {
+    fontFamily: "FontBold",
+    fontSize: 13,
+    letterSpacing: -0.2,
+  },
+  notifBannerSubtitle: {
+    fontFamily: "FontMedium",
+    fontSize: 11,
+    marginTop: 2,
+  },
+  notifBannerChevron: {
+    width: 14,
+    height: 14,
+    opacity: 0.7,
   },
 });
