@@ -92,43 +92,94 @@ async function verifyHeadlineWithGemini(
   }
 }
 
-async function verifySourceWithGemini(
-  content: string,
-  condition: string,
-  observability: AIObservabilityContext,
-): Promise<boolean> {
-  const prompt = `You are a strict fact-checker. Given the content of a web page, determine whether it satisfies the following condition.
-        Condition: "${condition}"
-        Content: "${content.substring(0, 15000)}"
+interface SourceVerificationResult {
+  satisfied: boolean;
+  summary: string;
+}
 
-        Reply with ONLY "true" if the condition is satisfied, or "false" if it is not. No explanation.`;
+function parseSourceVerification(text: string): SourceVerificationResult {
+  const lines = text.split("\n");
+  let satisfied = false;
+  let summary = "";
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (line.toUpperCase().startsWith("SATISFIED:")) {
+      const val = line.substring(10).trim().toLowerCase();
+      satisfied = val.startsWith("true");
+    } else if (line.toUpperCase().startsWith("SUMMARY:")) {
+      summary = line.substring(8).trim();
+    }
+  }
+
+  // Fallback: If model responded with just "true" or "false"
+  if (!text.toUpperCase().includes("SATISFIED:")) {
+    satisfied = text.trim().toLowerCase().startsWith("true");
+  }
+
+  if (summary.toLowerCase() === "none" || summary.toLowerCase() === "null") {
+    summary = "";
+  }
+
+  return { satisfied, summary };
+}
+
+async function verifySourceWithGemini(
+  currentContent: string,
+  condition: string,
+  previousContent?: string,
+  watchlistTitle?: string,
+  observability?: AIObservabilityContext,
+): Promise<SourceVerificationResult> {
+  const systemInstruction = `You are a strict intelligence fact-checker for Snoopa.
+You are monitoring a webpage for a user tracking: "${watchlistTitle ?? "Topic"}".
+Condition to track: "${condition}"
+
+Task:
+Determine whether the current webpage content (especially changes compared to the previous snapshot) satisfies the tracking condition.
+
+Verification Rules:
+1. If the condition describes a CHANGE or UPDATE (e.g. price change, injury update, restock, status change, new announcement):
+   - Compare the PREVIOUS snapshot with the CURRENT snapshot.
+   - If a change matching the condition took place, SATISFIED is true.
+   - Ignore trivial/cosmetic changes (e.g., page load timestamps, cookie notices, randomized product carousels, ad banners) unless they satisfy the condition.
+2. If the condition describes a STATE (e.g., "in stock", "price under $10", "recovering"):
+   - Verify whether the CURRENT snapshot satisfies this state.
+3. Be concise and factual.
+
+Output format:
+You must reply in EXACTLY this format:
+SATISFIED: <true | false>
+SUMMARY: <If true, provide a 1-sentence factual description of the verified change or state (e.g. "The price of Sourdough Bread changed from $6.00 to $8.00"). If false, write "none">`;
+
+  const userPrompt = `${previousContent ? `PREVIOUS PAGE SNAPSHOT:\n"""\n${previousContent.substring(0, 25000)}\n"""\n\n` : ""}CURRENT PAGE SNAPSHOT:\n"""\n${currentContent.substring(0, 25000)}\n"""`;
 
   try {
     const text = await generateContentWithGemini(
-      prompt,
-      undefined,
+      userPrompt,
+      systemInstruction,
       "google/gemini-2.5-flash-lite",
       observability,
     );
-    return text.trim().toLowerCase() === "true";
+    return parseSourceVerification(text);
   } catch (err) {
     console.warn(
       "Primary source verification model failed, falling back to gemini-3.1-flash-lite",
     );
     try {
       const text = await generateContentWithGemini(
-        prompt,
-        undefined,
+        userPrompt,
+        systemInstruction,
         "google/gemini-3.1-flash-lite",
         observability,
       );
-      return text.trim().toLowerCase() === "true";
+      return parseSourceVerification(text);
     } catch (fallbackErr) {
       console.error(
         "OpenRouter Gemini source verification error:",
         fallbackErr,
       );
-      return false;
+      return { satisfied: false, summary: "" };
     }
   }
 }
@@ -175,7 +226,7 @@ async function generateBrief(
 
   const currentDateTime = getCurrentDateTime();
   const systemInstructions = `You are Snoopa, a sharp AI intelligence agent.
-    Your task is to review new verified headlines and write a 1-2 sentence casual briefing covering ONLY what is genuinely new compared to what the user already knows.
+    Your task is to review new verified updates and write a 1-2 sentence casual briefing covering ONLY what is genuinely new compared to what the user already knows.
     Sound natural, like you're briefing a friend.
     Return ONLY the brief or ${NO_NEW_INFO_SENTINEL}. No quotes, no markdown.
 
@@ -184,7 +235,7 @@ async function generateBrief(
   const userPrompt = `Watchlist Topic: "${watchlistTitle}"
     Tracking Condition: "${condition}"
 
-    ${priorKnowledgeSection}NEW verified headlines:
+    ${priorKnowledgeSection}NEW verified updates:
     ${headlineList}
 
     If ALL of the above is already covered by what the user already knows, reply with exactly: ${NO_NEW_INFO_SENTINEL}`;
@@ -214,8 +265,10 @@ async function generateBrief(
       return text.trim();
     } catch (fallbackErr) {
       console.error("Gemini brief generation error:", fallbackErr);
-      // Fallback: use the first headline title
-      return headlines[0].title;
+      // Fallback: use the headline with snippet if available
+      return headlines[0].snippet
+        ? `${headlines[0].title}: ${headlines[0].snippet}`
+        : headlines[0].title;
     }
   }
 }
@@ -334,6 +387,7 @@ async function _processMonitoredSources(
     newHash: string;
     newSnapshot: string;
     satisfied: boolean;
+    summary: string;
   }> = [];
 
   // Parallel fetch + verify all sources
@@ -363,12 +417,20 @@ async function _processMonitoredSources(
       const item = activeItems.find((i: any) => i._id === source.watchlist_id);
       if (!item) return;
 
-      const satisfied = await verifySourceWithGemini(
+      const verification = await verifySourceWithGemini(
         snapshot,
         item.condition,
+        source.last_snapshot,
+        item.title,
         createAIObservabilityContext(`watchlist:${item._id}`, item.user_id),
       );
-      sourceUpdates.push({ source, newHash, newSnapshot: snapshot, satisfied });
+      sourceUpdates.push({
+        source,
+        newHash,
+        newSnapshot: snapshot,
+        satisfied: verification.satisfied,
+        summary: verification.summary,
+      });
     }),
   );
 
@@ -394,15 +456,21 @@ async function _processMonitoredSources(
       try {
         hostname = new URL(update.source.url).hostname;
       } catch {}
+
+      const snippet =
+        update.summary ||
+        `Update detected on ${hostname} matching condition: "${item.condition}"`;
+
       verifiedByItem.get(item._id)!.headlines.push({
         title: `Source Update detected on ${hostname}`,
-        snippet:
-          update.newSnapshot.substring(0, 200).replace(/\n/g, " ") + "...",
+        snippet,
         url: update.source.url,
         source: hostname,
         hash: update.newHash,
       });
-      console.log(`Firehose: Monitored Source HIT for "${item.title}"`);
+      console.log(
+        `Firehose: Monitored Source HIT for "${item.title}" — ${snippet}`,
+      );
     }
   }
 
@@ -601,7 +669,7 @@ async function _dispatchAlerts(
     const sourceEntries = headlines.map((h) => ({
       watchlist_id: item._id,
       chat_id: chatId,
-      title: `${h.title}${h.source ? ` — ${h.source}` : ""}`,
+      title: `${h.title}${h.source && !h.title.includes(h.source) ? ` — ${h.source}` : ""}`,
       url: h.url,
     }));
     await ctx.runMutation(internal.chat.batch_insert_sources, {
