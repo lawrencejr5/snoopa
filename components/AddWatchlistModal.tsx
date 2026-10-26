@@ -11,6 +11,7 @@ import {
   BottomSheetView,
 } from "@gorhom/bottom-sheet";
 import { useAction } from "convex/react";
+import { Octicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { usePostHog } from "posthog-react-native";
 import LottieView from "lottie-react-native";
@@ -49,6 +50,44 @@ interface WatchlistPreview {
   search_type?: "general" | "news";
   time_range?: "day" | "any_time";
   final_snoop_text?: string;
+  source_url?: string;
+  initial_snapshot?: string;
+}
+
+function cleanErrorMessage(error: any, fallback: string): string {
+  if (!error) return fallback;
+  const rawMsg = error.message || String(error);
+  if (rawMsg.includes("FREE_LIMIT_REACHED")) {
+    return "You have reached the maximum limit of 2 watchlists on a free account. Upgrade to Pro for unlimited watchlists! 🔒";
+  }
+
+  const lower = rawMsg.toLowerCase();
+  if (
+    lower.includes("could not be scraped") ||
+    lower.includes("scrape") ||
+    lower.includes("link") ||
+    lower.includes("extract")
+  ) {
+    return "The link provided could not be scraped. Please check the URL and try again.";
+  }
+
+  const cleaned = rawMsg
+    .replace(/^\[CONVEX[^\]]*\]\s*(Server Error\s*:?)?\s*/i, "")
+    .replace(/^Uncaught Error:\s*/i, "")
+    .replace(/^Error:\s*/i, "")
+    .trim();
+
+  if (
+    cleaned &&
+    cleaned.length < 100 &&
+    !cleaned.includes("{") &&
+    !cleaned.includes("http") &&
+    !cleaned.includes("at ")
+  ) {
+    return cleaned;
+  }
+
+  return fallback;
 }
 
 const PROGRESS_STEPS = [
@@ -298,6 +337,8 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
           search_type: result.search_type,
           time_range: result.time_range,
           final_snoop_text: result.final_snoop_text,
+          source_url: result.source_url,
+          initial_snapshot: result.initial_snapshot,
         });
         posthogLogger.info("watchlist_preview_generated", {
           source: "add_watchlist_modal",
@@ -311,11 +352,13 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
         source: "add_watchlist_modal",
       });
       console.error("Failed to generate watchlist preview:", error);
-      const msg = error?.message?.includes("FREE_LIMIT_REACHED")
-        ? "You have reached the maximum limit of 2 watchlists on a free account. Upgrade to Pro for unlimited watchlists! 🔒"
-        : "Failed to generate tracking intelligence. Please try again.";
+      const msg = cleanErrorMessage(
+        error,
+        "An error occurred while generating your watchlist. Please try again.",
+      );
       setErrorText(msg);
       setPhase("input");
+      bottomSheetRef.current?.snapToIndex(0);
     }
   };
 
@@ -343,6 +386,8 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
         search_type: watchlistPreview.search_type,
         time_range: watchlistPreview.time_range,
         final_snoop_text: watchlistPreview.final_snoop_text,
+        source_url: watchlistPreview.source_url,
+        initial_snapshot: watchlistPreview.initial_snapshot,
       });
 
       if (result?.watchlist_id) {
@@ -370,9 +415,10 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
         source: "add_watchlist_modal",
       });
       console.error("Failed to save watchlist:", error);
-      const msg = error?.message?.includes("FREE_LIMIT_REACHED")
-        ? "You have reached the maximum limit of 2 watchlists on a free account. Upgrade to Pro for unlimited watchlists! 🔒"
-        : "Failed to save watchlist. Please try again.";
+      const msg = cleanErrorMessage(
+        error,
+        "An error occurred while creating your watchlist. Please try again.",
+      );
       setErrorText(msg);
       setIsSaving(false);
     }
@@ -595,16 +641,24 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
                       fontSize: 14,
                     }}
                   >
-                    Start tracking
+                    {errorText ? "Try again" : "Start tracking"}
                   </Text>
-                  <Image
-                    source={require("@/assets/icons/tracked.png")}
-                    style={{
-                      width: 14,
-                      height: 14,
-                      tintColor: Colors[theme].background,
-                    }}
-                  />
+                  {errorText ? (
+                    <Octicons
+                      name="sync"
+                      size={14}
+                      color={Colors[theme].background}
+                    />
+                  ) : (
+                    <Image
+                      source={require("@/assets/icons/tracked.png")}
+                      style={{
+                        width: 14,
+                        height: 14,
+                        tintColor: Colors[theme].background,
+                      }}
+                    />
+                  )}
                 </Pressable>
               </View>
             </View>
@@ -887,16 +941,24 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
                           fontSize: 14,
                         }}
                       >
-                        Continue
+                        {errorText ? "Try again" : "Continue"}
                       </Text>
-                      <Image
-                        source={require("@/assets/icons/tracked.png")}
-                        style={{
-                          width: 14,
-                          height: 14,
-                          tintColor: Colors[theme].background,
-                        }}
-                      />
+                      {errorText ? (
+                        <Octicons
+                          name="sync"
+                          size={14}
+                          color={Colors[theme].background}
+                        />
+                      ) : (
+                        <Image
+                          source={require("@/assets/icons/tracked.png")}
+                          style={{
+                            width: 14,
+                            height: 14,
+                            tintColor: Colors[theme].background,
+                          }}
+                        />
+                      )}
                     </>
                   )}
                 </Pressable>

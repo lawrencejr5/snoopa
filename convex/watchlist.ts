@@ -155,6 +155,13 @@ export const add_watchlist_item = mutation({
     const user_id = await getAuthUserId(ctx);
     if (!user_id) throw new Error("Not authenticated");
 
+    if (!args.title || !args.title.trim()) {
+      throw new Error("Watchlist title cannot be empty.");
+    }
+    if (!args.condition || !args.condition.trim()) {
+      throw new Error("Watchlist tracking condition cannot be empty.");
+    }
+
     // Active watchlist limit by tier
     await assert_can_activate_watchlist(ctx, user_id);
 

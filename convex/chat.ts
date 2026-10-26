@@ -865,9 +865,10 @@ async function _handleSource(
   if (!url.startsWith("http")) url = `https://${url}`;
   url = cleanUrl(url);
 
-  let extractResult = await ctx.runAction(internal.firecrawl.extract_source, {
-    url,
-  });
+  let extractResult: { success: boolean; content?: string } =
+    await ctx.runAction(internal.firecrawl.extract_source, {
+      url,
+    });
   if (!extractResult.success) {
     console.warn(
       `[Chat] Firecrawl extract failed for ${url}, falling back to Tavily.`,
@@ -1473,123 +1474,85 @@ async function _attachInitialIntel(
   wl_id: Id<"watchlist">,
   final_snoop_text: string,
   payload: any,
+  targetUrl?: string | null,
+  snapshot?: string | null,
 ): Promise<void> {
-  const urlRegex =
-    /(?:https?:\/\/)?([a-zA-Z0-9][-a-zA-Z0-9]*\.[a-zA-Z][-a-zA-Z0-9.]*[a-zA-Z]{2,}(?:\/[^\s]*)?)/;
-  const urlMatch = prompt.match(urlRegex);
-
   let sourceInfoText = "";
-  let extractionFailed = false;
   let tavilySources: Array<{ title?: string; url: string }> = [];
 
-  if (urlMatch) {
-    let url = urlMatch[0].replace(/[.,;!?]$/, "");
-    if (!url.startsWith("http")) url = `https://${url}`;
-    url = cleanUrl(url);
+  if (targetUrl && snapshot) {
+    const last_hash = await hashString(snapshot);
+    const source_weight = await _determineSourceWeight(
+      prompt,
+      payload.condition,
+    );
 
+    await ctx.runMutation(
+      internal.monitored_sources.save_monitored_source_and_link,
+      {
+        url: targetUrl,
+        last_snapshot: snapshot,
+        last_hash,
+        watchlist_id: wl_id,
+        source_weight,
+        status: "success",
+      },
+    );
+
+    const brief = await _generateSourceBrief(snapshot, payload.condition);
+    sourceInfoText = `\n\n${brief}`;
+
+    // Save snoopa's opening message
+    const resultMsgId = await ctx.runMutation(internal.chat.save_message, {
+      watchlist_id: wl_id,
+      role: "snoopa",
+      content: final_snoop_text + sourceInfoText,
+      type: "watchlist",
+    });
+
+    let hostname = "Source";
     try {
-      let extractResult = await ctx.runAction(
-        internal.firecrawl.extract_source,
-        { url },
+      hostname = new URL(targetUrl).hostname;
+    } catch {}
+
+    await ctx.runMutation(internal.chat.batch_insert_sources, {
+      entries: [
+        { watchlist_id: wl_id, chat_id: resultMsgId, title: hostname, url: targetUrl },
+      ],
+    });
+    return;
+  }
+
+  // No URL — do a quick intel search
+  try {
+    const searchQuery = payload.canonical_topic || payload.title || prompt;
+    const searchResult = await ctx.runAction(internal.tavily.search, {
+      query: searchQuery,
+    });
+    if (searchResult?.leanNews) {
+      const brief = await _generateInitialBrief(
+        searchResult.leanNews,
+        payload.condition,
       );
-      if (!extractResult.success) {
-        console.warn(
-          `[Chat] Firecrawl extract failed on init for ${url}, falling back to Tavily.`,
-        );
-        extractResult = await ctx.runAction(internal.tavily.extract_source, {
-          url,
-        });
-      }
-      if (extractResult.success) {
-        const snapshot = extractResult.content as string;
-        const last_hash = await hashString(snapshot);
-        const source_weight = await _determineSourceWeight(
-          prompt,
-          payload.condition,
-        );
-
-        await ctx.runMutation(
-          internal.monitored_sources.save_monitored_source_and_link,
-          {
-            url,
-            last_snapshot: snapshot,
-            last_hash,
-            watchlist_id: wl_id,
-            source_weight,
-            status: "success",
-          },
-        );
-
-        const brief = await _generateSourceBrief(snapshot, payload.condition);
+      if (brief) {
         sourceInfoText = `\n\n${brief}`;
-      } else {
-        extractionFailed = true;
-        await ctx.runMutation(
-          internal.monitored_sources.save_monitored_source_and_link,
-          {
-            url,
-            watchlist_id: wl_id,
-            status: "failure",
-          },
-        );
-        sourceInfoText = `I noticed you provided a link (${url}), but I couldn't extract any trackable content from it. Please double-check the URL or try a different source later if you want me to monitor it.`;
+        tavilySources = searchResult.sources || [];
       }
-    } catch (err) {
-      console.error("Failed to extract source during initialization:", err);
-      extractionFailed = true;
-      await ctx.runMutation(
-        internal.monitored_sources.save_monitored_source_and_link,
-        {
-          url,
-          watchlist_id: wl_id,
-          status: "failure",
-        },
-      );
-      sourceInfoText = `I encountered an issue trying to process the link you provided (${url}). You might want to try adding it again once we're inside the snoop dashboard.`;
     }
-  } else {
-    // No URL — do a quick intel search
-    try {
-      const searchQuery = payload.canonical_topic || payload.title || prompt;
-      const searchResult = await ctx.runAction(internal.tavily.search, {
-        query: searchQuery,
-      });
-      if (searchResult?.leanNews) {
-        const brief = await _generateInitialBrief(
-          searchResult.leanNews,
-          payload.condition,
-        );
-        if (brief) {
-          sourceInfoText = `\n\n${brief}`;
-          tavilySources = searchResult.sources || [];
-        }
-      }
-    } catch (err) {
-      console.error("Failed to generate initial search brief:", err);
-    }
+  } catch (err) {
+    console.error("Failed to generate initial search brief:", err);
   }
 
   // Save snoopa's opening message
   const resultMsgId = await ctx.runMutation(internal.chat.save_message, {
     watchlist_id: wl_id,
     role: "snoopa",
-    content: extractionFailed
-      ? sourceInfoText
-      : final_snoop_text + sourceInfoText,
+    content: final_snoop_text + sourceInfoText,
     type: "watchlist",
   });
 
   // Attach source entries
-  if (urlMatch && !extractionFailed) {
-    let url = urlMatch[0].replace(/[.,;!?]$/, "");
-    if (!url.startsWith("http")) url = `https://${url}`;
-    const hostname = new URL(url).hostname;
-    await ctx.runMutation(internal.chat.batch_insert_sources, {
-      entries: [
-        { watchlist_id: wl_id, chat_id: resultMsgId, title: hostname, url },
-      ],
-    });
-  } else if (tavilySources.length > 0) {
+  if (tavilySources.length > 0) {
     await ctx.runMutation(internal.chat.batch_insert_sources, {
       entries: tavilySources.map((s) => {
         let hostname = s.title || "Tavily Source";
@@ -1612,6 +1575,7 @@ async function _attachInitialIntel(
 /**
  * Action to parse a watchlist prompt using AI and return the generated metadata preview
  * WITHOUT saving anything to the database.
+ * If a URL is present, it validates and scrapes the source upfront, failing immediately if inaccessible.
  */
 export const generate_watchlist_preview = action({
   args: { prompt: v.string() },
@@ -1624,6 +1588,8 @@ export const generate_watchlist_preview = action({
     search_type: v.optional(v.union(v.literal("general"), v.literal("news"))),
     time_range: v.optional(v.union(v.literal("day"), v.literal("any_time"))),
     final_snoop_text: v.optional(v.string()),
+    source_url: v.optional(v.string()),
+    initial_snapshot: v.optional(v.string()),
   }),
   handler: async (
     ctx,
@@ -1637,6 +1603,8 @@ export const generate_watchlist_preview = action({
     search_type?: "general" | "news";
     time_range?: "day" | "any_time";
     final_snoop_text?: string;
+    source_url?: string;
+    initial_snapshot?: string;
   }> => {
     const user_id = await getAuthUserId(ctx);
     if (!user_id) throw new Error("Not authenticated");
@@ -1644,6 +1612,47 @@ export const generate_watchlist_preview = action({
     const usage = await ctx.runQuery(api.watchlist.get_watchlist_usage);
     if (usage.limit !== null && usage.active >= usage.limit) {
       throw new Error(_watchlist_limit_error(usage.limit));
+    }
+
+    // 1. If a URL is in the prompt, validate and scrape it FIRST
+    const urlRegex =
+      /(?:https?:\/\/)?([a-zA-Z0-9][-a-zA-Z0-9]*\.[a-zA-Z][-a-zA-Z0-9.]*[a-zA-Z]{2,}(?:\/[^\s]*)?)/;
+    const urlMatch = args.prompt.match(urlRegex);
+
+    let extractedUrl: string | undefined;
+    let initialSnapshot: string | undefined;
+
+    if (urlMatch) {
+      let url = urlMatch[0].replace(/[.,;!?]$/, "");
+      if (!url.startsWith("http")) url = `https://${url}`;
+      url = cleanUrl(url);
+
+      try {
+        let extractResult: { success: boolean; content?: string } =
+          await ctx.runAction(internal.firecrawl.extract_source, { url });
+        if (!extractResult.success) {
+          console.warn(
+            `[Preview] Firecrawl extract failed for ${url}, falling back to Tavily.`,
+          );
+          extractResult = await ctx.runAction(internal.tavily.extract_source, {
+            url,
+          });
+        }
+
+        if (!extractResult.success || !extractResult.content) {
+          throw new Error(
+            "The link provided could not be scraped. Please check the URL and try again.",
+          );
+        }
+
+        extractedUrl = url;
+        initialSnapshot = extractResult.content as string;
+      } catch (scrapeErr: any) {
+        console.error("Source scraping failed during preview generation:", scrapeErr);
+        throw new Error(
+          "The link provided could not be scraped. Please check the URL and try again.",
+        );
+      }
     }
 
     try {
@@ -1657,10 +1666,23 @@ export const generate_watchlist_preview = action({
           user_id,
         ),
       );
-      return parsed;
+      return {
+        ...parsed,
+        source_url: extractedUrl,
+        initial_snapshot: initialSnapshot,
+      };
     } catch (err: any) {
       console.error("Error generating watchlist preview:", err);
-      throw new Error(err.message || "Failed generating tracking intelligence.");
+      const msg = err.message || "";
+      if (
+        msg.includes("FREE_LIMIT_REACHED") ||
+        msg.includes("link provided could not be scraped")
+      ) {
+        throw err;
+      }
+      throw new Error(
+        "An error occurred while generating your watchlist. Please try again.",
+      );
     }
   },
 });
@@ -1679,6 +1701,8 @@ export const confirm_and_create_watchlist = action({
     search_type: v.optional(v.union(v.literal("general"), v.literal("news"))),
     time_range: v.optional(v.union(v.literal("day"), v.literal("any_time"))),
     final_snoop_text: v.optional(v.string()),
+    source_url: v.optional(v.string()),
+    initial_snapshot: v.optional(v.string()),
   },
   returns: v.object({
     watchlist_id: v.id("watchlist"),
@@ -1697,7 +1721,43 @@ export const confirm_and_create_watchlist = action({
       throw new Error(_watchlist_limit_error(usage.limit));
     }
 
-    // 1. Create watchlist record
+    // Verify source link if present
+    const urlRegex =
+      /(?:https?:\/\/)?([a-zA-Z0-9][-a-zA-Z0-9]*\.[a-zA-Z][-a-zA-Z0-9.]*[a-zA-Z]{2,}(?:\/[^\s]*)?)/;
+    const urlMatch = args.prompt.match(urlRegex);
+    const targetUrl = args.source_url || (urlMatch ? urlMatch[0] : null);
+
+    let preparedSnapshot = args.initial_snapshot;
+    let formattedUrl: string | null = null;
+
+    if (targetUrl) {
+      let url = targetUrl.replace(/[.,;!?]$/, "");
+      if (!url.startsWith("http")) url = `https://${url}`;
+      formattedUrl = cleanUrl(url);
+
+      if (!preparedSnapshot) {
+        let extractResult: { success: boolean; content?: string } =
+          await ctx.runAction(internal.firecrawl.extract_source, {
+            url: formattedUrl,
+          });
+        if (!extractResult.success) {
+          console.warn(
+            `[Confirm] Firecrawl extract failed for ${formattedUrl}, falling back to Tavily.`,
+          );
+          extractResult = await ctx.runAction(internal.tavily.extract_source, {
+            url: formattedUrl,
+          });
+        }
+        if (!extractResult.success || !extractResult.content) {
+          throw new Error(
+            "The link provided could not be scraped. Please check the URL and try again.",
+          );
+        }
+        preparedSnapshot = extractResult.content as string;
+      }
+    }
+
+    // 1. Create watchlist record only after source is verified
     const wl_id = await ctx.runMutation(api.watchlist.add_watchlist_item, {
       title: args.title,
       keywords: args.keywords,
@@ -1718,11 +1778,19 @@ export const confirm_and_create_watchlist = action({
     // 3. Attach initial intel (source scrape or search brief) + snoopa message
     const final_snoop_text =
       args.final_snoop_text || "I'm on it. Tracking this target for you.";
-    await _attachInitialIntel(ctx, args.prompt, wl_id, final_snoop_text, {
-      condition: args.condition,
-      canonical_topic: args.canonical_topic,
-      title: args.title,
-    });
+    await _attachInitialIntel(
+      ctx,
+      args.prompt,
+      wl_id,
+      final_snoop_text,
+      {
+        condition: args.condition,
+        canonical_topic: args.canonical_topic,
+        title: args.title,
+      },
+      formattedUrl,
+      preparedSnapshot,
+    );
 
     return { watchlist_id: wl_id };
   },
@@ -1760,6 +1828,35 @@ export const initialize_watchlist = action({
     }
 
     try {
+      const urlRegex =
+        /(?:https?:\/\/)?([a-zA-Z0-9][-a-zA-Z0-9]*\.[a-zA-Z][-a-zA-Z0-9.]*[a-zA-Z]{2,}(?:\/[^\s]*)?)/;
+      const urlMatch = args.prompt.match(urlRegex);
+
+      let initialSnapshot: string | null = null;
+      let formattedUrl: string | null = null;
+
+      if (urlMatch) {
+        let url = urlMatch[0].replace(/[.,;!?]$/, "");
+        if (!url.startsWith("http")) url = `https://${url}`;
+        formattedUrl = cleanUrl(url);
+
+        let extractResult: { success: boolean; content?: string } =
+          await ctx.runAction(internal.firecrawl.extract_source, {
+            url: formattedUrl,
+          });
+        if (!extractResult.success) {
+          extractResult = await ctx.runAction(internal.tavily.extract_source, {
+            url: formattedUrl,
+          });
+        }
+        if (!extractResult.success || !extractResult.content) {
+          throw new Error(
+            "The link provided could not be scraped. Please check the URL and try again.",
+          );
+        }
+        initialSnapshot = extractResult.content as string;
+      }
+
       const { instructions } = await _buildWatchlistPrompt(ctx);
       const parsed = await _parseWatchlistPrompt(
         ctx,
@@ -1793,6 +1890,8 @@ export const initialize_watchlist = action({
         wl_id,
         parsed.final_snoop_text,
         parsed,
+        formattedUrl,
+        initialSnapshot,
       );
 
       return {
@@ -1802,9 +1901,9 @@ export const initialize_watchlist = action({
         canonical_topic: parsed.canonical_topic,
         tier: parsed.tier,
       };
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      throw new Error("Failed generating tracking intelligence.");
+      throw new Error(err.message || "Failed generating tracking intelligence.");
     }
   },
 });
