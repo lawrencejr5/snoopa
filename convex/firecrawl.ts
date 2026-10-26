@@ -1,8 +1,8 @@
 "use node";
 
-import { generateContentWithGemini } from "./openrouter";
 import { v } from "convex/values";
 import { internalAction } from "./_generated/server";
+import { generateContentWithGemini } from "./openrouter";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -39,6 +39,7 @@ export const extract_source = internalAction({
         body: JSON.stringify({
           url: args.url,
           formats: ["markdown"],
+          maxAge: 0,
         }),
       });
 
@@ -143,7 +144,11 @@ export const search = internalAction({
         New User Message: ${args.query}
         ${args.source ? `Target Source/URL: ${args.source}` : ""}`;
 
-      const text = await generateContentWithGemini(userPrompt, systemInstruction, "google/gemini-2.5-flash-lite");
+      const text = await generateContentWithGemini(
+        userPrompt,
+        systemInstruction,
+        "google/gemini-2.5-flash-lite",
+      );
 
       if (text) {
         const lines = text.split("\n");

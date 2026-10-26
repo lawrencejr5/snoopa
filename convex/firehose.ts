@@ -124,7 +124,10 @@ async function verifySourceWithGemini(
       );
       return text.trim().toLowerCase() === "true";
     } catch (fallbackErr) {
-      console.error("OpenRouter Gemini source verification error:", fallbackErr);
+      console.error(
+        "OpenRouter Gemini source verification error:",
+        fallbackErr,
+      );
       return false;
     }
   }
@@ -734,11 +737,7 @@ export const run_firehose = internalAction({
 
     // 3A. Process monitored sources (primary + secondary)
     const { sourceUpdates, sourcesByWatchlistId } =
-      await _processMonitoredSources(
-        ctx,
-        itemsToProcess,
-        verifiedByItem,
-      );
+      await _processMonitoredSources(ctx, itemsToProcess, verifiedByItem);
 
     // 3B. Determine which items still need a general search
     const itemsForGeneralSearch = itemsToProcess.filter((item: any) => {
@@ -775,11 +774,7 @@ export const run_firehose = internalAction({
     }
 
     // 7. Generate briefs + dispatch alerts (chat, notification, push)
-    const totalAlerts = await _dispatchAlerts(
-      ctx,
-      verifiedByItem,
-      deepseekKey,
-    );
+    const totalAlerts = await _dispatchAlerts(ctx, verifiedByItem, deepseekKey);
 
     // 8. Deduct 1 snoop for each successfully processed item
     for (const item of itemsToProcess) {
