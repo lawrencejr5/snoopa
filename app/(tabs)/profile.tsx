@@ -54,6 +54,7 @@ export default function ProfileScreen() {
     toggleNotifications,
     openDeviceSettings,
     expoPushToken,
+    refreshPermissions,
   } = usePushNotification();
 
   // Snoop balance
@@ -153,6 +154,7 @@ export default function ProfileScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      refreshPermissions();
       if (!isLoaded) return;
 
       const lastTab = getLastFocusedTab();
@@ -505,7 +507,9 @@ export default function ProfileScreen() {
 
                   <Switch
                     value={
-                      permissionStatus === "denied" ? false : isPushEnabled
+                      permissionStatus === "denied"
+                        ? false
+                        : signedIn?.notifications_enabled !== false && isPushEnabled
                     }
                     onValueChange={(value) => {
                       if (permissionStatus === "denied") {
@@ -528,7 +532,9 @@ export default function ProfileScreen() {
                       true: Colors[theme].success,
                     }}
                     thumbColor={
-                      isPushEnabled && permissionStatus !== "denied"
+                      isPushEnabled &&
+                      permissionStatus !== "denied" &&
+                      signedIn?.notifications_enabled !== false
                         ? Colors[theme].text
                         : Colors[theme].text_secondary
                     }

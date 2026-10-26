@@ -56,7 +56,7 @@ export const PushNotificationProvider: React.FC<
   const [expoPushToken, setExpoPushToken] = useState<string | null>(null);
   const [permissionStatus, setPermissionStatus] =
     useState<Notifications.PermissionStatus | null>(null);
-  const [isPushEnabled, setIsPushEnabled] = useState<boolean>(false);
+  const [optimisticEnabled, setOptimisticEnabled] = useState<boolean | null>(null);
   const [notification, setNotification] =
     useState<Notifications.Notification | null>(null);
   const [notificationResponse, setNotificationResponse] =
@@ -85,6 +85,19 @@ export const PushNotificationProvider: React.FC<
   const isPermissionGranted =
     permissionStatus === Notifications.PermissionStatus.GRANTED;
 
+  // Clear optimistic override whenever currentUser query syncs from Convex
+  useEffect(() => {
+    if (currentUser !== undefined) {
+      setOptimisticEnabled(null);
+    }
+  }, [currentUser?.notifications_enabled]);
+
+  // Derived enabled state: always strictly respects database notifications_enabled
+  const isPushEnabled =
+    optimisticEnabled !== null
+      ? optimisticEnabled
+      : isPermissionGranted && currentUser?.notifications_enabled !== false;
+
   /**
    * Refresh the OS notification permission status.
    * If permission is granted, safely retrieve the token.
@@ -100,13 +113,6 @@ export const PushNotificationProvider: React.FC<
           if (token) {
             setExpoPushToken(token);
           }
-          if (currentUser?.notifications_enabled === false) {
-            setIsPushEnabled(false);
-          } else {
-            setIsPushEnabled(true);
-          }
-        } else {
-          setIsPushEnabled(false);
         }
 
         return status;
@@ -115,7 +121,7 @@ export const PushNotificationProvider: React.FC<
         setError(err);
         return null;
       }
-    }, [currentUser?.notifications_enabled]);
+    }, []);
 
   /**
    * Request notification permission from the user.
@@ -136,7 +142,6 @@ export const PushNotificationProvider: React.FC<
               await storePushToken({ token });
             }
           }
-          setIsPushEnabled(true);
           return true;
         }
 
@@ -173,10 +178,8 @@ export const PushNotificationProvider: React.FC<
               storePushToken({ token }).catch(() => {});
             }
           }
-          setIsPushEnabled(true);
           return true;
         } else {
-          setIsPushEnabled(false);
           return false;
         }
       } catch (err: any) {
@@ -195,15 +198,21 @@ export const PushNotificationProvider: React.FC<
         if (enable) {
           // If permission is already granted, flip switch immediately with zero network delay
           if (permissionStatus === Notifications.PermissionStatus.GRANTED) {
-            setIsPushEnabled(true);
+            setOptimisticEnabled(true);
             if (isAuthenticated) {
-              setNotificationsEnabledMutation({
-                enabled: true,
-                token: expoPushToken ?? undefined,
-              }).catch((err) => {
-                console.warn("Failed to update notification setting in Convex:", err);
-                setIsPushEnabled(false);
-              });
+              try {
+                await setNotificationsEnabledMutation({
+                  enabled: true,
+                  token: expoPushToken ?? undefined,
+                });
+              } catch (err) {
+                console.warn(
+                  "Failed to update notification setting in Convex:",
+                  err,
+                );
+                setOptimisticEnabled(false);
+                return false;
+              }
             }
             return true;
           }
@@ -211,36 +220,50 @@ export const PushNotificationProvider: React.FC<
           // If not granted, request permission
           const granted = await requestNotificationPermission();
           if (!granted) {
-            setIsPushEnabled(false);
+            setOptimisticEnabled(false);
             return false;
           }
 
-          setIsPushEnabled(true);
+          setOptimisticEnabled(true);
           if (isAuthenticated) {
-            setNotificationsEnabledMutation({
-              enabled: true,
-              token: expoPushToken ?? undefined,
-            }).catch((err) => {
-              console.warn("Failed to update notification setting in Convex:", err);
-            });
+            try {
+              await setNotificationsEnabledMutation({
+                enabled: true,
+                token: expoPushToken ?? undefined,
+              });
+            } catch (err) {
+              console.warn(
+                "Failed to update notification setting in Convex:",
+                err,
+              );
+              setOptimisticEnabled(false);
+              return false;
+            }
           }
           return true;
         } else {
           // Disable notifications immediately with zero network delay
-          setIsPushEnabled(false);
+          setOptimisticEnabled(false);
           if (isAuthenticated) {
-            setNotificationsEnabledMutation({
-              enabled: false,
-            }).catch((err) => {
-              console.warn("Failed to update notification setting in Convex:", err);
-              setIsPushEnabled(true);
-            });
+            try {
+              await setNotificationsEnabledMutation({
+                enabled: false,
+              });
+            } catch (err) {
+              console.warn(
+                "Failed to update notification setting in Convex:",
+                err,
+              );
+              setOptimisticEnabled(true);
+              return false;
+            }
           }
           return true;
         }
       } catch (err: any) {
         console.warn("Error toggling notifications:", err);
         setError(err);
+        setOptimisticEnabled(null);
         return false;
       }
     },
@@ -276,8 +299,6 @@ export const PushNotificationProvider: React.FC<
           if (token) {
             setExpoPushToken(token);
           }
-        } else {
-          setIsPushEnabled(false);
         }
       } catch (err: any) {
         setError(err);
@@ -331,29 +352,23 @@ export const PushNotificationProvider: React.FC<
 
   // Sync token to Convex automatically whenever authenticated and permissions are active
   useEffect(() => {
-    if (!isAuthenticated || !isPermissionGranted) {
-      setIsPushEnabled(false);
+    if (!isAuthenticated || !isPermissionGranted || !currentUser) {
       return;
     }
 
-    if (currentUser) {
-      if (currentUser.notifications_enabled === false) {
-        setIsPushEnabled(false);
-        return;
+    if (currentUser.notifications_enabled === false) {
+      return;
+    }
+
+    if (expoPushToken) {
+      const userTokens = currentUser.pushTokens || [];
+      const needsTokenSync = !userTokens.includes(expoPushToken);
+
+      if (needsTokenSync) {
+        storePushToken({ token: expoPushToken }).catch((err) => {
+          console.warn("Failed to auto-sync push token to Convex:", err);
+        });
       }
-
-      if (expoPushToken) {
-        const userTokens = currentUser.pushTokens || [];
-        const needsTokenSync = !userTokens.includes(expoPushToken);
-
-        if (needsTokenSync) {
-          storePushToken({ token: expoPushToken }).catch((err) => {
-            console.warn("Failed to auto-sync push token to Convex:", err);
-          });
-        }
-      }
-
-      setIsPushEnabled(true);
     }
   }, [
     isAuthenticated,

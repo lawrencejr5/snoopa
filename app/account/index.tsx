@@ -327,7 +327,11 @@ export default function AccountScreen() {
                   </View>
 
                   <Switch
-                    value={permissionStatus === "denied" ? false : isPushEnabled}
+                    value={
+                      permissionStatus === "denied"
+                        ? false
+                        : signedIn?.notifications_enabled !== false && isPushEnabled
+                    }
                     onValueChange={(value) => {
                       if (permissionStatus === "denied") {
                         openDeviceSettings();
@@ -349,7 +353,9 @@ export default function AccountScreen() {
                       true: Colors[theme].lightgreen,
                     }}
                     thumbColor={
-                      isPushEnabled && permissionStatus !== "denied"
+                      isPushEnabled &&
+                      permissionStatus !== "denied" &&
+                      signedIn?.notifications_enabled !== false
                         ? Colors[theme].text
                         : Colors[theme].text_secondary
                     }
