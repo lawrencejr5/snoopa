@@ -3,6 +3,8 @@ import { useCustomAlert } from "@/context/CustomAlertContext";
 import { useTheme } from "@/context/ThemeContext";
 import { useUser } from "@/context/UserContext";
 import { api } from "@/convex/_generated/api";
+import { isAdSupported, showRewardedAd } from "@/utils/adHelper";
+import WatchAdModal from "@/components/WatchAdModal";
 import {
   BottomSheetBackdrop,
   BottomSheetModal,
@@ -174,7 +176,12 @@ export default function TrackTopicModal({
   const [progressIndex, setProgressIndex] = useState(0);
   const [errorText, setErrorText] = useState<string | null>(null);
 
-  const snapPoints = useMemo(() => ["45%", "55%", "85%"], []);
+  const isFreeUser = !signedIn?.is_premium;
+  const [adWatched, setAdWatched] = useState(false);
+  const [isLoadingAd, setIsLoadingAd] = useState(false);
+  const [showCustomAdModal, setShowCustomAdModal] = useState(false);
+
+  const snapPoints = useMemo(() => ["45%", "60%", "85%"], []);
 
   const generateWatchlistPreview = useAction(
     api.chat.generate_watchlist_preview,
@@ -191,6 +198,9 @@ export default function TrackTopicModal({
     setIsSaving(false);
     setProgressIndex(0);
     setErrorText(null);
+    setAdWatched(false);
+    setIsLoadingAd(false);
+    setShowCustomAdModal(false);
     inputRef.current?.clear();
     inputRef.current?.setNativeProps({ text: "" });
   }, []);
@@ -324,12 +334,61 @@ export default function TrackTopicModal({
     }
   };
 
+  const handleUpgrade = () => {
+    handleClose();
+    router.push("/account/billing");
+  };
+
   const handleEditPrompt = () => {
     setPhase("input");
     setErrorText(null);
+    setAdWatched(false);
     setTimeout(() => {
       inputRef.current?.setNativeProps({ text: prompt });
     }, 50);
+  };
+
+    const handleProceed = () => {
+    if (isSaving || isLoadingAd) return;
+
+    if (isFreeUser && !adWatched) {
+      if (!isAdSupported) {
+        setShowCustomAdModal(true);
+        return;
+      }
+
+      setIsLoadingAd(true);
+      try {
+        showRewardedAd({
+          onAdLoaded: () => {
+            setIsLoadingAd(false);
+          },
+          onRewardEarned: async () => {
+            return 1;
+          },
+          onAdClosed: (earnedRewardAmount) => {
+            setIsLoadingAd(false);
+            if (earnedRewardAmount !== null) {
+              setAdWatched(true);
+              handleContinueToWatchlist();
+            } else {
+              showCustomAlert("Please finish watching the ad to continue.", "warning");
+            }
+          },
+          onAdFailedToLoad: () => {
+            setIsLoadingAd(false);
+            setShowCustomAdModal(true);
+          },
+        });
+      } catch (err) {
+        console.warn("Error showing rewarded ad, falling back to custom ad:", err);
+        setIsLoadingAd(false);
+        setShowCustomAdModal(true);
+      }
+      return;
+    }
+
+    handleContinueToWatchlist();
   };
 
   const handleContinueToWatchlist = async () => {
@@ -378,7 +437,8 @@ export default function TrackTopicModal({
   const currentStep = PROGRESS_STEPS[progressIndex] || PROGRESS_STEPS[0];
 
   return (
-    <BottomSheetModal
+    <>
+      <BottomSheetModal
       ref={bottomSheetRef}
       snapPoints={snapPoints}
       enableContentPanningGesture={phase === "input"}
@@ -836,11 +896,11 @@ export default function TrackTopicModal({
                 </View>
               </View>
 
-              {/* ACTIONS */}
+{/* ACTIONS */}
               <View style={styles.actions}>
                 <Pressable
                   onPress={handleEditPrompt}
-                  disabled={isSaving}
+                  disabled={isSaving || isLoadingAd}
                   style={[
                     styles.cancelBtn,
                     { borderColor: Colors[theme].border },
@@ -858,13 +918,13 @@ export default function TrackTopicModal({
                 </Pressable>
 
                 <Pressable
-                  onPress={handleContinueToWatchlist}
-                  disabled={isSaving}
+                  onPress={handleProceed}
+                  disabled={isSaving || isLoadingAd}
                   style={[
                     styles.proceedBtn,
                     {
                       backgroundColor: Colors[theme].primary,
-                      opacity: isSaving ? 0.7 : 1,
+                      opacity: isSaving || isLoadingAd ? 0.7 : 1,
                     },
                   ]}
                 >
@@ -873,6 +933,22 @@ export default function TrackTopicModal({
                       size="small"
                       color={Colors[theme].background}
                     />
+                  ) : isLoadingAd ? (
+                    <>
+                      <Text
+                        style={{
+                          color: Colors[theme].background,
+                          fontFamily: "FontBold",
+                          fontSize: 14,
+                        }}
+                      >
+                        Loading ad...
+                      </Text>
+                      <ActivityIndicator
+                        size="small"
+                        color={Colors[theme].background}
+                      />
+                    </>
                   ) : (
                     <>
                       <Text
@@ -909,6 +985,21 @@ export default function TrackTopicModal({
         </Pressable>
       </BottomSheetView>
     </BottomSheetModal>
+
+      <WatchAdModal
+        visible={showCustomAdModal}
+        onClose={() => setShowCustomAdModal(false)}
+        onAdComplete={() => {
+          setShowCustomAdModal(false);
+          setAdWatched(true);
+          handleContinueToWatchlist();
+        }}
+        onUpgradePress={() => {
+          setShowCustomAdModal(false);
+          handleUpgrade();
+        }}
+      />
+    </>
   );
 }
 
