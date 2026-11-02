@@ -4,7 +4,7 @@ import { useTheme } from "@/context/ThemeContext";
 import { useUser } from "@/context/UserContext";
 import { api } from "@/convex/_generated/api";
 import { posthogLogger } from "@/utils/posthog-logger";
-import { isAdSupported, showRewardedAd } from "@/utils/adHelper";
+import { isAdSupported, showInterstitialAd } from "@/utils/adHelper";
 import { markAdWatchedForWatchlist } from "@/utils/navigationState";
 import WatchAdModal from "@/components/WatchAdModal";
 import {
@@ -401,21 +401,14 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
 
       setIsLoadingAd(true);
       try {
-        showRewardedAd({
+        showInterstitialAd({
           onAdLoaded: () => {
             setIsLoadingAd(false);
           },
-          onRewardEarned: async () => {
-            return 1;
-          },
-          onAdClosed: (earnedRewardAmount) => {
+          onAdClosed: () => {
             setIsLoadingAd(false);
-            if (earnedRewardAmount !== null) {
-              setAdWatched(true);
-              handleContinueToWatchlist();
-            } else {
-              showCustomAlert("Please finish watching the ad to continue.", "warning");
-            }
+            setAdWatched(true);
+            handleContinueToWatchlist();
           },
           onAdFailedToLoad: () => {
             setIsLoadingAd(false);
@@ -423,7 +416,7 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
           },
         });
       } catch (err) {
-        console.warn("Error showing rewarded ad, falling back to custom ad:", err);
+        console.warn("Error showing interstitial ad, falling back to custom ad:", err);
         setIsLoadingAd(false);
         setShowCustomAdModal(true);
       }

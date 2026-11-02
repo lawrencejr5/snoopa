@@ -1,13 +1,20 @@
 import { Platform } from "react-native";
 import {
   AdEventType,
+  InterstitialAd,
   RewardedAd,
   RewardedAdEventType,
 } from "react-native-google-mobile-ads";
 
-const AD_UNIT_ID = Platform.select({
+const REWARDED_AD_UNIT_ID = Platform.select({
   android: "ca-app-pub-7078901325871517/4361854748",
   ios: "ca-app-pub-7078901325871517/4067140038",
+  default: "",
+});
+
+const INTERSTITIAL_AD_UNIT_ID = Platform.select({
+  android: "ca-app-pub-7078901325871517/6799852146",
+  ios: "ca-app-pub-7078901325871517/6174212368",
   default: "",
 });
 
@@ -26,7 +33,7 @@ export async function showRewardedAd({
   onRewardEarned,
   onAdFailedToLoad,
 }: ShowRewardedAdParams) {
-  const rewarded = RewardedAd.createForAdRequest(AD_UNIT_ID, {
+  const rewarded = RewardedAd.createForAdRequest(REWARDED_AD_UNIT_ID, {
     requestNonPersonalizedAdsOnly: false,
   });
 
@@ -102,4 +109,73 @@ export async function showRewardedAd({
   }
 
   rewarded.load();
+}
+
+export interface ShowInterstitialAdParams {
+  onAdLoaded: () => void;
+  onAdClosed: () => void;
+  onAdFailedToLoad: () => void;
+}
+
+export async function showInterstitialAd({
+  onAdLoaded,
+  onAdClosed,
+  onAdFailedToLoad,
+}: ShowInterstitialAdParams) {
+  const adUnitId = INTERSTITIAL_AD_UNIT_ID;
+  if (!adUnitId) {
+    onAdFailedToLoad();
+    return;
+  }
+
+  const interstitial = InterstitialAd.createForAdRequest(adUnitId, {
+    requestNonPersonalizedAdsOnly: false,
+  });
+
+  let hasClosed = false;
+
+  const unsubscribeLoaded = interstitial.addAdEventListener(
+    AdEventType.LOADED,
+    () => {
+      onAdLoaded();
+      interstitial.show();
+    },
+  );
+
+  const unsubscribeClosed = interstitial.addAdEventListener(
+    AdEventType.CLOSED,
+    () => {
+      if (hasClosed) return;
+      hasClosed = true;
+      cleanup();
+      onAdClosed();
+    },
+  );
+
+  const unsubscribeError = interstitial.addAdEventListener(
+    AdEventType.ERROR,
+    (error) => {
+      console.warn("Google Mobile Ads error loading/showing interstitial ad:", error);
+      if (hasClosed) return;
+      hasClosed = true;
+      cleanup();
+      onAdFailedToLoad();
+    },
+  );
+
+  const timeout = setTimeout(() => {
+    if (hasClosed) return;
+    hasClosed = true;
+    cleanup();
+    onAdFailedToLoad();
+  }, 15000);
+
+  function cleanup() {
+    clearTimeout(timeout);
+    unsubscribeLoaded();
+    unsubscribeClosed();
+    unsubscribeError();
+  }
+
+  interstitial.load();
 }

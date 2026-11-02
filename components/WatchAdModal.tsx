@@ -25,7 +25,8 @@ interface WatchAdModalProps {
   onUpgradePress: () => void;
 }
 
-const TOTAL_AD_SECONDS = 60;
+const TOTAL_AD_SECONDS = 15;
+const SKIP_AFTER_SECONDS = 5;
 
 const isLottieSupported =
   Platform.OS !== "web" &&
@@ -115,6 +116,10 @@ export default function WatchAdModal({
     }).start();
   }, [secondsRemaining, visible]);
 
+  const secondsElapsed = TOTAL_AD_SECONDS - secondsRemaining;
+  const canSkip = secondsElapsed >= SKIP_AFTER_SECONDS;
+  const secondsUntilSkip = Math.max(0, SKIP_AFTER_SECONDS - secondsElapsed);
+
   const handleFinish = () => {
     setIsCompleted(true);
     haptics.impact("success");
@@ -123,15 +128,20 @@ export default function WatchAdModal({
     }, 1000);
   };
 
+  const handleSkip = () => {
+    haptics.impact("light");
+    onAdComplete();
+  };
+
   const handleRequestClose = () => {
-    if (isCompleted) {
-      onAdComplete();
+    if (isCompleted || canSkip) {
+      handleSkip();
       return;
     }
 
     Alert.alert(
       "Exit Ad?",
-      "You need to finish watching the ad to create your watchlist. Want to skip ads? Switch to Pro.",
+      "You can skip this ad in a few seconds, or switch to Pro to never see ads.",
       [
         {
           text: "Keep Watching",
@@ -192,24 +202,73 @@ export default function WatchAdModal({
           </View>
 
           <View style={styles.headerRight}>
-            <View
-              style={[
-                styles.timerPill,
-                {
-                  backgroundColor: Colors[theme].surface,
-                  borderColor: Colors[theme].border,
-                },
-              ]}
-            >
-              <Octicons
-                name="clock"
-                size={12}
-                color={Colors[theme].text_secondary}
-              />
-              <Text style={[styles.timerText, { color: Colors[theme].text }]}>
-                {isCompleted ? "Completed" : formattedTime}
-              </Text>
-            </View>
+            {isCompleted ? (
+              <View
+                style={[
+                  styles.timerPill,
+                  {
+                    backgroundColor: Colors[theme].surface,
+                    borderColor: Colors[theme].border,
+                  },
+                ]}
+              >
+                <Octicons
+                  name="check"
+                  size={12}
+                  color={Colors[theme].success}
+                />
+                <Text style={[styles.timerText, { color: Colors[theme].success }]}>
+                  Completed
+                </Text>
+              </View>
+            ) : canSkip ? (
+              <Pressable
+                onPress={handleSkip}
+                hitSlop={10}
+                style={[
+                  styles.skipBtn,
+                  { backgroundColor: Colors[theme].primary },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.skipBtnText,
+                    { color: Colors[theme].background },
+                  ]}
+                >
+                  Skip Ad
+                </Text>
+                <Octicons
+                  name="chevron-right"
+                  size={12}
+                  color={Colors[theme].background}
+                />
+              </Pressable>
+            ) : (
+              <View
+                style={[
+                  styles.timerPill,
+                  {
+                    backgroundColor: Colors[theme].surface,
+                    borderColor: Colors[theme].border,
+                  },
+                ]}
+              >
+                <Octicons
+                  name="clock"
+                  size={12}
+                  color={Colors[theme].text_secondary}
+                />
+                <Text
+                  style={[
+                    styles.timerText,
+                    { color: Colors[theme].text_secondary },
+                  ]}
+                >
+                  Skip in {secondsUntilSkip}s
+                </Text>
+              </View>
+            )}
 
             <Pressable
               onPress={handleRequestClose}
@@ -491,6 +550,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   timerText: {
+    fontFamily: "FontBold",
+    fontSize: 12,
+  },
+  skipBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  skipBtnText: {
     fontFamily: "FontBold",
     fontSize: 12,
   },
