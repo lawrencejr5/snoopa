@@ -4,6 +4,7 @@ import { useTheme } from "@/context/ThemeContext";
 import { useUser } from "@/context/UserContext";
 import { api } from "@/convex/_generated/api";
 import { isAdSupported, showRewardedAd } from "@/utils/adHelper";
+import { markAdWatchedForWatchlist } from "@/utils/navigationState";
 import WatchAdModal from "@/components/WatchAdModal";
 import {
   BottomSheetBackdrop,
@@ -414,6 +415,9 @@ export default function TrackTopicModal({
 
       if (result?.watchlist_id) {
         const targetId = result.watchlist_id;
+        if (isFreeUser) {
+          markAdWatchedForWatchlist();
+        }
         handleClose();
         showCustomAlert("New watchlist created", "success");
         router.push({

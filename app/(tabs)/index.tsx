@@ -4,6 +4,7 @@ import Loading from "@/components/Loading";
 import { usePushNotification } from "@/context/PushNotification";
 import PaywallModal from "@/components/PaywallModal";
 import PremiumFeatureModal from "@/components/PremiumFeatureModal";
+import StopAdsModal from "@/components/StopAdsModal";
 import ReferralModal from "@/components/ReferralModal";
 import TopUpModal from "@/components/TopUpModal";
 import TrackTopicModal from "@/components/TrackTopicModal";
@@ -22,7 +23,12 @@ import { useTheme } from "@/context/ThemeContext";
 import { useUser } from "@/context/UserContext";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { getLastFocusedTab, setLastFocusedTab } from "@/utils/navigationState";
+import {
+  DONT_SHOW_STOP_ADS_KEY,
+  consumeStopAdsPrompt,
+  getLastFocusedTab,
+  setLastFocusedTab,
+} from "@/utils/navigationState";
 import { Octicons } from "@expo/vector-icons";
 import {
   BottomSheetBackdrop,
@@ -690,11 +696,29 @@ export default function HomeScreen() {
         s4.value = 1;
       }
       setLastFocusedTab("index");
-    }, [isLoaded]),
+
+      const checkStopAdsPrompt = async () => {
+        if (!signedIn?.is_premium && consumeStopAdsPrompt()) {
+          try {
+            const suppressed = await AsyncStorage.getItem(DONT_SHOW_STOP_ADS_KEY);
+            if (suppressed !== "true") {
+              setTimeout(() => {
+                setShowStopAdsModal(true);
+              }, 250);
+            }
+          } catch (e) {
+            console.error("Error checking stop ads suppression:", e);
+          }
+        }
+      };
+
+      checkStopAdsPrompt();
+    }, [isLoaded, signedIn?.is_premium]),
   );
 
   const [activeBriefIndex, setActiveBriefIndex] = useState(0);
 
+  const [showStopAdsModal, setShowStopAdsModal] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showTrackModal, setShowTrackModal] = useState(false);
   const [selectedTopic, setSelectedTopic] = useState("");
@@ -1517,6 +1541,11 @@ export default function HomeScreen() {
       </Pressable>
 
       {/* Modals */}
+      <StopAdsModal
+        visible={showStopAdsModal}
+        onClose={() => setShowStopAdsModal(false)}
+      />
+
       <AddWatchlistModal
         visible={showAddModal}
         onClose={() => setShowAddModal(false)}

@@ -2,6 +2,7 @@ import AddWatchlistModal from "@/components/AddWatchlistModal";
 import Container from "@/components/Container";
 import Loading from "@/components/Loading";
 import PremiumFeatureModal from "@/components/PremiumFeatureModal";
+import StopAdsModal from "@/components/StopAdsModal";
 import {
   CommandsModal,
   ConfirmationModal,
@@ -13,7 +14,13 @@ import { useLoadingContext } from "@/context/LoadingContext";
 import { useTheme } from "@/context/ThemeContext";
 import { useUser } from "@/context/UserContext";
 import { api } from "@/convex/_generated/api";
-import { getLastFocusedTab, setLastFocusedTab } from "@/utils/navigationState";
+import {
+  DONT_SHOW_STOP_ADS_KEY,
+  consumeStopAdsPrompt,
+  getLastFocusedTab,
+  setLastFocusedTab,
+} from "@/utils/navigationState";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Octicons } from "@expo/vector-icons";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import { useFocusEffect, useNavigation, useRouter } from "expo-router";
@@ -320,6 +327,7 @@ export default function WatchlistScreen() {
   const [animationKey, setAnimationKey] = useState(0);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showPremiumModal, setShowPremiumModal] = useState(false);
+  const [showStopAdsModal, setShowStopAdsModal] = useState(false);
 
   // Options Modal State
   const [selectedSnoop, setSelectedSnoop] = useState<{
@@ -458,7 +466,24 @@ export default function WatchlistScreen() {
         s4.value = 1;
       }
       setLastFocusedTab("watchlist");
-    }, [isLoaded]),
+
+      const checkStopAdsPrompt = async () => {
+        if (!signedIn?.is_premium && consumeStopAdsPrompt()) {
+          try {
+            const suppressed = await AsyncStorage.getItem(DONT_SHOW_STOP_ADS_KEY);
+            if (suppressed !== "true") {
+              setTimeout(() => {
+                setShowStopAdsModal(true);
+              }, 250);
+            }
+          } catch (e) {
+            console.error("Error checking stop ads suppression:", e);
+          }
+        }
+      };
+
+      checkStopAdsPrompt();
+    }, [isLoaded, signedIn?.is_premium]),
   );
 
   const style1 = useAnimatedStyle(() => ({
@@ -776,6 +801,11 @@ export default function WatchlistScreen() {
       <AddWatchlistModal
         visible={showAddModal}
         onClose={() => setShowAddModal(false)}
+      />
+
+      <StopAdsModal
+        visible={showStopAdsModal}
+        onClose={() => setShowStopAdsModal(false)}
       />
 
       <PremiumFeatureModal

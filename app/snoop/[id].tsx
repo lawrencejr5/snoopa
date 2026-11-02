@@ -14,6 +14,7 @@ import { useTheme } from "@/context/ThemeContext";
 import { useUser } from "@/context/UserContext";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
+import { armStopAdsPromptOnSnoopExit } from "@/utils/navigationState";
 import { Octicons, SimpleLineIcons } from "@expo/vector-icons";
 import {
   BottomSheetBackdrop,
@@ -561,6 +562,7 @@ export default function SnoopDetailsScreen() {
       setIsScreenFocused(true);
       return () => {
         setIsScreenFocused(false);
+        armStopAdsPromptOnSnoopExit();
       };
     }, []),
   );

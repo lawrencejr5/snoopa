@@ -5,6 +5,7 @@ import { useUser } from "@/context/UserContext";
 import { api } from "@/convex/_generated/api";
 import { posthogLogger } from "@/utils/posthog-logger";
 import { isAdSupported, showRewardedAd } from "@/utils/adHelper";
+import { markAdWatchedForWatchlist } from "@/utils/navigationState";
 import WatchAdModal from "@/components/WatchAdModal";
 import {
   BottomSheetBackdrop,
@@ -464,6 +465,9 @@ export default function AddWatchlistModal({ visible, onClose }: Props) {
           search_type: watchlistPreview.search_type ?? "general",
           time_range: watchlistPreview.time_range ?? "any_time",
         });
+        if (isFreeUser) {
+          markAdWatchedForWatchlist();
+        }
         handleClose();
         showCustomAlert("New watchlist created", "success");
         router.push({
