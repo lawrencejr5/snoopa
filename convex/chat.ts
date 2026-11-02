@@ -137,6 +137,7 @@ export const save_message = internalMutation({
       ),
     ),
     sources: v.optional(v.array(v.string())),
+    seen: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const message = await ctx.db.insert("chats", {
@@ -144,7 +145,7 @@ export const save_message = internalMutation({
       role: args.role,
       content: args.content,
       // User messages are always "seen" by the user; snoopa messages start unseen
-      seen: args.role === "user" ? true : false,
+      seen: args.seen ?? (args.role === "user" ? true : false),
       type: args.type,
     });
 
@@ -202,7 +203,7 @@ export const save_gate_message = mutation({
       watchlist_id: args.watchlist_id,
       role: "snoopa",
       content: gate_message,
-      seen: false,
+      seen: true,
       type: "chat",
     });
 
@@ -750,6 +751,7 @@ async function _handlePause(
     role: "snoopa",
     content: text,
     type: "chat",
+    seen: true,
   });
   return { response: text };
 }
@@ -768,6 +770,7 @@ async function _handleResume(
     role: "snoopa",
     content: text,
     type: "chat",
+    seen: true,
   });
   return { response: text };
 }
@@ -796,6 +799,7 @@ async function _handleEditCondition(
         role: "snoopa",
         content: ask_text,
         type: "chat",
+        seen: true,
       });
       return { response: ask_text };
     }
@@ -812,6 +816,7 @@ async function _handleEditCondition(
     role: "snoopa",
     content: edit_text,
     type: "chat",
+    seen: true,
   });
   return { response: edit_text };
 }
@@ -833,6 +838,7 @@ async function _handleSource(
       role: "snoopa",
       content: text,
       type: "source",
+      seen: true,
     });
     return { response: text };
   }
@@ -856,6 +862,7 @@ async function _handleSource(
         role: "snoopa",
         content: text,
         type: "source",
+      seen: true,
       });
       return { response: text };
     }
@@ -891,6 +898,7 @@ async function _handleSource(
       role: "snoopa",
       content: text,
       type: "source",
+      seen: true,
     });
     return { response: text };
   }
@@ -927,6 +935,7 @@ async function _handleSource(
       role: "snoopa",
       content: response_text,
       type: "source",
+      seen: true,
     });
     const hostname = new URL(url).hostname;
     await ctx.runMutation(internal.chat.batch_insert_sources, {
@@ -948,6 +957,7 @@ async function _handleSource(
     role: "snoopa",
     content: text,
     type: "source",
+    seen: true,
   });
   return { response: text };
 }
@@ -1159,6 +1169,7 @@ export const send_message = action({
           role: "snoopa",
           content: out_message,
           type: "chat",
+          seen: true,
         });
         return { response: out_message };
       }
@@ -1215,6 +1226,7 @@ export const send_message = action({
           role: "snoopa",
           content: gate_message,
           type: "chat",
+          seen: true,
         });
         return { response: gate_message };
       }
@@ -1267,6 +1279,7 @@ export const send_message = action({
         watchlist_id: args.watchlist_id,
         role: "snoopa",
         content: error_message,
+        seen: true,
       });
       throw new Error("All AI models failed or timed out.");
     }
@@ -1277,6 +1290,7 @@ export const send_message = action({
       role: "snoopa",
       content: response_text,
       type: intent.toLowerCase() as "watchlist" | "search" | "chat" | "source",
+      seen: true,
     });
 
     if (capturedSources.length > 0) {

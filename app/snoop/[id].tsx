@@ -562,9 +562,17 @@ export default function SnoopDetailsScreen() {
       setIsScreenFocused(true);
       return () => {
         setIsScreenFocused(false);
+        if (id) {
+          if (hasUnseenLogsRef.current) {
+            markLogsSeen({ watchlist_id: id as Id<"watchlist"> }).catch(() => {});
+          }
+          if (hasUnseenChatsRef.current) {
+            markChatsSeen({ watchlist_id: id as Id<"watchlist"> }).catch(() => {});
+          }
+        }
         armStopAdsPromptOnSnoopExit();
       };
-    }, []),
+    }, [id]),
   );
 
   // Merge logs + chat into a unified timeline with seen flags
@@ -669,23 +677,49 @@ export default function SnoopDetailsScreen() {
     return timeline.findIndex((item) => item.id === initialUnseenId);
   }, [initialUnseenId, timeline]);
 
-  // Mark logs & chats as seen in DB after user views them
+  const hasUnseenChats = useMemo(
+    () =>
+      chatMessages?.some((m) => m.role === "snoopa" && m.seen === false) ??
+      false,
+    [chatMessages],
+  );
+
+  const hasUnseenLogs = useMemo(
+    () => logs?.some((l) => l.seen === false) ?? false,
+    [logs],
+  );
+
+  const hasUnseenChatsRef = useRef(false);
+  const hasUnseenLogsRef = useRef(false);
+  hasUnseenChatsRef.current = hasUnseenChats;
+  hasUnseenLogsRef.current = hasUnseenLogs;
+
+  // Mark logs & chats as seen in DB whenever unseen items exist while screen is focused
   useEffect(() => {
     if (
-      initialUnseenCaptured.current &&
-      initialUnseenId !== undefined &&
-      id &&
-      isScreenFocused &&
-      !hasMarkedSeen.current
+      !initialUnseenCaptured.current ||
+      initialUnseenId === undefined ||
+      !id ||
+      !isScreenFocused
     ) {
-      const timer = setTimeout(() => {
-        hasMarkedSeen.current = true;
-        markLogsSeen({ watchlist_id: id as Id<"watchlist"> }).catch(() => {});
-        markChatsSeen({ watchlist_id: id as Id<"watchlist"> }).catch(() => {});
-      }, 1000);
-      return () => clearTimeout(timer);
+      return;
     }
-  }, [initialUnseenId, id, isScreenFocused]);
+
+    if (!hasUnseenChats && !hasUnseenLogs && hasMarkedSeen.current) return;
+
+    const delay = hasMarkedSeen.current ? 150 : 800;
+    const timer = setTimeout(() => {
+      hasMarkedSeen.current = true;
+      if (hasUnseenLogs) {
+        markLogsSeen({ watchlist_id: id as Id<"watchlist"> }).catch(() => {});
+      }
+      if (hasUnseenChats) {
+        markChatsSeen({ watchlist_id: id as Id<"watchlist"> }).catch(() => {});
+      }
+    }, delay);
+
+    return () => clearTimeout(timer);
+  }, [initialUnseenId, id, isScreenFocused, hasUnseenChats, hasUnseenLogs]);
 
   const scrollToUnread = useCallback(
     (targetY: number) => {
@@ -862,6 +896,8 @@ export default function SnoopDetailsScreen() {
       return;
     }
 
+    setInitialUnseenId(null);
+    initialUnseenIdRef.current = null;
     setInput("");
     setSending(true);
     setLoadingStatus("...");
